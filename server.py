@@ -341,6 +341,11 @@ def execute_enrollment_job(job_id: str, simulate_first_choice_full: bool = False
                 "type": "enrolled_exercise",
                 "enabled": True,
             })
+
+            # Automatically close Google Chrome as requested once the enrollment order is fulfilled
+            time.sleep(1.2)
+            session_mgr.close_browser()
+            job["browser_closed"] = True
         else:
             job["status"] = "failed"
             job["completed_at"] = datetime.now().strftime("%H:%M:%S")
@@ -803,6 +808,11 @@ class CAUBotRequestHandler(SimpleHTTPRequestHandler):
             target_url = body.get("url")
             force_auto_login = bool(body.get("force_auto_login", True))
             res = session_mgr.launch_login_browser(target_url=target_url, force_auto_login=force_auto_login)
+            self._send_json(res)
+            return
+
+        if path == "/api/browser/close":
+            res = session_mgr.close_browser()
             self._send_json(res)
             return
 

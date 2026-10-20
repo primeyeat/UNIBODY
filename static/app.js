@@ -97,6 +97,15 @@ async function fetchInitialState() {
   renderTimetable();
   renderLogs(data.logs || []);
   updateBrowserBadge(data.browser_status);
+
+  // Mark existing completed jobs as already acknowledged so no old popup shows on initial load
+  if (data.jobs && Array.isArray(data.jobs)) {
+    data.jobs.forEach((j) => {
+      if (j.status === "completed" && j.job_id) {
+        sessionStorage.setItem(`notified_job_${j.job_id}`, "1");
+      }
+    });
+  }
 }
 
 function syncCredentialsUI(creds, isInitial = false) {
@@ -907,6 +916,23 @@ function bindUIEvents() {
     });
   });
 
+  // Enrollment success modal: "Im Wochenplan ansehen" button
+  const btnNotifShowSchedule = document.getElementById("btnNotifShowSchedule");
+  if (btnNotifShowSchedule) {
+    btnNotifShowSchedule.addEventListener("click", () => {
+      document.getElementById("modalEnrollmentSuccess").classList.add("hidden");
+      const schedCard = document.querySelector(".calendar-card");
+      if (schedCard) {
+        schedCard.scrollIntoView({ behavior: "smooth", block: "start" });
+        schedCard.style.boxShadow = "0 0 0 3px #10b981, 0 16px 40px rgba(16, 185, 129, 0.4)";
+        schedCard.style.transition = "box-shadow 0.3s ease";
+        setTimeout(() => {
+          schedCard.style.boxShadow = "";
+        }, 2400);
+      }
+    });
+  }
+
   // Add Manual Schedule Event
   document.getElementById("formAddEvent").addEventListener("submit", async (e) => {
     e.preventDefault();
@@ -1083,6 +1109,13 @@ async function pollTelemetry() {
         badge.textContent = `✓ ${latest.result_message}`;
         appState.schedule = data.schedule || appState.schedule;
         renderTimetable();
+
+        // Show enrollment success notification modal if not already notified
+        const notifKey = `notified_job_${latest.job_id}`;
+        if (!sessionStorage.getItem(notifKey)) {
+          sessionStorage.setItem(notifKey, "1");
+          showEnrollmentSuccessModal(latest);
+        }
       } else if (latest.status === "running" || latest.status === "armed") {
         badge.className = "status-pill";
         badge.textContent = `⚡ ${latest.result_message}`;
@@ -1090,6 +1123,116 @@ async function pollTelemetry() {
     }
   } catch (e) {
     // Ignore transient network errors
+  }
+}
+
+function showEnrollmentSuccessModal(job) {
+  if (!job) return;
+  const grp = job.enrolled_group || (job.priorities && job.priorities[0]) || {};
+  const host = job.platform_host || (job.course_url ? new URL(job.course_url).host : "lms.uni-kiel.de");
+
+  // Platform pill
+  const pillEl = document.getElementById("notifPlatformPill");
+  if (pillEl) {
+    if (host.includes("elearn")) {
+      pillEl.textContent = `⚡ Moodle / Elearn (${host})`;
+    } else {
+      pillEl.textContent = `🏛️ OpenOlat (${host})`;
+    }
+  }
+
+  // Course Title
+  const courseObj = (appState.catalog || []).find(
+    (c) => c.course_id.toLowerCase() === (job.course_id || "").toLowerCase()
+  ) || appState.currentCourse;
+  const titleEl = document.getElementById("notifCourseTitle");
+  if (titleEl) {
+    const fullTitle = job.course_title || (courseObj ? courseObj.title : job.course_id);
+    titleEl.textContent = fullTitle;
+  }
+
+  // Group Name & Rank
+  const groupEl = document.getElementById("notifGroupName");
+  if (groupEl) {
+    const rankBadge = job.rank_won ? ` · 🥇 Wunsch-Rang #${job.rank_won}` : "";
+    groupEl.textContent = `🎯 ${grp.name || "Übungsgruppe"}${rankBadge}`;
+  }
+
+  // Time & Day
+  const timeEl = document.getElementById("notifTime");
+  if (timeEl) {
+    if (grp.day_name && grp.start_time) {
+      timeEl.textContent = `${grp.day_name}, ${grp.start_time} – ${grp.end_time || ""} Uhr`;
+    } else {
+      timeEl.textContent = "Wöchentlicher Termin verbindlich gebucht";
+    }
+  }
+
+  // Room
+  const roomEl = document.getElementById("notifRoom");
+  if (roomEl) {
+    roomEl.textContent = grp.room || "Hörsaal / LMS";
+  }
+
+  // Platform Host
+  const platEl = document.getElementById("notifPlatform");
+  if (platEl) {
+    platEl.textContent = host;
+  }
+
+  // Confirmation Token
+  const tokenEl = document.getElementById("notifToken");
+  if (tokenEl) {
+    tokenEl.textContent = job.confirmation_token || `CONF-${(job.job_id || "OK").slice(-8).toUpperCase()}`;
+  }
+
+  // Display Modal
+  const modal = document.getElementById("modalEnrollmentSuccess");
+  if (modal) {
+    modal.classList.remove("hidden");
+  }
+
+  // Play celebratory synthesized two-tone audio chime
+  playSuccessChime();
+}
+
+function playSuccessChime() {
+  try {
+    const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+    if (!AudioContextClass) return;
+    const ctx = new AudioContextClass();
+    if (ctx.state === "suspended") {
+      ctx.resume();
+    }
+    const now = ctx.currentTime;
+
+    // Note 1: E5 (659.25 Hz)
+    const osc1 = ctx.createOscillator();
+    const gain1 = ctx.createGain();
+    osc1.type = "sine";
+    osc1.frequency.setValueAtTime(659.25, now);
+    gain1.gain.setValueAtTime(0, now);
+    gain1.gain.linearRampToValueAtTime(0.24, now + 0.04);
+    gain1.gain.exponentialRampToValueAtTime(0.001, now + 0.45);
+    osc1.connect(gain1);
+    gain1.connect(ctx.destination);
+    osc1.start(now);
+    osc1.stop(now + 0.45);
+
+    // Note 2: B5 (987.77 Hz) slightly delayed
+    const osc2 = ctx.createOscillator();
+    const gain2 = ctx.createGain();
+    osc2.type = "sine";
+    osc2.frequency.setValueAtTime(987.77, now + 0.16);
+    gain2.gain.setValueAtTime(0, now + 0.16);
+    gain2.gain.linearRampToValueAtTime(0.28, now + 0.20);
+    gain2.gain.exponentialRampToValueAtTime(0.001, now + 0.85);
+    osc2.connect(gain2);
+    gain2.connect(ctx.destination);
+    osc2.start(now + 0.16);
+    osc2.stop(now + 0.85);
+  } catch (e) {
+    console.debug("Web Audio chime could not play:", e);
   }
 }
 

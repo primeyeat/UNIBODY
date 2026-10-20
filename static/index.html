@@ -478,6 +478,62 @@
     </div>
   </div>
 
+  <!-- MODAL 5: ENROLLMENT SUCCESS NOTIFICATION POPUP -->
+  <div id="modalEnrollmentSuccess" class="modal-backdrop hidden">
+    <div class="modal modal-success-notification">
+      <div class="modal-header success-header">
+        <div class="success-header-badge">
+          <span class="confetti-icon">🎉</span>
+          <div>
+            <h3>Einschreibung erfolgreich abgeschlossen!</h3>
+            <p class="subtitle-modal">UNIBODY hat deinen Auftrag verbindlich ausgeführt</p>
+          </div>
+        </div>
+        <button class="btn-close" data-close="modalEnrollmentSuccess">&times;</button>
+      </div>
+      <div class="modal-body success-body">
+        <div class="success-card">
+          <div class="success-badge-pill" id="notifPlatformPill">🏛️ OpenOlat (lms.uni-kiel.de)</div>
+          <h4 class="success-course-title" id="notifCourseTitle">Kursname</h4>
+          <div class="success-group-name" id="notifGroupName">Übungsgruppe</div>
+
+          <div class="success-details-grid">
+            <div class="detail-item">
+              <span class="detail-label">📅 Wochentag &amp; Uhrzeit</span>
+              <span class="detail-val" id="notifTime">Mittwoch, 16:15 – 17:45 Uhr</span>
+            </div>
+            <div class="detail-item">
+              <span class="detail-label">📍 Hörsaal / Raum</span>
+              <span class="detail-val" id="notifRoom">HHP6 - R.EG.004</span>
+            </div>
+            <div class="detail-item">
+              <span class="detail-label">🌐 Ziel-Plattform</span>
+              <span class="detail-val" id="notifPlatform">lms.uni-kiel.de</span>
+            </div>
+            <div class="detail-item">
+              <span class="detail-label">🎟️ Bestätigungs-Token</span>
+              <span class="detail-val code-token" id="notifToken">OLAT-CONF-XXXXX</span>
+            </div>
+          </div>
+
+          <div class="chrome-closed-notice">
+            <span class="pulse-indicator"></span>
+            <div>
+              <strong>Google Chrome wurde automatisch beendet.</strong>
+              <p>Auftrag abgeschlossen – alle Browser-Tabs wurden geschlossen und Systemressourcen freigegeben.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-ghost" data-close="modalEnrollmentSuccess">Schließen</button>
+        <button type="button" class="btn btn-primary" id="btnNotifShowSchedule" data-close="modalEnrollmentSuccess">
+          📅 Im Wochenplan ansehen
+        </button>
+      </div>
+    </div>
+  </div>
+
   <script src="/app.js"></script>
 </body>
 </html>

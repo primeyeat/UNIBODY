@@ -1431,6 +1431,66 @@ setTimeout(runUnibodyAutoFill, 2200);
             self.add_log("ERROR", f"Fehler beim Starten von Chrome: {e}")
             return {"ok": False, "error": str(e)}
 
+    def close_browser(self) -> Dict[str, Any]:
+        """
+        Gracefully terminates the UNIBODY Google Chrome browser session once group enrollment is completed.
+        Sends CDP Browser.close, terminates the Chrome subprocess, and releases all debugging port resources.
+        """
+        self.add_log("INFO", "🛑 UNIBODY: Auftrag erledigt – Beende Google Chrome Browser...")
+
+        # 1. Send CDP Browser.close
+        tabs = self._get_cdp_tabs()
+        if tabs:
+            for t in tabs:
+                ws = t.get("webSocketDebuggerUrl")
+                if ws:
+                    try:
+                        self._cdp_send_command(ws, "Browser.close", {}, timeout=1.5)
+                        break
+                    except Exception:
+                        pass
+
+        time.sleep(0.6)
+
+        # 2. Terminate subprocess if tracked
+        if self.chrome_process:
+            try:
+                self.chrome_process.terminate()
+                self.chrome_process.wait(timeout=1.5)
+            except Exception:
+                try:
+                    self.chrome_process.kill()
+                except Exception:
+                    pass
+            self.chrome_process = None
+
+        # 3. Terminate any residual Chrome process on debug_port
+        try:
+            p_cmd = f"lsof -ti :{self.debug_port}"
+            pids = subprocess.check_output(p_cmd, shell=True, text=True, stderr=subprocess.DEVNULL).strip().splitlines()
+            for pid in pids:
+                if pid.strip().isdigit():
+                    try:
+                        os.kill(int(pid.strip()), 15)
+                    except Exception:
+                        pass
+        except Exception:
+            pass
+
+        now_str = datetime.now().strftime("%H:%M:%S")
+        self.session_state.update({
+            "browser_running": False,
+            "logged_in": False,
+            "openolat_logged_in": False,
+            "elearn_inf_logged_in": False,
+            "current_url": None,
+            "current_title": None,
+            "last_checked": now_str,
+            "user_hint": "Google Chrome nach erfolgreicher Einschreibung automatisch beendet.",
+        })
+        self.add_log("SUCCESS", "🛑 Google Chrome nach erfolgreicher Einschreibung automatisch beendet. Ressourcen freigegeben.")
+        return {"ok": True, "browser_running": False}
+
     def _get_cdp_tabs(self) -> Optional[List[Dict[str, Any]]]:
         try:
             req = urllib.request.Request(f"http://127.0.0.1:{self.debug_port}/json")

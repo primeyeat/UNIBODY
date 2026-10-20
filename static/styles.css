@@ -1690,3 +1690,292 @@ body.dark-mode .vault-toggles-row {
   border-color: rgba(100, 210, 255, 0.32);
 }
 
+/* ENROLLMENT SUCCESS POPUP NOTIFICATION (FRUTIGER AERO) */
+.modal-success-notification {
+  max-width: 540px;
+  animation: modalPopIn 0.28s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  border: 2px solid #ffffff;
+  outline: 2px solid rgba(34, 197, 94, 0.5);
+  box-shadow: 0 28px 70px rgba(16, 120, 60, 0.35), 0 0 35px rgba(52, 211, 153, 0.25), inset 0 1px 0 #ffffff;
+}
+
+@keyframes modalPopIn {
+  from {
+    transform: scale(0.88) translateY(12px);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1) translateY(0);
+    opacity: 1;
+  }
+}
+
+.modal-header.success-header {
+  background: linear-gradient(
+    180deg,
+    #ffffff 0%,
+    #e3fbe8 48%,
+    #c4f7ce 52%,
+    #d9fae0 100%
+  );
+  border-bottom: 1.5px solid rgba(34, 197, 94, 0.4);
+  padding: 16px 20px;
+}
+
+.success-header-badge {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.confetti-icon {
+  font-size: 2.2rem;
+  line-height: 1;
+  filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.15));
+  animation: confettiBounce 1.4s ease-in-out infinite alternate;
+}
+
+@keyframes confettiBounce {
+  0% { transform: translateY(0) rotate(0deg) scale(1); }
+  100% { transform: translateY(-4px) rotate(12deg) scale(1.08); }
+}
+
+.success-header h3 {
+  color: #0d5423;
+  font-size: 1.12rem;
+  font-weight: 800;
+  margin: 0;
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.9);
+}
+
+.subtitle-modal {
+  font-size: 0.77rem;
+  color: #1b6d34;
+  margin: 2px 0 0 0;
+  font-weight: 600;
+}
+
+.modal-body.success-body {
+  padding: 18px 20px;
+}
+
+.success-card {
+  background: linear-gradient(170deg, rgba(255, 255, 255, 0.85) 0%, rgba(240, 253, 244, 0.9) 100%);
+  border: 1.5px solid rgba(34, 197, 94, 0.35);
+  border-radius: var(--radius-md);
+  padding: 16px;
+  box-shadow: inset 0 1px 0 #ffffff, 0 4px 16px rgba(22, 101, 52, 0.08);
+}
+
+.success-badge-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.72rem;
+  font-weight: 800;
+  color: #065f46;
+  background: linear-gradient(180deg, #d1fae5 0%, #a7f3d0 100%);
+  border: 1px solid rgba(16, 185, 129, 0.45);
+  border-radius: 999px;
+  padding: 3px 10px;
+  margin-bottom: 8px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.8);
+}
+
+.success-course-title {
+  font-size: 1.18rem;
+  font-weight: 800;
+  color: #043259;
+  margin: 0 0 4px 0;
+  line-height: 1.25;
+}
+
+.success-group-name {
+  font-size: 0.95rem;
+  font-weight: 800;
+  color: #15803d;
+  margin-bottom: 14px;
+}
+
+.success-details-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin: 12px 0;
+}
+
+@media (max-width: 520px) {
+  .success-details-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.detail-item {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  background: rgba(255, 255, 255, 0.72);
+  border: 1px solid rgba(0, 132, 214, 0.22);
+  border-radius: 9px;
+  padding: 8px 11px;
+}
+
+.detail-label {
+  font-size: 0.69rem;
+  font-weight: 700;
+  color: #55728a;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+.detail-val {
+  font-size: 0.85rem;
+  font-weight: 800;
+  color: #062b47;
+  word-break: break-word;
+}
+
+.detail-val.code-token {
+  font-family: "Consolas", "SF Mono", Menlo, monospace;
+  font-size: 0.82rem;
+  background: rgba(16, 185, 129, 0.12);
+  color: #047857;
+  padding: 2px 6px;
+  border-radius: 6px;
+  border: 1px dashed rgba(16, 185, 129, 0.45);
+  letter-spacing: 0.5px;
+  user-select: all;
+}
+
+.chrome-closed-notice {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  margin-top: 14px;
+  padding: 10px 14px;
+  background: linear-gradient(180deg, rgba(238, 248, 255, 0.92) 0%, rgba(224, 242, 254, 0.85) 100%);
+  border: 1px solid rgba(56, 189, 248, 0.45);
+  border-radius: 10px;
+  box-shadow: inset 0 1px 0 #ffffff;
+}
+
+.chrome-closed-notice strong {
+  font-size: 0.82rem;
+  color: #0369a1;
+  display: block;
+  margin-bottom: 2px;
+}
+
+.chrome-closed-notice p {
+  font-size: 0.75rem;
+  color: #475569;
+  margin: 0;
+  line-height: 1.35;
+}
+
+.pulse-indicator {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #10b981;
+  box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7);
+  animation: pulseGreen 1.8s infinite;
+  margin-top: 4px;
+  flex-shrink: 0;
+}
+
+@keyframes pulseGreen {
+  0% {
+    transform: scale(0.95);
+    box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7);
+  }
+  70% {
+    transform: scale(1);
+    box-shadow: 0 0 0 8px rgba(16, 185, 129, 0);
+  }
+  100% {
+    transform: scale(0.95);
+    box-shadow: 0 0 0 0 rgba(16, 185, 129, 0);
+  }
+}
+
+/* Dark Mode Overrides for Success Modal */
+body.dark-mode .modal-success-notification {
+  border-color: rgba(52, 211, 153, 0.6);
+  outline-color: rgba(16, 185, 129, 0.4);
+  box-shadow: 0 28px 70px rgba(0, 0, 0, 0.75), 0 0 30px rgba(16, 185, 129, 0.3);
+}
+
+body.dark-mode .modal-header.success-header {
+  background: linear-gradient(
+    180deg,
+    #0d3822 0%,
+    #062916 50%,
+    #041d0f 51%,
+    #08331d 100%
+  );
+  border-bottom-color: rgba(52, 211, 153, 0.35);
+}
+
+body.dark-mode .success-header h3 {
+  color: #86efac;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.7);
+}
+
+body.dark-mode .subtitle-modal {
+  color: #a7f3d0;
+}
+
+body.dark-mode .success-card {
+  background: linear-gradient(170deg, rgba(8, 38, 28, 0.85) 0%, rgba(4, 24, 20, 0.9) 100%);
+  border-color: rgba(52, 211, 153, 0.3);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.1);
+}
+
+body.dark-mode .success-badge-pill {
+  background: linear-gradient(180deg, #064e3b 0%, #022c22 100%);
+  border-color: rgba(52, 211, 153, 0.4);
+  color: #a7f3d0;
+}
+
+body.dark-mode .success-course-title {
+  color: #f1f5f9;
+}
+
+body.dark-mode .success-group-name {
+  color: #4ade80;
+}
+
+body.dark-mode .detail-item {
+  background: rgba(15, 23, 42, 0.65);
+  border-color: rgba(56, 189, 248, 0.25);
+}
+
+body.dark-mode .detail-label {
+  color: #94a3b8;
+}
+
+body.dark-mode .detail-val {
+  color: #e2e8f0;
+}
+
+body.dark-mode .detail-val.code-token {
+  background: rgba(16, 185, 129, 0.2);
+  color: #6ee7b7;
+  border-color: rgba(52, 211, 153, 0.4);
+}
+
+body.dark-mode .chrome-closed-notice {
+  background: linear-gradient(180deg, rgba(8, 28, 48, 0.85) 0%, rgba(4, 18, 34, 0.9) 100%);
+  border-color: rgba(56, 189, 248, 0.35);
+}
+
+body.dark-mode .chrome-closed-notice strong {
+  color: #7dd3fc;
+}
+
+body.dark-mode .chrome-closed-notice p {
+  color: #cbd5e1;
+}
+
+
