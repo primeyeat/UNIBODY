@@ -9,8 +9,7 @@ public struct DynamicCampusIslandView: View {
     @State private var mapDisplayMode: MapDisplayMode = .campusPlan
     @State private var isExpanded: Bool = true
     @State private var pulseAnimation: Bool = false
-    @State private var isPressingPill: Bool = false
-    @State private var isPressingCardHeader: Bool = false
+    @State private var isPressingCameraNotch: Bool = false
     
     public enum MapDisplayMode: String, CaseIterable, Identifiable {
         case campusPlan = "Campus-Plan"
@@ -37,40 +36,45 @@ public struct DynamicCampusIslandView: View {
     }
     
     public var body: some View {
-        ZStack(alignment: .top) {
-            // MUTUALLY EXCLUSIVE STATES:
-            // 1. When Expanded: ONLY the expanded campus navigator card is shown!
-            // 2. When Minimized: ONLY the small Dynamic Island hardware pill is shown!
-            if isExpanded {
-                // Dimming backdrop
-                Color.black.opacity(0.45)
-                    .ignoresSafeArea()
-                    .onTapGesture {
-                        minimizeToIsland()
-                    }
-                    .transition(.opacity)
+        GeometryReader { geo in
+            ZStack(alignment: .top) {
+                // Dimming backdrop when island is expanded
+                if isExpanded {
+                    Color.black.opacity(0.45)
+                        .ignoresSafeArea()
+                        .onTapGesture {
+                            minimizeToIsland()
+                        }
+                        .transition(.opacity)
+                }
                 
-                expandedIslandCard
-                    .padding(.top, 52) // Safely below status bar & Dynamic Island - NO cut-off borders!
-                    .padding(.horizontal, 12)
-                    .transition(.asymmetric(
-                        insertion: .scale(scale: 0.88, anchor: .top).combined(with: .opacity).combined(with: .move(edge: .top)),
-                        removal: .scale(scale: 0.88, anchor: .top).combined(with: .opacity).combined(with: .move(edge: .top))
-                    ))
-            } else {
-                // Compact Dynamic Island Pill sitting in the top hardware notch
-                compactIslandHardwarePill
-                    .padding(.top, 11) // Exact physical position of iPhone 14 Pro / 15 / 16 Dynamic Island
-                    .transition(.asymmetric(
-                        insertion: .scale(scale: 0.92, anchor: .top).combined(with: .opacity),
-                        removal: .scale(scale: 0.92, anchor: .top).combined(with: .opacity)
-                    ))
+                // NATIVE DYNAMIC ISLAND INTEGRATION:
+                // Anchored directly at the physical iPhone TrueDepth camera notch (y = 11pt, height = 37pt).
+                // Minimized: Compact pill hugging the camera sensor cutout.
+                // Expanded: Card morphs directly from the camera notch downwards.
+                if isExpanded {
+                    expandedIslandCard(in: geo)
+                        .padding(.top, 11) // Begins directly at the camera notch level
+                        .padding(.horizontal, 14) // Safe inside physical display corner curvature
+                        .transition(.asymmetric(
+                            insertion: .scale(scale: 0.88, anchor: .top).combined(with: .opacity),
+                            removal: .scale(scale: 0.88, anchor: .top).combined(with: .opacity)
+                        ))
+                } else {
+                    compactIslandHardwareNotch(in: geo)
+                        .padding(.top, 11) // Exactly where the camera cutout is located in the notch!
+                        .transition(.asymmetric(
+                            insertion: .scale(scale: 0.90, anchor: .top).combined(with: .opacity),
+                            removal: .scale(scale: 0.90, anchor: .top).combined(with: .opacity)
+                        ))
+                }
             }
-        }
-        .animation(.spring(response: 0.36, dampingFraction: 0.78), value: isExpanded)
-        .animation(.spring(response: 0.30, dampingFraction: 0.82), value: mapDisplayMode)
-        .onAppear {
-            pulseAnimation = true
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+            .animation(.spring(response: 0.36, dampingFraction: 0.78), value: isExpanded)
+            .animation(.spring(response: 0.30, dampingFraction: 0.82), value: mapDisplayMode)
+            .onAppear {
+                pulseAnimation = true
+            }
         }
     }
     
@@ -92,42 +96,39 @@ public struct DynamicCampusIslandView: View {
         }
     }
     
-    // MARK: - 1. Compact Dynamic Island Hardware Pill (Shown ONLY when Minimized)
-    private var compactIslandHardwarePill: some View {
-        HStack(spacing: 8) {
-            // Leading sensor flank (Building icon + Room)
+    // MARK: - 1. Compact Notch Island (Physically wraps around the TrueDepth camera cutout)
+    private func compactIslandHardwareNotch(in geo: GeometryProxy) -> some View {
+        HStack(spacing: 0) {
+            // Leading flank: Left of camera sensor
             HStack(spacing: 5) {
                 Image(systemName: resolvedRoom.building.iconName)
                     .font(.system(size: 13, weight: .bold))
                     .foregroundColor(AeroTheme.emerald)
-                Text("\(resolvedRoom.building.code) · \(resolvedRoom.roomName)")
-                    .font(.system(size: 12, weight: .bold, design: .rounded))
+                Text(resolvedRoom.building.code)
+                    .font(.system(size: 13, weight: .black, design: .rounded))
                     .foregroundColor(.white)
-                    .lineLimit(1)
             }
+            .padding(.leading, 14)
             
-            Spacer(minLength: 8)
+            // Center space: Where the physical camera hardware cutout sits
+            Spacer(minLength: 80)
             
-            // Trailing sensor flank (Pulsing radar dot + walking time)
-            HStack(spacing: 5) {
+            // Trailing flank: Right of camera sensor
+            HStack(spacing: 6) {
+                Text("\(resolvedRoom.building.walkingMinutes) Min")
+                    .font(.system(size: 12, weight: .bold, design: .rounded))
+                    .foregroundColor(AeroTheme.skyBlue)
+                
                 Circle()
                     .fill(AeroTheme.emerald)
                     .frame(width: 7, height: 7)
                     .scaleEffect(pulseAnimation ? 1.3 : 0.85)
                     .opacity(pulseAnimation ? 1.0 : 0.6)
                     .animation(.easeInOut(duration: 0.9).repeatForever(autoreverses: true), value: pulseAnimation)
-                
-                Text("\(resolvedRoom.building.walkingMinutes) Min")
-                    .font(.system(size: 12, weight: .bold, design: .rounded))
-                    .foregroundColor(AeroTheme.skyBlue)
-                
-                Image(systemName: "chevron.down.circle.fill")
-                    .font(.system(size: 12, weight: .bold))
-                    .foregroundColor(.white.opacity(0.8))
             }
+            .padding(.trailing, 14)
         }
-        .padding(.horizontal, 14)
-        .frame(width: 254, height: 37) // Exact hardware Dynamic Island footprint
+        .frame(width: 236, height: 37) // Standard compact Dynamic Island hardware footprint
         .background(
             Capsule()
                 .fill(Color.black)
@@ -136,24 +137,24 @@ public struct DynamicCampusIslandView: View {
                         .strokeBorder(
                             LinearGradient(
                                 colors: [
-                                    AeroTheme.skyBlue.opacity(0.7),
-                                    AeroTheme.emerald.opacity(0.6),
-                                    Color.white.opacity(0.2)
+                                    AeroTheme.skyBlue.opacity(0.6),
+                                    AeroTheme.emerald.opacity(0.5),
+                                    Color.white.opacity(0.15)
                                 ],
                                 startPoint: .leading,
                                 endPoint: .trailing
                             ),
-                            lineWidth: 1.2
+                            lineWidth: 1.0
                         )
                 )
                 .shadow(color: Color.black.opacity(0.85), radius: 10, y: 4)
         )
-        .scaleEffect(isPressingPill ? 0.93 : 1.0)
-        .animation(.easeInOut(duration: 0.15), value: isPressingPill)
-        .contentShape(Capsule())
-        // User requested: Long press on Dynamic Island expands the map
+        .scaleEffect(isPressingCameraNotch ? 0.94 : 1.0)
+        .animation(.easeInOut(duration: 0.15), value: isPressingCameraNotch)
+        .contentShape(Rectangle())
+        // Long-press directly on the camera notch location expands the island
         .highPriorityGesture(
-            LongPressGesture(minimumDuration: 0.25)
+            LongPressGesture(minimumDuration: 0.22)
                 .onEnded { _ in
                     expandFromIsland()
                 }
@@ -165,66 +166,103 @@ public struct DynamicCampusIslandView: View {
         )
     }
     
-    // MARK: - 2. Expanded Campus Navigator Card (Shown ONLY when Expanded)
-    private var expandedIslandCard: some View {
-        VStack(spacing: 12) {
-            // Interactive Dynamic Island Header Anchor Bar (Long-Press to minimize)
-            HStack(spacing: 7) {
-                Circle()
-                    .fill(AeroTheme.emerald)
-                    .frame(width: 6, height: 6)
-                Text("DYNAMIC ISLAND · GEDRÜCKT HALTEN ZUM MINIMIEREN")
-                    .font(.system(size: 9, weight: .black, design: .rounded))
-                    .foregroundColor(.white.opacity(0.90))
-                Image(systemName: "chevron.up.circle.fill")
-                    .font(.system(size: 11, weight: .bold))
-                    .foregroundColor(AeroTheme.skyBlue)
-            }
-            .padding(.horizontal, 14)
-            .padding(.vertical, 6)
-            .background(
-                Capsule()
-                    .fill(Color.black.opacity(0.75))
-                    .overlay(
+    // MARK: - 2. Expanded Island Card (Expands seamlessly downwards from the camera notch)
+    private func expandedIslandCard(in geo: GeometryProxy) -> some View {
+        VStack(spacing: 11) {
+            // ============================================
+            // TOP CAMERA NOTCH ROW (Physically sitting right at the camera cutout)
+            // ============================================
+            HStack(spacing: 0) {
+                // Leading flank: Left of camera
+                HStack(spacing: 5) {
+                    Circle()
+                        .fill(AeroTheme.emerald)
+                        .frame(width: 7, height: 7)
+                    Text("CAMPUS-RADAR")
+                        .font(.system(size: 9.5, weight: .black, design: .rounded))
+                        .foregroundColor(AeroTheme.emerald)
+                    Text("·")
+                        .foregroundColor(.secondary)
+                    Text(resolvedRoom.building.code)
+                        .font(.system(size: 9.5, weight: .bold))
+                        .foregroundColor(.white.opacity(0.85))
+                }
+                .padding(.leading, 16)
+                
+                Spacer(minLength: 16)
+                
+                // Center Camera Notch Touch Zone (where camera is physically located!)
+                // User can long-press or tap right here on the camera location to minimize!
+                ZStack {
                     Capsule()
-                        .strokeBorder(AeroTheme.skyBlue.opacity(0.4), lineWidth: 1)
-                    )
-            )
-            .scaleEffect(isPressingCardHeader ? 0.93 : 1.0)
-            .animation(.easeInOut(duration: 0.15), value: isPressingCardHeader)
-            .contentShape(Capsule())
+                        .fill(Color.white.opacity(0.06))
+                        .frame(width: 90, height: 26)
+                        .overlay(
+                            Capsule()
+                                .strokeBorder(Color.white.opacity(0.12), lineWidth: 0.8)
+                        )
+                    
+                    HStack(spacing: 4) {
+                        Image(systemName: "chevron.up")
+                            .font(.system(size: 9, weight: .heavy))
+                            .foregroundColor(.white.opacity(0.65))
+                    }
+                }
+                .contentShape(Rectangle())
+                .scaleEffect(isPressingCameraNotch ? 0.92 : 1.0)
+                .animation(.easeInOut(duration: 0.15), value: isPressingCameraNotch)
+                .highPriorityGesture(
+                    LongPressGesture(minimumDuration: 0.22)
+                        .onEnded { _ in
+                            minimizeToIsland()
+                        }
+                )
+                .simultaneousGesture(
+                    TapGesture().onEnded {
+                        minimizeToIsland()
+                    }
+                )
+                
+                Spacer(minLength: 16)
+                
+                // Trailing flank: Right of camera (Minimize & Close buttons)
+                HStack(spacing: 8) {
+                    Button {
+                        minimizeToIsland()
+                    } label: {
+                        Image(systemName: "chevron.up.circle.fill")
+                            .font(.system(size: 17))
+                            .foregroundColor(.white.opacity(0.75))
+                    }
+                    
+                    Button {
+                        #if canImport(UIKit)
+                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                        #endif
+                        onClose()
+                    } label: {
+                        Image(systemName: "xmark.circle.fill")
+                            .font(.system(size: 17))
+                            .foregroundColor(.white.opacity(0.75))
+                    }
+                }
+                .padding(.trailing, 16)
+            }
+            .frame(height: 37) // Exact height matching the camera notch
+            .padding(.top, 4)
+            // Entire top notch row supports long press on the camera location to minimize
             .highPriorityGesture(
-                LongPressGesture(minimumDuration: 0.25)
+                LongPressGesture(minimumDuration: 0.22)
                     .onEnded { _ in
                         minimizeToIsland()
                     }
             )
-            .simultaneousGesture(
-                TapGesture().onEnded {
-                    minimizeToIsland()
-                }
-            )
-            .padding(.top, 10)
             
-            // Header Info Bar
+            // ============================================
+            // EVENT & LOCATION HEADER
+            // ============================================
             HStack(alignment: .top) {
                 VStack(alignment: .leading, spacing: 3) {
-                    HStack(spacing: 6) {
-                        Circle()
-                            .fill(AeroTheme.emerald)
-                            .frame(width: 8, height: 8)
-                        Text("LIVE-CAMPUS-RADAR")
-                            .font(.system(size: 10, weight: .black, design: .rounded))
-                            .foregroundColor(AeroTheme.emerald)
-                        
-                        Text("·")
-                            .foregroundColor(.secondary)
-                        
-                        Text(resolvedRoom.building.area)
-                            .font(.system(size: 10, weight: .bold))
-                            .foregroundColor(.white.opacity(0.8))
-                    }
-                    
                     Text(event.title)
                         .font(.system(.headline, design: .rounded).weight(.bold))
                         .foregroundColor(.white)
@@ -240,37 +278,21 @@ public struct DynamicCampusIslandView: View {
                 
                 Spacer()
                 
-                // Minimize & Close Buttons
-                HStack(spacing: 8) {
-                    Button {
-                        minimizeToIsland()
-                    } label: {
-                        Image(systemName: "chevron.up.circle.fill")
-                            .font(.title3)
-                            .foregroundColor(.white.opacity(0.75))
-                    }
+                VStack(alignment: .trailing, spacing: 2) {
+                    Text(resolvedRoom.building.area)
+                        .font(.system(size: 9.5, weight: .bold))
+                        .foregroundColor(.white.opacity(0.75))
                     
-                    Button {
-                        #if canImport(UIKit)
-                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                        #endif
-                        onClose()
-                    } label: {
-                        Image(systemName: "xmark.circle.fill")
-                            .font(.title3)
-                            .foregroundColor(.white.opacity(0.75))
-                    }
+                    Text("ca. \(resolvedRoom.walkingDistanceMeters) m")
+                        .font(.system(size: 9, weight: .semibold))
+                        .foregroundColor(AeroTheme.skyBlue)
                 }
             }
             .padding(.horizontal, 16)
-            .highPriorityGesture(
-                LongPressGesture(minimumDuration: 0.3)
-                    .onEnded { _ in
-                        minimizeToIsland()
-                    }
-            )
             
-            // Map Mode Segmented Switcher
+            // ============================================
+            // 3-WAY MAP SELECTOR
+            // ============================================
             HStack(spacing: 4) {
                 ForEach(MapDisplayMode.allCases) { mode in
                     Button {
@@ -298,7 +320,9 @@ public struct DynamicCampusIslandView: View {
             }
             .padding(.horizontal, 16)
             
-            // Big Detailed Map Canvas
+            // ============================================
+            // MAP CANVAS
+            // ============================================
             ZStack {
                 switch mapDisplayMode {
                 case .campusPlan:
@@ -309,7 +333,7 @@ public struct DynamicCampusIslandView: View {
                     FloorBlueprintView(resolvedRoom: resolvedRoom)
                 }
             }
-            .frame(height: 230)
+            .frame(height: 220)
             .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
             .overlay(
                 RoundedRectangle(cornerRadius: 18, style: .continuous)
@@ -317,7 +341,9 @@ public struct DynamicCampusIslandView: View {
             )
             .padding(.horizontal, 16)
             
-            // Navigation Tip Banner
+            // ============================================
+            // NAVIGATION TIP BANNER
+            // ============================================
             HStack(alignment: .top, spacing: 10) {
                 Image(systemName: "figure.walk.motion")
                     .font(.title3)
@@ -330,7 +356,7 @@ public struct DynamicCampusIslandView: View {
                             .font(.system(.caption, design: .rounded).weight(.bold))
                             .foregroundColor(AeroTheme.emerald)
                         Spacer()
-                        Text("ca. \(resolvedRoom.walkingDistanceMeters) m · \(resolvedRoom.building.walkingMinutes) Min.")
+                        Text("\(resolvedRoom.building.walkingMinutes) Min. Gehzeit")
                             .font(.caption2.weight(.bold))
                             .foregroundColor(.white.opacity(0.9))
                     }
@@ -341,11 +367,13 @@ public struct DynamicCampusIslandView: View {
                         .fixedSize(horizontal: false, vertical: true)
                 }
             }
-            .padding(12)
+            .padding(11)
             .background(RoundedRectangle(cornerRadius: 12).fill(Color.white.opacity(0.06)))
             .padding(.horizontal, 16)
             
-            // Action Buttons
+            // ============================================
+            // ACTION BUTTONS
+            // ============================================
             HStack(spacing: 12) {
                 Button {
                     let destName = "Christian-Albrechts-Universität \(resolvedRoom.building.address)"
@@ -386,7 +414,7 @@ public struct DynamicCampusIslandView: View {
         }
         .background(
             ZStack {
-                Color.black.opacity(0.96)
+                Color.black.opacity(0.97)
                 LinearGradient(
                     colors: [
                         Color(red: 0.02, green: 0.08, blue: 0.16).opacity(0.95),
@@ -397,10 +425,10 @@ public struct DynamicCampusIslandView: View {
                 )
             }
             .clipShape(
-                RoundedRectangle(cornerRadius: 24, style: .continuous)
+                RoundedRectangle(cornerRadius: 38, style: .continuous)
             )
             .overlay(
-                RoundedRectangle(cornerRadius: 24, style: .continuous)
+                RoundedRectangle(cornerRadius: 38, style: .continuous)
                     .strokeBorder(
                         LinearGradient(
                             colors: [
@@ -414,7 +442,7 @@ public struct DynamicCampusIslandView: View {
                         lineWidth: 1.2
                     )
             )
-            .shadow(color: Color.black.opacity(0.75), radius: 24, y: 12)
+            .shadow(color: Color.black.opacity(0.85), radius: 24, y: 12)
         )
         .gesture(
             DragGesture(minimumDistance: 25)
