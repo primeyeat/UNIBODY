@@ -32,31 +32,6 @@ public class AppState: ObservableObject {
     @Published public var showClaireEasterEgg: Bool = false
     private var themeToggleTimestamps: [Date] = []
     
-    // Dynamic Island Campus Map & Room Navigator
-    @Published public var activeNavEvent: ScheduleEvent? = nil
-    @Published public var isDynamicIslandActive: Bool = true
-    
-    public func navigateToCampusRoom(for event: ScheduleEvent) {
-        self.activeNavEvent = event
-        self.isDynamicIslandActive = true
-        #if canImport(UIKit)
-        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-        #endif
-    }
-    
-    public func closeCampusNavigation() {
-        self.activeNavEvent = nil
-        self.isDynamicIslandActive = false
-    }
-    
-    public var nextUpcomingEvent: ScheduleEvent? {
-        let calendar = Calendar.current
-        let weekday = calendar.component(.weekday, from: Date())
-        let dayIdx = max(0, min(4, weekday - 2))
-        let eventsToday = schedule.filter { $0.day == dayIdx && $0.enabled }.sorted { $0.startMinutes < $1.startMinutes }
-        return eventsToday.first ?? schedule.first(where: { $0.enabled && !$0.room.isEmpty })
-    }
-    
     public func toggleDarkMode() {
         isDarkMode.toggle()
         #if canImport(UIKit)

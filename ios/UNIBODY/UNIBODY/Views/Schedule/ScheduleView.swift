@@ -90,18 +90,6 @@ public struct ScheduleView: View {
                     HStack(spacing: 12) {
                         Button {
                             withAnimation {
-                                if let ev = appState.activeNavEvent ?? appState.nextUpcomingEvent {
-                                    appState.navigateToCampusRoom(for: ev)
-                                }
-                            }
-                        } label: {
-                            Image(systemName: "map.circle.fill")
-                                .font(.title3)
-                                .foregroundColor(AeroTheme.emerald)
-                        }
-                        
-                        Button {
-                            withAnimation {
                                 appState.toggleDarkMode()
                             }
                         } label: {

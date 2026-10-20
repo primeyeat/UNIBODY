@@ -6,41 +6,26 @@ public struct ContentView: View {
     public init() {}
     
     public var body: some View {
-        ZStack(alignment: .top) {
-            TabView {
-                ScheduleView()
-                    .tabItem {
-                        Label("Wochenplan", systemImage: "calendar")
-                    }
-                
-                CoursesView()
-                    .tabItem {
-                        Label("Module", systemImage: "books.vertical.fill")
-                    }
-                
-                SniperDashboardView()
-                    .tabItem {
-                        Label("Sniper", systemImage: "cross.circle.fill")
-                    }
-                
-                SettingsLoginView()
-                    .tabItem {
-                        Label("Login & Tresor", systemImage: "key.fill")
-                    }
-            }
-            
-            // Native Dynamic Island Hardware Campus Map & Room Navigator
-            if let event = appState.activeNavEvent ?? (appState.isDynamicIslandActive ? appState.nextUpcomingEvent : nil) {
-                DynamicCampusIslandView(event: event) {
-                    appState.closeCampusNavigation()
+        TabView {
+            ScheduleView()
+                .tabItem {
+                    Label("Wochenplan", systemImage: "calendar")
                 }
-                .ignoresSafeArea(.container, edges: .top)
-                .zIndex(999)
-                .transition(.asymmetric(
-                    insertion: .scale(scale: 0.9, anchor: .top).combined(with: .opacity),
-                    removal: .scale(scale: 0.9, anchor: .top).combined(with: .opacity)
-                ))
-            }
+            
+            CoursesView()
+                .tabItem {
+                    Label("Module", systemImage: "books.vertical.fill")
+                }
+            
+            SniperDashboardView()
+                .tabItem {
+                    Label("Sniper", systemImage: "cross.circle.fill")
+                }
+            
+            SettingsLoginView()
+                .tabItem {
+                    Label("Login & Tresor", systemImage: "key.fill")
+                }
         }
         .environmentObject(appState)
         .tint(AeroTheme.skyBlue)

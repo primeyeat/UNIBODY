@@ -82,22 +82,13 @@ public struct ScheduleEventCard: View {
                 }
                 
                 if !event.room.isEmpty {
-                    Button {
-                        appState.navigateToCampusRoom(for: event)
-                    } label: {
-                        HStack(spacing: 4) {
-                            Image(systemName: "mappin.and.ellipse")
-                                .font(.caption2)
-                            Text(event.room)
-                                .font(.caption.weight(.semibold))
-                                .lineLimit(1)
-                            Image(systemName: "location.north.circle.fill")
-                                .font(.system(size: 9))
-                                .foregroundColor(AeroTheme.emerald)
-                        }
-                        .foregroundColor(AeroTheme.skyBlue)
+                    HStack(spacing: 4) {
+                        Image(systemName: "mappin.and.ellipse")
+                            .font(.caption2)
+                        Text(event.room)
+                            .font(.caption.weight(.medium))
+                            .lineLimit(1)
                     }
-                    .buttonStyle(.plain)
                 }
             }
             .foregroundColor(.secondary)
@@ -122,17 +113,6 @@ public struct ScheduleEventCard: View {
         )
         .opacity(event.enabled ? 1.0 : 0.6)
         .contextMenu {
-            // 0. Dynamic Island Campus Map
-            if !event.room.isEmpty {
-                Button {
-                    appState.navigateToCampusRoom(for: event)
-                } label: {
-                    Label("Campus-Karte & Dynamic Island", systemImage: "map.circle.fill")
-                }
-                
-                Divider()
-            }
-            
             // 1. Status umschalten
             Button(action: onToggle) {
                 if event.enabled {
