@@ -10,7 +10,7 @@ import time
 import threading
 from datetime import datetime
 from typing import Dict, List, Any, Optional
-from http.server import HTTPServer, SimpleHTTPRequestHandler
+from http.server import HTTPServer, ThreadingHTTPServer, SimpleHTTPRequestHandler
 from urllib.parse import urlparse, parse_qs
 
 from optimizer import (
@@ -342,10 +342,6 @@ def execute_enrollment_job(job_id: str, simulate_first_choice_full: bool = False
                 "enabled": True,
             })
 
-            # Automatically close Google Chrome as requested once the enrollment order is fulfilled
-            time.sleep(1.2)
-            session_mgr.close_browser()
-            job["browser_closed"] = True
         else:
             job["status"] = "failed"
             job["completed_at"] = datetime.now().strftime("%H:%M:%S")
@@ -353,8 +349,18 @@ def execute_enrollment_job(job_id: str, simulate_first_choice_full: bool = False
 
         save_state(APP_STATE)
 
+    # Automatically close Google Chrome as requested once the enrollment order is fulfilled (outside of lock)
+    if live_res.get("ok"):
+        time.sleep(1.0)
+        session_mgr.close_browser()
+        with STATE_LOCK:
+            job["browser_closed"] = True
+            save_state(APP_STATE)
+
 
 class CAUBotRequestHandler(SimpleHTTPRequestHandler):
+    timeout = 10
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, directory=STATIC_DIR, **kwargs)
 
@@ -884,9 +890,19 @@ class CAUBotRequestHandler(SimpleHTTPRequestHandler):
 
 
 def run_server(port: int = 8765):
-    server = HTTPServer(("127.0.0.1", port), CAUBotRequestHandler)
-    print(f"CAU Kiel LMS Sniper & Schedule Optimizer running on http://127.0.0.1:{port}")
-    server.serve_forever()
+    try:
+        # Bind to 0.0.0.0 to support 127.0.0.1, localhost, and all local interfaces
+        server = ThreadingHTTPServer(("0.0.0.0", port), CAUBotRequestHandler)
+    except Exception:
+        server = ThreadingHTTPServer(("127.0.0.1", port), CAUBotRequestHandler)
+    server.daemon_threads = True
+    print(f"CAU Kiel LMS Sniper & Schedule Optimizer running on http://127.0.0.1:{port} and http://localhost:{port}")
+    try:
+        server.serve_forever()
+    except KeyboardInterrupt:
+        pass
+    finally:
+        server.server_close()
 
 
 if __name__ == "__main__":
