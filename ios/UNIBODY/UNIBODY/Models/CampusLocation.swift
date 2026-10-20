@@ -57,15 +57,43 @@ public enum CampusLocationEngine {
     public static let cap3 = CampusBuilding(
         id: "CAP3",
         code: "CAP 3",
-        name: "Hörsaalgebäude & Audimax",
+        name: "Hörsaalgebäude CAP 3",
         address: "Christian-Albrechts-Platz 3, 24118 Kiel",
         coordinate: CLLocationCoordinate2D(latitude: 54.338464, longitude: 10.121958),
         area: "Campus Mitte (Hauptcampus)",
         busStops: ["Universitätsbibliothek (81, 60S, 61, 62)", "Mensa I (Westring)"],
         walkingMinutes: 2,
-        description: "Zentrales Hörsaalgebäude der CAU mit Hörsaal 1 (Audimax), Hörsaal 2, Hörsaal 3 und Klaus-Murmann-Hörsaal.",
-        entranceTip: "Haupteingang direkt am Christian-Albrechts-Platz gegenüber Mensa I. Hörsäle liegen im Erdgeschoss.",
+        description: "Zentrales Hörsaalgebäude der CAU mit Hörsaal 1, Hörsaal 2, Hörsaal 3 und Klaus-Murmann-Hörsaal.",
+        entranceTip: "Haupteingang direkt am Christian-Albrechts-Platz. Hörsaal 2 liegt im Erdgeschoss.",
         iconName: "building.columns.fill"
+    )
+    
+    public static let cap2 = CampusBuilding(
+        id: "CAP2",
+        code: "CAP 2",
+        name: "Audimax (Auditorium Maximum)",
+        address: "Christian-Albrechts-Platz 2, 24118 Kiel",
+        coordinate: CLLocationCoordinate2D(latitude: 54.338236, longitude: 10.123757),
+        area: "Campus Mitte (Hauptcampus)",
+        busStops: ["Mensa I (Westring)", "Universitätsbibliothek"],
+        walkingMinutes: 2,
+        description: "Großes Hauptauditorium der CAU mit Frederik-Paulsen-Hörsaal und Hörsälen A bis K.",
+        entranceTip: "Haupteingang über die Freitreppe am Christian-Albrechts-Platz / Westring ins Audimax-Foyer.",
+        iconName: "building.columns.fill"
+    )
+    
+    public static let mensa1 = CampusBuilding(
+        id: "Mensa1",
+        code: "Mensa I",
+        name: "Mensa I & AStA",
+        address: "Westring 385, 24118 Kiel",
+        coordinate: CLLocationCoordinate2D(latitude: 54.337469, longitude: 10.122759),
+        area: "Campus Mitte",
+        busStops: ["Mensa I (Westring)"],
+        walkingMinutes: 1,
+        description: "Zentrale Universitätsmensa mit Cafeteria, Kaffeebar und AStA-Büros.",
+        entranceTip: "Eingang über den Westring oder direkt von der Platzebene Christian-Albrechts-Platz.",
+        iconName: "fork.knife"
     )
     
     public static let lms8 = CampusBuilding(
@@ -115,12 +143,12 @@ public enum CampusLocationEngine {
         code: "OS 40 / OH 14",
         name: "Chemiezentrum & Geozentrum",
         address: "Olshausenstraße 40, 24118 Kiel",
-        coordinate: CLLocationCoordinate2D(latitude: 54.339059, longitude: 10.124858),
-        area: "Campus Ost",
-        busStops: ["Universitätsbibliothek / Olshausenstraße"],
-        walkingMinutes: 3,
-        description: "Chemie-Hörsäle und Praktikumsräume mit großem Flachtrakt.",
-        entranceTip: "Eingang über Olshausenstraße, Hörsäle im Erdgeschoss.",
+        coordinate: CLLocationCoordinate2D(latitude: 54.339409, longitude: 10.121270),
+        area: "Campus Nordwest (Chemie)",
+        busStops: ["Universitätsbibliothek / Olshausenstraße", "Botanischer Garten"],
+        walkingMinutes: 4,
+        description: "Chemie-Hörsäle und Praktikumslabore mit großem Flachtrakt.",
+        entranceTip: "Eingang über Olshausenstraße 40, Hörsäle im Erdgeschoss.",
         iconName: "atom"
     )
     
@@ -132,7 +160,7 @@ public enum CampusLocationEngine {
         coordinate: CLLocationCoordinate2D(latitude: 54.339718, longitude: 10.123655),
         area: "Campus Nord (WiSo-Hochhaus)",
         busStops: ["Wilhelm-Seelig-Platz", "Universitätsbibliothek"],
-        walkingMinutes: 4,
+        walkingMinutes: 3,
         description: "Hochhaus am Wilhelm-Seelig-Platz mit Hörsälen und Institutsräumen.",
         entranceTip: "Haupteingang Wilhelm-Seelig-Platz, Fahrstühle zu den Obergeschossen.",
         iconName: "chart.bar.fill"
@@ -152,7 +180,7 @@ public enum CampusLocationEngine {
         iconName: "video.fill"
     )
     
-    public static let allBuildings = [cap3, lms8, lms2, hhp6, oh14, wsp7]
+    public static let allBuildings = [cap3, cap2, mensa1, lms8, lms2, hhp6, oh14, wsp7]
     
     // Resolve any room string
     public static func resolve(room: String) -> ResolvedCampusRoom {
@@ -173,9 +201,27 @@ public enum CampusLocationEngine {
             )
         }
         
-        // 2. CAP 3 / Audimax
-        if lower.contains("cap3") || lower.contains("cap 3") || lower.contains("audimax") || lower.contains("cap2") || lower.contains("christian-albrechts-platz") {
-            let rName = extractRoomName(from: raw, fallback: "Hörsaal 1")
+        // 2. Audimax CAU (CAP 2)
+        if lower.contains("audimax") || lower.contains("cap2") || lower.contains("cap 2") || lower.contains("paulsen") {
+            let rName = extractRoomName(from: raw, fallback: "Frederik-Paulsen-Hörsaal")
+            return ResolvedCampusRoom(
+                rawRoomString: raw,
+                building: cap2,
+                roomName: rName,
+                floor: "Erdgeschoss (EG)",
+                isOnline: false,
+                floorRooms: [
+                    FloorRoom(name: "Frederik-Paulsen-Hörsaal (Audimax)", code: "AUDIMAX", isTarget: true, xFraction: 0.15, yFraction: 0.28, widthFraction: 0.70, heightFraction: 0.48, details: "Großes Auditorium Maximum · 1250 Plätze"),
+                    FloorRoom(name: "Audimax Foyer & Treppe", code: "FOYER", isTarget: false, xFraction: 0.15, yFraction: 0.78, widthFraction: 0.70, heightFraction: 0.16, details: "Zugang Christian-Albrechts-Platz / Westring")
+                ],
+                walkingDistanceMeters: 180,
+                navigationTip: "Am Christian-Albrechts-Platz über die Freitreppe ins Audimax-Foyer."
+            )
+        }
+        
+        // 3. CAP 3 (Hörsaalgebäude mit Hörsaal 1, 2, 3)
+        if lower.contains("cap3") || lower.contains("cap 3") || lower.contains("christian-albrechts-platz") {
+            let rName = extractRoomName(from: raw, fallback: "Hörsaal 2")
             let floor = lower.contains("og") ? "1. Obergeschoss (1. OG)" : "Erdgeschoss (EG)"
             return ResolvedCampusRoom(
                 rawRoomString: raw,
@@ -184,13 +230,13 @@ public enum CampusLocationEngine {
                 floor: floor,
                 isOnline: false,
                 floorRooms: [
-                    FloorRoom(name: "Hörsaal 1", code: "H1", isTarget: lower.contains("1") || (!lower.contains("2") && !lower.contains("3")), xFraction: 0.18, yFraction: 0.35, widthFraction: 0.32, heightFraction: 0.45, details: "Großer Hörsaal · 450 Plätze"),
-                    FloorRoom(name: "Hörsaal 2", code: "H2", isTarget: lower.contains("2"), xFraction: 0.54, yFraction: 0.35, widthFraction: 0.28, heightFraction: 0.35, details: "Hörsaal 2 · 280 Plätze"),
-                    FloorRoom(name: "Hörsaal 3", code: "H3", isTarget: lower.contains("3"), xFraction: 0.54, yFraction: 0.72, widthFraction: 0.28, heightFraction: 0.22, details: "Hörsaal 3 · 120 Plätze"),
-                    FloorRoom(name: "Foyer / Haupteingang", code: "EINGANG", isTarget: false, xFraction: 0.18, yFraction: 0.82, widthFraction: 0.32, heightFraction: 0.14, details: "Zugang Christian-Albrechts-Platz"),
+                    FloorRoom(name: "Hörsaal 1", code: "H1", isTarget: lower.contains("hörsaal 1") || lower.contains("hs 1") || (lower.contains("1") && !lower.contains("10")), xFraction: 0.12, yFraction: 0.22, widthFraction: 0.38, heightFraction: 0.52, details: "Großer Hörsaal 1 · 400 Plätze"),
+                    FloorRoom(name: "Hörsaal 2", code: "H2", isTarget: lower.contains("2") || (!lower.contains("1") && !lower.contains("3")), xFraction: 0.54, yFraction: 0.22, widthFraction: 0.36, heightFraction: 0.30, details: "Hörsaal 2 · 280 Plätze"),
+                    FloorRoom(name: "Hörsaal 3", code: "H3", isTarget: lower.contains("3"), xFraction: 0.54, yFraction: 0.56, widthFraction: 0.36, heightFraction: 0.20, details: "Hörsaal 3 · 120 Plätze"),
+                    FloorRoom(name: "CAP 3 Foyer / Eingang", code: "EINGANG", isTarget: false, xFraction: 0.12, yFraction: 0.78, widthFraction: 0.78, heightFraction: 0.16, details: "Zugang Christian-Albrechts-Platz"),
                 ],
                 walkingDistanceMeters: 210,
-                navigationTip: "Am Christian-Albrechts-Platz geradeaus ins Audimax-Foyer. Der Hörsaal liegt direkt im Erdgeschoss."
+                navigationTip: "Am Christian-Albrechts-Platz geradeaus ins CAP 3 Foyer. Der Hörsaal liegt direkt im Erdgeschoss."
             )
         }
         
