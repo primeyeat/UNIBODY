@@ -1769,6 +1769,71 @@ setTimeout(runUnibodyAutoFill, 2200);
                 raw_findings.append({"platform": "lms.uni-kiel.de", "group": g_name, "course": c_name, "desc": desc_text[:200]})
                 match_course_and_group(c_name, g_name, desc_text, bg_url)
 
+            # Live-Scrape real-time exercise capacities from active OpenOlat courses
+            for ckey, raw_c in all_courses.items():
+                c = enrich_course_with_unibody(raw_c)
+                repo_id = str(c.get("olat_repo_id") or "")
+                if repo_id.isdigit() and len(repo_id) > 6:
+                    course_url = f"https://lms.uni-kiel.de/auth/RepositoryEntry/{repo_id}"
+                    self.add_log("INFO", f"🏛️ UNIBODY Live-Sync: Lese Echtzeit-Belegung für '{c['course_id']}' ({repo_id})...")
+                    self._cdp_send_command(ws_olat, "Page.navigate", {"url": course_url})
+                    time.sleep(1.4)
+
+                    click_tree_js = """
+                    (() => {
+                        const span = Array.from(document.querySelectorAll("span.o_tree_item")).find(s => /(?:einschreib|anmeld)/i.test((s.innerText || '').trim()));
+                        if (span && span.closest("a")) { span.closest("a").click(); return true; }
+                        return false;
+                    })()
+                    """
+                    self._cdp_send_command(ws_olat, "Runtime.evaluate", {"expression": click_tree_js, "returnByValue": True})
+                    time.sleep(1.8)
+
+                    scrape_table_js = """
+                    (() => {
+                        const table = document.querySelector('table.o_table, table.table');
+                        if (!table) return [];
+                        return Array.from(table.querySelectorAll('tbody tr')).map(tr => {
+                            const tds = Array.from(tr.querySelectorAll('td')).map(td => (td.innerText || '').replace(/\\s+/g, ' ').trim());
+                            return {
+                                name: tds[0] || '',
+                                desc: tds[1] || '',
+                                capacity: tds[2] || '',
+                                status: tds[3] || ''
+                            };
+                        });
+                    })()
+                    """
+                    res_cap = self._cdp_send_command(ws_olat, "Runtime.evaluate", {"expression": scrape_table_js, "returnByValue": True})
+                    cap_rows = res_cap.get("result", {}).get("result", {}).get("value") if isinstance(res_cap, dict) else None
+                    if isinstance(cap_rows, list) and cap_rows:
+                        matched_count = 0
+                        for r in cap_rows:
+                            m_cap = re.search(r"(\d+)\s*/\s*(\d+)", r.get("capacity", ""))
+                            if m_cap:
+                                taken = int(m_cap.group(1))
+                                total = int(m_cap.group(2))
+                                free = max(0, total - taken)
+                                is_full = (free <= 0) or ("voll" in (r.get("status") or "").lower())
+                                for grp in raw_c.get("groups", []):
+                                    slot = parse_german_timeslot(f"{r['name']} {r['desc']}")
+                                    m_gnum = re.search(r"(?:gruppe|gr\.?|übung)\s*0*(\d+)", r['name'].lower())
+                                    matched = False
+                                    if slot and grp.get("day") == slot["day"] and grp.get("start_time") == slot["start_time"]:
+                                        matched = True
+                                    elif m_gnum:
+                                        g_num = m_gnum.group(1)
+                                        if re.search(rf"\b0*{g_num}\b", grp.get("name", "").lower()):
+                                            matched = True
+                                    if matched:
+                                        grp["spots_free"] = free
+                                        grp["spots_total"] = total
+                                        grp["is_full"] = is_full
+                                        grp["waitlist_available"] = False if is_full else grp.get("waitlist_available", True)
+                                        matched_count += 1
+                        if matched_count > 0:
+                            self.add_log("INFO", f"📊 OpenOlat: {matched_count} Übungsgruppen von '{c['course_id']}' mit Echtzeit-Kapazitäten synchronisiert.")
+
             # Navigate back to GroupsSite overview so user sees a clean table
             if olat_groups:
                 self._cdp_send_command(ws_olat, "Page.navigate", {"url": "https://lms.uni-kiel.de/url/GroupsSite/0"})
