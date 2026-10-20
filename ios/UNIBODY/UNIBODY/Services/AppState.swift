@@ -369,64 +369,81 @@ public class AppState: ObservableObject {
         #endif
     }
     
-    /// Real-time live enrollment on the university platform (OpenOlat / Moodle) via CDP bot
+    /// Real-time live enrollment directly on the iPhone using native on-device WebKit automation
+    @MainActor
     public func enrollInGroupAsync(courseId: String, groupId: String, force: Bool = false) async -> (success: Bool, message: String) {
-        let server = serverURL
-        guard let host = await SyncService.shared.discoverActiveServer(preferredURL: server) else {
-            if force {
-                await MainActor.run {
-                    enrollInGroup(courseId: courseId, groupId: groupId)
-                }
-                return (true, "Gruppe direkt im Wochenplan gebucht (Offline-Modus).")
-            }
-            return (false, "UNIBODY Mac-Server nicht erreichbar. Bitte stelle sicher, dass UNIBODY auf deinem Rechner läuft.")
+        guard let course = courses.first(where: { $0.courseId.lowercased() == courseId.lowercased() || $0.courseId == courseId }),
+              let group = course.groups.first(where: { $0.groupId == groupId }) else {
+            return (false, "Kurs oder Gruppe nicht im Katalog gefunden.")
         }
         
-        let result = await SyncService.shared.postEnroll(serverURL: host, courseId: courseId, groupId: groupId, force: force)
-        if result.success {
-            await MainActor.run {
-                enrollInGroup(courseId: courseId, groupId: groupId)
-                #if canImport(UIKit)
-                UINotificationFeedbackGenerator().notificationOccurred(.success)
-                #endif
-            }
-        } else if force {
-            await MainActor.run {
-                enrollInGroup(courseId: courseId, groupId: groupId)
-            }
-            return (true, "Gruppe manuell im Wochenplan gebucht.")
+        // 1. Force mode: immediately enroll locally in timetable
+        if force {
+            enrollInGroup(courseId: course.courseId, groupId: groupId)
+            return (true, "Gruppe direkt im Wochenplan gebucht (Offline-Modus).")
         }
-        return (result.success, result.message)
+        
+        // 2. Credentials check
+        let user = username.trimmingCharacters(in: .whitespacesAndNewlines)
+        let pass = password
+        
+        // 3. Execute native on-device mobile enrollment directly on the iPhone!
+        let result = await LMSMobileEngine.shared.enroll(
+            course: course,
+            group: group,
+            username: user,
+            password: pass
+        )
+        
+        if result.success {
+            enrollInGroup(courseId: course.courseId, groupId: groupId)
+            #if canImport(UIKit)
+            UINotificationFeedbackGenerator().notificationOccurred(.success)
+            #endif
+            return (true, result.message)
+        } else {
+            #if canImport(UIKit)
+            UINotificationFeedbackGenerator().notificationOccurred(.warning)
+            #endif
+            return (false, result.message)
+        }
     }
     
-    /// Strictly verified async unenrollment: only removes from local state and triggers UI success if verified on the university LMS.
+    /// Strictly verified async unenrollment directly on the iPhone using native on-device WebKit automation
+    @MainActor
     public func clearEnrollmentAsync(courseId: String, force: Bool = false) async -> (success: Bool, message: String) {
-        let server = serverURL
-        guard let host = await SyncService.shared.discoverActiveServer(preferredURL: server) else {
-            return (false, "UNIBODY Mac-Server nicht erreichbar. Bitte stelle sicher, dass UNIBODY auf deinem Rechner läuft.")
+        guard let course = courses.first(where: { $0.courseId.lowercased() == courseId.lowercased() || $0.courseId == courseId }) else {
+            clearEnrollment(courseId: courseId)
+            return (true, "Aus Wochenplan entfernt.")
         }
         
-        let result = await SyncService.shared.postUnenroll(serverURL: host, courseId: courseId, force: force)
-        if result.success {
-            await MainActor.run {
-                let cidKey = courseId.lowercased()
-                enrolledGroups.removeValue(forKey: courseId)
-                enrolledGroups.removeValue(forKey: cidKey)
-                schedule.removeAll {
-                    ($0.courseId?.lowercased() == cidKey || $0.id.lowercased().contains(cidKey)) &&
-                    $0.type == "enrolled_exercise"
-                }
-                for i in 0..<courses.count {
-                    if courses[i].courseId.lowercased() == cidKey {
-                        courses[i].enrolledGroupId = nil
-                    }
-                }
-                #if canImport(UIKit)
-                UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-                #endif
-            }
+        if force {
+            clearEnrollment(courseId: course.courseId)
+            return (true, "Erfolgreich aus dem Wochenplan entfernt.")
         }
-        return result
+        
+        let user = username.trimmingCharacters(in: .whitespacesAndNewlines)
+        let pass = password
+        
+        let enrolledGid = enrolledGroups[course.courseId] ?? enrolledGroups[course.courseId.lowercased()]
+        let grp = course.groups.first(where: { $0.groupId == enrolledGid })
+        
+        let result = await LMSMobileEngine.shared.unenroll(
+            course: course,
+            group: grp,
+            username: user,
+            password: pass
+        )
+        
+        if result.success {
+            clearEnrollment(courseId: course.courseId)
+            #if canImport(UIKit)
+            UINotificationFeedbackGenerator().notificationOccurred(.success)
+            #endif
+            return (true, result.message)
+        } else {
+            return (false, result.message)
+        }
     }
     
     public func clearEnrollment(courseId: String) {

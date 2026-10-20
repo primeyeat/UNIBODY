@@ -259,7 +259,7 @@ public struct CourseDetailView: View {
                 }
             }
         } message: {
-            Text(unenrollErrorMessage.isEmpty ? "Die Austragung konnte auf dem LMS nicht verifiziert werden. Google Chrome bleibt geöffnet." : "\(unenrollErrorMessage)\n\nGoogle Chrome bleibt zur manuellen Überprüfung geöffnet.")
+            Text(unenrollErrorMessage.isEmpty ? "Die Austragung konnte auf dem Portal nicht abgeschlossen werden. Bitte überprüfe deine Verbindung." : unenrollErrorMessage)
         }
         .sheet(isPresented: $showUnenrollSheet) {
             if let info = unenrolledInfo {
@@ -284,7 +284,7 @@ public struct CourseDetailView: View {
                 }
             }
         } message: {
-            Text(enrollErrorMessage.isEmpty ? "Die Einschreibung konnte auf dem LMS nicht verifiziert werden. Google Chrome bleibt geöffnet." : "\(enrollErrorMessage)\n\nGoogle Chrome bleibt zur manuellen Überprüfung geöffnet.")
+            Text(enrollErrorMessage.isEmpty ? "Die Einschreibung konnte auf dem Portal nicht abgeschlossen werden. Bitte überprüfe deine Zugangsdaten in den Einstellungen." : enrollErrorMessage)
         }
         .sheet(isPresented: $showEnrollSheet) {
             if let info = enrolledInfo {
