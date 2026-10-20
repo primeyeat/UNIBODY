@@ -9,7 +9,7 @@ public struct DynamicCampusIslandView: View {
     @State private var mapDisplayMode: MapDisplayMode = .campusPlan
     @State private var isExpanded: Bool = true
     @State private var pulseAnimation: Bool = false
-    @State private var walkingPathPhase: CGFloat = 0.0
+    @State private var islandPressed: Bool = false
     
     public enum MapDisplayMode: String, CaseIterable, Identifiable {
         case campusPlan = "Campus-Plan"
@@ -36,96 +36,124 @@ public struct DynamicCampusIslandView: View {
     }
     
     public var body: some View {
-        VStack(spacing: 0) {
+        ZStack(alignment: .top) {
+            // Background dimming scrim when expanded
             if isExpanded {
-                expandedIslandView
-                    .transition(.asymmetric(
-                        insertion: .scale(scale: 0.88, anchor: .top).combined(with: .opacity),
-                        removal: .scale(scale: 0.88, anchor: .top).combined(with: .opacity)
-                    ))
-            } else {
-                compactIslandPill
-                    .transition(.asymmetric(
-                        insertion: .scale(scale: 0.92, anchor: .top).combined(with: .opacity),
-                        removal: .scale(scale: 0.92, anchor: .top).combined(with: .opacity)
-                    ))
+                Color.black.opacity(0.45)
+                    .ignoresSafeArea()
+                    .onTapGesture {
+                        toggleIslandExpansion()
+                    }
+                    .transition(.opacity)
             }
+            
+            VStack(spacing: 8) {
+                // 1. HARDWARE DYNAMIC ISLAND PILL (Fixed at top notch position)
+                dynamicIslandHardwarePill
+                    .zIndex(100)
+                
+                // 2. EXPANDED CAMPUS NAVIGATOR CARD (Hanging cleanly below notch)
+                if isExpanded {
+                    expandedIslandCard
+                        .transition(.asymmetric(
+                            insertion: .scale(scale: 0.88, anchor: .top).combined(with: .opacity).combined(with: .move(edge: .top)),
+                            removal: .scale(scale: 0.88, anchor: .top).combined(with: .opacity).combined(with: .move(edge: .top))
+                        ))
+                }
+            }
+            .padding(.top, 11) // Exact physical position of iPhone 14 Pro/15/16 Dynamic Island
+            .animation(.spring(response: 0.38, dampingFraction: 0.76), value: isExpanded)
+            .animation(.spring(response: 0.32, dampingFraction: 0.8), value: mapDisplayMode)
         }
-        .animation(.spring(response: 0.38, dampingFraction: 0.78), value: isExpanded)
-        .animation(.spring(response: 0.32, dampingFraction: 0.8), value: mapDisplayMode)
         .onAppear {
             pulseAnimation = true
-            withAnimation(.linear(duration: 1.5).repeatForever(autoreverses: false)) {
-                walkingPathPhase = 20
-            }
         }
     }
     
-    // MARK: - Compact Dynamic Island Hardware Notch Pill
-    private var compactIslandPill: some View {
-        Button {
-            #if canImport(UIKit)
-            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-            #endif
-            withAnimation(.spring(response: 0.38, dampingFraction: 0.78)) {
-                isExpanded = true
-            }
-        } label: {
-            HStack(spacing: 8) {
-                // Leading Sensor Flank (Building icon + Room)
-                HStack(spacing: 6) {
-                    Image(systemName: resolvedRoom.building.iconName)
-                        .font(.system(size: 13, weight: .bold))
-                        .foregroundColor(AeroTheme.emerald)
-                    Text("\(resolvedRoom.building.code) · \(resolvedRoom.roomName)")
-                        .font(.system(size: 12, weight: .bold, design: .rounded))
-                        .foregroundColor(.white)
-                        .lineLimit(1)
-                }
-                
-                Spacer(minLength: 12)
-                
-                // Trailing Sensor Flank (Radar dot + Walking minutes)
-                HStack(spacing: 6) {
-                    Circle()
-                        .fill(AeroTheme.emerald)
-                        .frame(width: 7, height: 7)
-                        .scaleEffect(pulseAnimation ? 1.3 : 0.85)
-                        .opacity(pulseAnimation ? 1.0 : 0.6)
-                        .animation(.easeInOut(duration: 0.9).repeatForever(autoreverses: true), value: pulseAnimation)
-                    
-                    Text("\(resolvedRoom.building.walkingMinutes) Min")
-                        .font(.system(size: 12, weight: .bold, design: .rounded))
-                        .foregroundColor(AeroTheme.skyBlue)
-                }
-            }
-            .padding(.horizontal, 16)
-            .frame(width: 254, height: 37) // Exact hardware Dynamic Island footprint
-            .background(
-                Capsule()
-                    .fill(Color.black)
-                    .overlay(
-                        Capsule()
-                            .strokeBorder(
-                                LinearGradient(
-                                    colors: [AeroTheme.skyBlue.opacity(0.4), AeroTheme.emerald.opacity(0.35), Color.clear],
-                                    startPoint: .leading,
-                                    endPoint: .trailing
-                                ),
-                                lineWidth: 1.0
-                            )
-                    )
-                    .shadow(color: Color.black.opacity(0.75), radius: 10, y: 3)
-            )
+    // Toggle expand/minimize with heavy haptic feedback as requested
+    private func toggleIslandExpansion() {
+        #if canImport(UIKit)
+        UIImpactFeedbackGenerator(style: .heavy).impactOccurred()
+        #endif
+        withAnimation(.spring(response: 0.38, dampingFraction: 0.76)) {
+            isExpanded.toggle()
         }
-        .buttonStyle(.plain)
-        .padding(.top, 11) // Exact physical Dynamic Island Y-position on iPhone 14 Pro/15/16!
     }
     
-    // MARK: - Expanded Detailed Dynamic Island Campus Navigator
-    private var expandedIslandView: some View {
+    // MARK: - Dynamic Island Hardware Pill (Responsive to Long Press & Tap)
+    private var dynamicIslandHardwarePill: some View {
+        HStack(spacing: 8) {
+            // Leading Island Sensor Flank
+            HStack(spacing: 5) {
+                Image(systemName: resolvedRoom.building.iconName)
+                    .font(.system(size: 13, weight: .bold))
+                    .foregroundColor(AeroTheme.emerald)
+                Text("\(resolvedRoom.building.code) · \(resolvedRoom.roomName)")
+                    .font(.system(size: 12, weight: .bold, design: .rounded))
+                    .foregroundColor(.white)
+                    .lineLimit(1)
+            }
+            
+            Spacer(minLength: 10)
+            
+            // Trailing Island Sensor Flank
+            HStack(spacing: 6) {
+                Circle()
+                    .fill(AeroTheme.emerald)
+                    .frame(width: 7, height: 7)
+                    .scaleEffect(pulseAnimation ? 1.3 : 0.85)
+                    .opacity(pulseAnimation ? 1.0 : 0.6)
+                    .animation(.easeInOut(duration: 0.9).repeatForever(autoreverses: true), value: pulseAnimation)
+                
+                Text("\(resolvedRoom.building.walkingMinutes) Min")
+                    .font(.system(size: 12, weight: .bold, design: .rounded))
+                    .foregroundColor(AeroTheme.skyBlue)
+                
+                Image(systemName: isExpanded ? "chevron.up.circle.fill" : "chevron.down.circle.fill")
+                    .font(.system(size: 13, weight: .bold))
+                    .foregroundColor(.white.opacity(0.8))
+            }
+        }
+        .padding(.horizontal, 14)
+        .frame(width: isExpanded ? 300 : 252, height: 37) // Dynamic Island Hardware Width
+        .background(
+            Capsule()
+                .fill(Color.black)
+                .overlay(
+                    Capsule()
+                        .strokeBorder(
+                            LinearGradient(
+                                colors: [
+                                    AeroTheme.skyBlue.opacity(0.7),
+                                    AeroTheme.emerald.opacity(0.6),
+                                    Color.white.opacity(0.2)
+                                ],
+                                startPoint: .leading,
+                                endPoint: .trailing
+                            ),
+                            lineWidth: 1.2
+                        )
+                )
+                .shadow(color: Color.black.opacity(0.85), radius: 10, y: 4)
+        )
+        .scaleEffect(islandPressed ? 0.96 : 1.0)
+        // User requested: Long press on Dynamic Island toggles expansion
+        .onLongPressGesture(minimumDuration: 0.25, pressing: { pressing in
+            withAnimation(.easeInOut(duration: 0.15)) {
+                islandPressed = pressing
+            }
+        }, perform: {
+            toggleIslandExpansion()
+        })
+        .onTapGesture {
+            toggleIslandExpansion()
+        }
+    }
+    
+    // MARK: - Expanded Detailed Campus Navigator Card
+    private var expandedIslandCard: some View {
         VStack(spacing: 12) {
-            // Header Bar - padded so text begins beneath the hardware island sensor cutout
+            // Header Bar
             HStack(alignment: .top) {
                 VStack(alignment: .leading, spacing: 3) {
                     HStack(spacing: 6) {
@@ -162,12 +190,7 @@ public struct DynamicCampusIslandView: View {
                 // Minimize & Close Buttons
                 HStack(spacing: 8) {
                     Button {
-                        #if canImport(UIKit)
-                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                        #endif
-                        withAnimation(.spring(response: 0.38, dampingFraction: 0.78)) {
-                            isExpanded = false
-                        }
+                        toggleIslandExpansion()
                     } label: {
                         Image(systemName: "chevron.up.circle.fill")
                             .font(.title3)
@@ -187,7 +210,7 @@ public struct DynamicCampusIslandView: View {
                 }
             }
             .padding(.horizontal, 16)
-            .padding(.top, 50) // Hardware cutout sits safely above the header text
+            .padding(.top, 14)
             
             // Map Mode Segmented Switcher
             HStack(spacing: 4) {
@@ -305,21 +328,28 @@ public struct DynamicCampusIslandView: View {
         }
         .background(
             ZStack {
-                Color.black // Pure pitch-black OLED background flush with Dynamic Island
+                Color.black.opacity(0.95)
                 LinearGradient(
-                    colors: [Color(red: 0.02, green: 0.08, blue: 0.16).opacity(0.85), Color.black.opacity(0.98)],
+                    colors: [
+                        Color(red: 0.02, green: 0.08, blue: 0.16).opacity(0.95),
+                        Color.black.opacity(0.98)
+                    ],
                     startPoint: .top,
                     endPoint: .bottom
                 )
             }
             .clipShape(
-                RoundedRectangle(cornerRadius: 38, style: .continuous)
+                RoundedRectangle(cornerRadius: 26, style: .continuous)
             )
             .overlay(
-                RoundedRectangle(cornerRadius: 38, style: .continuous)
+                RoundedRectangle(cornerRadius: 26, style: .continuous)
                     .strokeBorder(
                         LinearGradient(
-                            colors: [AeroTheme.skyBlue.opacity(0.55), AeroTheme.emerald.opacity(0.35), Color.white.opacity(0.1)],
+                            colors: [
+                                AeroTheme.skyBlue.opacity(0.6),
+                                AeroTheme.emerald.opacity(0.4),
+                                Color.white.opacity(0.15)
+                            ],
                             startPoint: .topLeading,
                             endPoint: .bottomTrailing
                         ),
@@ -328,18 +358,13 @@ public struct DynamicCampusIslandView: View {
             )
             .shadow(color: Color.black.opacity(0.75), radius: 24, y: 12)
         )
-        .padding(.horizontal, 8)
-        .padding(.top, 0) // Anchored directly flush into top of screen around Dynamic Island!
+        // Fully within display safe margins - NO cut-off borders!
+        .padding(.horizontal, 12)
         .gesture(
             DragGesture(minimumDistance: 20)
                 .onEnded { value in
                     if value.translation.height < -30 {
-                        #if canImport(UIKit)
-                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                        #endif
-                        withAnimation(.spring(response: 0.38, dampingFraction: 0.78)) {
-                            isExpanded = false
-                        }
+                        toggleIslandExpansion()
                     }
                 }
         )
@@ -362,98 +387,99 @@ private struct VectorCampusMapView: View {
                 // CAU Campus Green Grass backdrop
                 Color(red: 0.03, green: 0.10, blue: 0.15)
                 
-                // Pedestrian Plaza: Christian-Albrechts-Platz
+                // Pedestrian Plaza: Christian-Albrechts-Platz (Center South-East)
                 RoundedRectangle(cornerRadius: 12)
-                    .fill(Color(red: 0.07, green: 0.17, blue: 0.25).opacity(0.8))
-                    .frame(width: w * 0.44, height: h * 0.32)
-                    .position(x: w * 0.50, y: h * 0.66)
+                    .fill(Color(red: 0.07, green: 0.18, blue: 0.26).opacity(0.85))
+                    .frame(width: w * 0.44, height: h * 0.34)
+                    .position(x: w * 0.60, y: h * 0.72)
                 
                 Text("Christian-Albrechts-Platz")
                     .font(.system(size: 7.5, weight: .bold))
                     .foregroundColor(Color.white.opacity(0.35))
-                    .position(x: w * 0.50, y: h * 0.66)
+                    .position(x: w * 0.60, y: h * 0.72)
                 
-                // Campus Streets
+                // Streets of CAU Kiel (Accurate Orientation)
                 Path { path in
-                    // Olshausenstraße (Main campus avenue running SW to NE)
-                    path.move(to: CGPoint(x: 0, y: h * 0.44))
-                    path.addLine(to: CGPoint(x: w, y: h * 0.34))
+                    // Westring: Runs North-South on the East (Right) edge
+                    path.move(to: CGPoint(x: w * 0.84, y: h))
+                    path.addLine(to: CGPoint(x: w * 0.84, y: h * 0.35))
                     
-                    // Westring (Running N-S along East side past Mensa I)
-                    path.move(to: CGPoint(x: w * 0.88, y: h))
-                    path.addLine(to: CGPoint(x: w * 0.94, y: h * 0.34))
+                    // Olshausenstraße: Branches from Westring at Mensa I / CAP and runs diagonally Northwest
+                    path.move(to: CGPoint(x: w * 0.84, y: h * 0.74))
+                    path.addLine(to: CGPoint(x: w * 0.06, y: h * 0.26))
                     
-                    // Ludewig-Meyn-Straße (Branching West to Informatik LMS 8)
-                    path.move(to: CGPoint(x: w * 0.36, y: h * 0.42))
-                    path.addLine(to: CGPoint(x: 0, y: h * 0.48))
+                    // Ludewig-Meyn-Straße: Branches off Olshausenstraße towards LMS 8 (Southwest)
+                    path.move(to: CGPoint(x: w * 0.44, y: h * 0.42))
+                    path.addLine(to: CGPoint(x: w * 0.20, y: h * 0.68))
                 }
-                .stroke(Color.white.opacity(0.20), style: StrokeStyle(lineWidth: 16, lineCap: .round, lineJoin: .round))
+                .stroke(Color.white.opacity(0.20), style: StrokeStyle(lineWidth: 15, lineCap: .round, lineJoin: .round))
                 
                 // Central Dashed Street Markings
                 Path { path in
-                    path.move(to: CGPoint(x: 0, y: h * 0.44))
-                    path.addLine(to: CGPoint(x: w, y: h * 0.34))
-                    path.move(to: CGPoint(x: w * 0.88, y: h))
-                    path.addLine(to: CGPoint(x: w * 0.94, y: h * 0.34))
-                    path.move(to: CGPoint(x: w * 0.36, y: h * 0.42))
-                    path.addLine(to: CGPoint(x: 0, y: h * 0.48))
+                    path.move(to: CGPoint(x: w * 0.84, y: h))
+                    path.addLine(to: CGPoint(x: w * 0.84, y: h * 0.35))
+                    path.move(to: CGPoint(x: w * 0.84, y: h * 0.74))
+                    path.addLine(to: CGPoint(x: w * 0.06, y: h * 0.26))
+                    path.move(to: CGPoint(x: w * 0.44, y: h * 0.42))
+                    path.addLine(to: CGPoint(x: w * 0.20, y: h * 0.68))
                 }
-                .stroke(Color.white.opacity(0.32), style: StrokeStyle(lineWidth: 1.2, dash: [5, 5]))
+                .stroke(Color.white.opacity(0.35), style: StrokeStyle(lineWidth: 1.2, dash: [5, 5]))
                 
                 // Street Labels
-                Text("Olshausenstraße")
-                    .font(.system(size: 8.5, weight: .bold))
-                    .foregroundColor(Color.white.opacity(0.5))
-                    .rotationEffect(.degrees(-6))
-                    .position(x: w * 0.30, y: h * 0.41)
-                
                 Text("Westring")
                     .font(.system(size: 8, weight: .bold))
                     .foregroundColor(Color.white.opacity(0.45))
-                    .rotationEffect(.degrees(78))
-                    .position(x: w * 0.92, y: h * 0.70)
+                    .rotationEffect(.degrees(90))
+                    .position(x: w * 0.89, y: h * 0.58)
+                
+                Text("Olshausenstraße")
+                    .font(.system(size: 8.5, weight: .bold))
+                    .foregroundColor(Color.white.opacity(0.55))
+                    .rotationEffect(.degrees(-31))
+                    .position(x: w * 0.42, y: h * 0.35)
                 
                 Text("Ludewig-Meyn-Str.")
-                    .font(.system(size: 7.5, weight: .bold))
+                    .font(.system(size: 7, weight: .bold))
                     .foregroundColor(Color.white.opacity(0.45))
-                    .position(x: w * 0.16, y: h * 0.45)
+                    .rotationEffect(.degrees(45))
+                    .position(x: w * 0.32, y: h * 0.56)
                 
                 // ============================================
                 // REALISTIC CAU KIEL BUILDINGS & FOOTPRINTS
                 // ============================================
                 
-                // 1. Mensa I & UB (Westring 385, South of Christian-Albrechts-Platz)
+                // 1. Mensa I (Westring 385, South-East at Westring corner)
                 CampusBuildingBlock(
                     title: "Mensa I & UB",
                     code: "Mensa I",
                     isTarget: false,
-                    rect: CGRect(x: w * 0.60, y: h * 0.74, width: w * 0.24, height: h * 0.20)
+                    rect: CGRect(x: w * 0.66, y: h * 0.78, width: w * 0.22, height: h * 0.18)
                 )
                 
-                // 2. CAP 3 (Hörsaalgebäude / Hörsaal 1, 2, 3 - West side of CAP)
+                // 2. CAP 2 (Audimax CAU - East side of Christian-Albrechts-Platz)
+                CampusBuildingBlock(
+                    title: "Audimax CAU",
+                    code: "CAP 2",
+                    isTarget: false,
+                    rect: CGRect(x: w * 0.58, y: h * 0.58, width: w * 0.20, height: h * 0.18)
+                )
+                
+                // 3. CAP 3 (Hörsaalgebäude / Hörsaal 1, 2, 3 - West side of CAP)
                 let isCAP3 = targetBuilding.id == "CAP3"
                 CampusBuildingBlock(
                     title: "CAP 3 (Hörsäle)",
                     code: "CAP 3",
                     isTarget: isCAP3,
-                    rect: CGRect(x: w * 0.26, y: h * 0.52, width: w * 0.23, height: h * 0.24)
+                    rect: CGRect(x: w * 0.40, y: h * 0.58, width: w * 0.20, height: h * 0.20)
                 )
                 
-                // 3. CAP 2 (Audimax CAU Kiel - East side of CAP)
-                CampusBuildingBlock(
-                    title: "Audimax CAU",
-                    code: "CAP 2",
-                    isTarget: false,
-                    rect: CGRect(x: w * 0.53, y: h * 0.52, width: w * 0.22, height: h * 0.20)
-                )
-                
-                // 4. LMS 8 (Institut für Informatik & RZ, along Ludewig-Meyn-Straße West)
+                // 4. LMS 8 (Institut für Informatik & Geographie, Ludewig-Meyn-Str. Southwest)
                 let isLMS8 = targetBuilding.id == "LMS8"
                 CampusBuildingBlock(
                     title: "LMS 8 (Informatik)",
                     code: "LMS 8",
                     isTarget: isLMS8,
-                    rect: CGRect(x: w * 0.04, y: h * 0.54, width: w * 0.20, height: h * 0.24)
+                    rect: CGRect(x: w * 0.10, y: h * 0.52, width: w * 0.20, height: h * 0.22)
                 )
                 
                 // 5. WSP 7 (WiSo-Hochhaus, North of Olshausenstraße)
@@ -462,16 +488,16 @@ private struct VectorCampusMapView: View {
                     title: "WSP 7 (WiSo)",
                     code: "WSP 7",
                     isTarget: isWSP7,
-                    rect: CGRect(x: w * 0.34, y: h * 0.16, width: w * 0.20, height: h * 0.20)
+                    rect: CGRect(x: w * 0.30, y: h * 0.10, width: w * 0.18, height: h * 0.18)
                 )
                 
-                // 6. OS 40 / OH 14 (Chemiezentrum, North-East)
+                // 6. OS 40 / OH 14 (Chemiezentrum, North of Olshausenstraße)
                 let isOH14 = targetBuilding.id == "OH14"
                 CampusBuildingBlock(
                     title: "OS 40 (Chemie)",
                     code: "OS 40",
                     isTarget: isOH14,
-                    rect: CGRect(x: w * 0.58, y: h * 0.16, width: w * 0.20, height: h * 0.19)
+                    rect: CGRect(x: w * 0.52, y: h * 0.14, width: w * 0.18, height: h * 0.17)
                 )
                 
                 // 7. HHP 6 (Mathematik & Physik, Heinrich-Hecht-Platz North-East)
@@ -480,7 +506,7 @@ private struct VectorCampusMapView: View {
                     title: "HHP 6 (Mathe/Physik)",
                     code: "HHP 6",
                     isTarget: isHHP6,
-                    rect: CGRect(x: w * 0.72, y: h * 0.04, width: w * 0.24, height: h * 0.18)
+                    rect: CGRect(x: w * 0.72, y: h * 0.04, width: w * 0.22, height: h * 0.17)
                 )
                 
                 // Target Radar Pin on the selected building
@@ -545,17 +571,17 @@ private struct VectorCampusMapView: View {
     private func getBuildingPosition(building: CampusBuilding, in size: CGSize) -> CGPoint {
         switch building.id {
         case "CAP3":
-            return CGPoint(x: size.width * 0.37, y: size.height * 0.64)
+            return CGPoint(x: size.width * 0.50, y: size.height * 0.68)
         case "LMS8":
-            return CGPoint(x: size.width * 0.14, y: size.height * 0.66)
+            return CGPoint(x: size.width * 0.20, y: size.height * 0.63)
         case "HHP6":
-            return CGPoint(x: size.width * 0.84, y: size.height * 0.13)
+            return CGPoint(x: size.width * 0.83, y: size.height * 0.12)
         case "OH14":
-            return CGPoint(x: size.width * 0.68, y: size.height * 0.25)
+            return CGPoint(x: size.width * 0.61, y: size.height * 0.22)
         case "WSP7":
-            return CGPoint(x: size.width * 0.44, y: size.height * 0.26)
+            return CGPoint(x: size.width * 0.39, y: size.height * 0.19)
         default:
-            return CGPoint(x: size.width * 0.37, y: size.height * 0.64)
+            return CGPoint(x: size.width * 0.50, y: size.height * 0.68)
         }
     }
 }
