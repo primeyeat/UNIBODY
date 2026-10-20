@@ -1379,6 +1379,20 @@ body.dark-mode .chip {
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.2);
 }
 
+body.dark-mode .chip.active {
+  background: linear-gradient(
+    180deg,
+    #68e878 0%,
+    #25b83b 50%,
+    #149428 51%,
+    #35cf4c 100%
+  );
+  color: #ffffff;
+  text-shadow: 0 1px 2px rgba(0, 60, 15, 0.65);
+  border-color: #62f276;
+  box-shadow: 0 3px 10px rgba(37, 184, 59, 0.45), inset 0 1px 1px rgba(255, 255, 255, 0.85);
+}
+
 body.dark-mode .verification-banner.verified {
   background: linear-gradient(90deg, rgba(16, 120, 60, 0.45) 0%, rgba(10, 80, 90, 0.45) 100%);
   border-color: rgba(72, 240, 120, 0.6);
@@ -1409,6 +1423,25 @@ body.dark-mode .day-btn {
   color: #e6f7ff;
   border-color: rgba(100, 210, 255, 0.35);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.14);
+}
+
+body.dark-mode .day-btn:hover {
+  border-color: rgba(110, 235, 255, 0.75);
+  color: #ffffff;
+}
+
+body.dark-mode .day-btn.active {
+  background: linear-gradient(
+    180deg,
+    #78f088 0%,
+    #34cf4c 49%,
+    #1da834 51%,
+    #46df5e 100%
+  );
+  border-color: #62f276;
+  color: #ffffff;
+  text-shadow: 0 1px 2px rgba(0, 50, 10, 0.75);
+  box-shadow: 0 0 12px rgba(52, 207, 76, 0.55), inset 0 1px 1px rgba(255, 255, 255, 0.9);
 }
 
 body.dark-mode .sniper-action-bar {
