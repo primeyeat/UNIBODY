@@ -392,19 +392,29 @@ def evaluate_group_candidate(
 def rank_course_groups(
     groups: List[Dict[str, Any]],
     fixed_schedule: List[Dict[str, Any]],
-    preferences: Dict[str, Any]
+    preferences: Dict[str, Any],
+    pinned_group_id: Optional[str] = None,
 ) -> List[Dict[str, Any]]:
     """
     Evaluates all tutorial groups of a course and returns them sorted from best (Rank 1) to worst.
+    If pinned_group_id is provided (when the user clicks a group in the timetable or list),
+    that group is promoted to Rank #1 (Wunsch #1).
     """
     evaluated = [
         evaluate_group_candidate(g, fixed_schedule, preferences)
         for g in groups
     ]
 
-    # Sort: non-conflicts first, then non-full, then highest score
+    for item in evaluated:
+        is_pinned = bool(pinned_group_id and item.get("group_id") == pinned_group_id)
+        item["is_pinned"] = is_pinned
+        if is_pinned:
+            item["reasons"] = ["📌 Manuell als Wunsch #1 priorisiert (Kalender-/Listen-Auswahl)"] + item.get("reasons", [])
+
+    # Sort: pinned group first (if not a hard conflict), then non-conflicts, then non-full, then highest score
     evaluated.sort(
         key=lambda x: (
+            0 if (x.get("is_pinned") and not x["is_conflict"]) else 1,
             0 if not x["is_conflict"] else 1,
             0 if not x["is_full"] else 1,
             -x["score"]
@@ -420,3 +430,4 @@ def rank_course_groups(
             item["rank"] = None
 
     return evaluated
+

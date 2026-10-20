@@ -147,6 +147,29 @@ async function verifyAndRankCourse(queryId) {
 }
 
 /* RENDER RANKED EXERCISE GROUPS */
+async function pinGroupAsRank1(groupId) {
+  if (!appState.currentCourse) return;
+  const res = await apiPost("/api/course/pin-group", {
+    course_id: appState.currentCourse.course_id,
+    group_id: groupId,
+  });
+  if (res.ok) {
+    appState.rankedGroups = res.ranked_groups || [];
+    appState.pinnedGroupId = res.pinned_group_id || null;
+    renderRankedGroups();
+    renderTimetable();
+    // Smoothly highlight the newly promoted Rank #1 card in Step 3
+    const firstCard = document.querySelector("#rankedGroupsContainer .group-card.rank-1");
+    if (firstCard) {
+      firstCard.scrollIntoView({ behavior: "smooth", block: "nearest" });
+      firstCard.style.boxShadow = "0 0 0 3px #10b981, 0 8px 25px rgba(16, 185, 129, 0.4)";
+      setTimeout(() => {
+        firstCard.style.boxShadow = "";
+      }, 900);
+    }
+  }
+}
+
 function renderRankedGroups() {
   const container = document.getElementById("rankedGroupsContainer");
   container.innerHTML = "";
@@ -159,12 +182,24 @@ function renderRankedGroups() {
   appState.rankedGroups.forEach((g) => {
     const card = document.createElement("div");
     const isRank1 = g.rank === 1;
+    const isPinned = Boolean(g.is_pinned);
     card.className = `group-card ${isRank1 ? "rank-1" : ""} ${g.is_conflict ? "conflict" : ""}`;
+    card.title = g.is_conflict
+      ? "Zeitkonflikt mit deinem Stundenplan"
+      : isPinned
+      ? "Manuell als Wunsch #1 fixiert (Klicke erneut zum Aufheben)"
+      : "Klicke hier oder im Kalender, um diese Übungsgruppe als Wunsch #1 zu priorisieren!";
 
     const rankText = g.is_conflict ? "KONFLIKT" : `#${g.rank}`;
     const reasonsHtml = (g.reasons || [])
       .map((r) => `<span class="reason-pill">${r}</span>`)
       .join("");
+
+    const pinBadge = isPinned
+      ? `<span style="background:#10b981;color:#052e16;font-size:0.7rem;padding:2px 7px;border-radius:99px;margin-left:6px;font-weight:800;">📌 Manuell Priorisiert (Wunsch #1)</span>`
+      : isRank1
+      ? `<span style="color:#34d399;font-size:0.8rem;margin-left:4px;">🏆 (Bester Platz)</span>`
+      : `<span style="font-size:0.72rem;color:#94a3b8;margin-left:6px;opacity:0.85;">👆 Klick = als #1 priorisieren</span>`;
 
     card.innerHTML = `
       <div class="group-left">
@@ -172,9 +207,9 @@ function renderRankedGroups() {
           <span>${rankText}</span>
         </div>
         <div class="group-info">
-          <h4>${g.name} ${isRank1 ? "🏆 (Bester Platz)" : ""}</h4>
+          <h4>${g.name} ${pinBadge}</h4>
           <div class="group-meta">
-            🗓️ <strong>${g.day_name}, ${g.start_time} – ${g.end_time} Uhr</strong> · 📍 ${g.room || "CAU"} ${g.tutor ? `· 👤 Tutor/in: ${g.tutor}` : ""}
+            🗓️ <strong>${g.day_name}, ${g.start_time} – ${g.end_time} Uhr</strong> · 📍 ${g.room || "CAU"} ${g.tutor ? `· 👤 ${g.tutor}` : ""}
           </div>
           <div class="group-reasons">${reasonsHtml}</div>
         </div>
@@ -184,6 +219,12 @@ function renderRankedGroups() {
         <div class="spots-tag">${g.spots_free} / ${g.spots_total} Plätze frei</div>
       </div>
     `;
+
+    if (!g.is_conflict) {
+      card.addEventListener("click", () => {
+        pinGroupAsRank1(g.group_id);
+      });
+    }
 
     card.addEventListener("mouseenter", () => {
       appState.highlightedGroupId = g.group_id;
@@ -288,43 +329,83 @@ function renderTimetable() {
     dayCols[dayIdx].appendChild(el);
   });
 
-  // 2. Place Candidate Tutorial Overlays (Rank 1, hovered group, or conflicts)
+  // 2. Place Candidate Tutorial Overlays (All non-conflicting groups + hovered conflicts)
+  // Group overlapping candidate slots on the same day/time so side-by-side parallel groups can both be clicked!
+  const slotBuckets = {};
   appState.rankedGroups.forEach((g) => {
     const dayIdx = Number(g.day);
     if (dayIdx < 0 || dayIdx > 4) return;
-
     const isHovered = appState.highlightedGroupId === g.group_id;
-    const isRank1 = g.rank === 1;
-    const isRank2Or3 = g.rank === 2 || g.rank === 3;
+    if (g.is_conflict && !isHovered) return;
 
-    // Show Rank 1 always, Rank 2/3 subtly, or any group currently hovered
-    if (!isRank1 && !isRank2Or3 && !isHovered) return;
+    const key = `${dayIdx}-${g.start_time}-${g.end_time}`;
+    if (!slotBuckets[key]) slotBuckets[key] = [];
+    slotBuckets[key].push(g);
+  });
 
-    const startMins = timeToMinutes(g.start_time);
-    const endMins = timeToMinutes(g.end_time);
-    const topPx = ((startMins - START_HOUR * 60) / 60) * PX_PER_HOUR;
-    const heightPx = Math.max(26, ((endMins - startMins) / 60) * PX_PER_HOUR);
+  Object.values(slotBuckets).forEach((bucket) => {
+    bucket.forEach((g, idxInBucket) => {
+      const dayIdx = Number(g.day);
+      const isHovered = appState.highlightedGroupId === g.group_id;
+      const isRank1 = g.rank === 1;
 
-    const el = document.createElement("div");
-    let variant = "candidate-rank-alt";
-    if (g.is_conflict) variant = "candidate-conflict";
-    else if (isRank1) variant = "candidate-rank-1";
+      const startMins = timeToMinutes(g.start_time);
+      const endMins = timeToMinutes(g.end_time);
+      const topPx = ((startMins - START_HOUR * 60) / 60) * PX_PER_HOUR;
+      const heightPx = Math.max(28, ((endMins - startMins) / 60) * PX_PER_HOUR);
 
-    el.className = `tt-event candidate-overlay ${variant}`;
-    if (isHovered) {
-      el.style.transform = "scale(1.03)";
-      el.style.zIndex = "35";
-    }
-    el.style.top = `${topPx}px`;
-    el.style.height = `${heightPx}px`;
+      const el = document.createElement("div");
+      let variant = "candidate-rank-alt";
+      if (g.is_conflict) variant = "candidate-conflict";
+      else if (isRank1) variant = "candidate-rank-1";
 
-    const badge = g.is_conflict ? "❌ KONFLIKT" : `⭐ Wunsch #${g.rank} (${g.display_score}%)`;
-    el.innerHTML = `
-      <div class="tt-ev-title">${badge}: ${g.name}</div>
-      <div class="tt-ev-time">${g.start_time}–${g.end_time}</div>
-    `;
+      el.className = `tt-event candidate-overlay ${variant}`;
+      // If multiple groups of the same course share the exact same time slot, split width side-by-side
+      if (bucket.length > 1) {
+        const widthPct = 96 / bucket.length;
+        const leftPct = 2 + idxInBucket * widthPct;
+        el.style.left = `${leftPct}%`;
+        el.style.right = "auto";
+        el.style.width = `${widthPct - 1}%`;
+      }
 
-    dayCols[dayIdx].appendChild(el);
+      if (isHovered) {
+        el.style.transform = "scale(1.03)";
+        el.style.zIndex = "35";
+      }
+      el.style.top = `${topPx}px`;
+      el.style.height = `${heightPx}px`;
+      el.title = g.is_conflict
+        ? "Zeitkonflikt"
+        : isRank1
+        ? "Aktuell als Wunsch #1 ausgewählt! (Erneut klicken für Automatik)"
+        : `Klicke auf diesen Kasten, um '${g.name}' sofort als Wunsch #1 (Grün) für Schritt 3 auszuwählen!`;
+
+      const pinIcon = g.is_pinned ? "📌 " : "⭐ ";
+      const badge = g.is_conflict
+        ? "❌ KONFLIKT"
+        : `${pinIcon}Wunsch #${g.rank} (${g.display_score}%)`;
+      el.innerHTML = `
+        <div class="tt-ev-title">${badge}: ${g.name}</div>
+        <div class="tt-ev-time">${g.start_time}–${g.end_time} · 👆 Klick = Prio #1</div>
+      `;
+
+      if (!g.is_conflict) {
+        el.addEventListener("click", (e) => {
+          e.stopPropagation();
+          pinGroupAsRank1(g.group_id);
+        });
+      }
+
+      el.addEventListener("mouseenter", () => {
+        appState.highlightedGroupId = g.group_id;
+      });
+      el.addEventListener("mouseleave", () => {
+        appState.highlightedGroupId = null;
+      });
+
+      dayCols[dayIdx].appendChild(el);
+    });
   });
 }
 

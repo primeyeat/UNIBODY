@@ -189,6 +189,7 @@ def load_state() -> Dict[str, Any]:
                     "schedule": data.get("schedule", DEFAULT_SCHEDULE),
                     "preferences": {**DEFAULT_PREFERENCES, **data.get("preferences", {})},
                     "custom_courses": data.get("custom_courses", {}),
+                    "pinned_groups": data.get("pinned_groups", {}),
                     "jobs": data.get("jobs", []),
                 }
         except Exception:
@@ -197,6 +198,7 @@ def load_state() -> Dict[str, Any]:
         "schedule": list(DEFAULT_SCHEDULE),
         "preferences": dict(DEFAULT_PREFERENCES),
         "custom_courses": {},
+        "pinned_groups": {},
         "jobs": [],
     }
 
@@ -476,16 +478,59 @@ class CAUBotRequestHandler(SimpleHTTPRequestHandler):
                     return
 
                 course = res["course"]
+                pinned_gid = APP_STATE.get("pinned_groups", {}).get(course["course_id"].lower())
                 ranked_groups = rank_course_groups(
                     course.get("groups", []),
                     APP_STATE["schedule"],
                     APP_STATE["preferences"],
+                    pinned_group_id=pinned_gid,
                 )
                 self._send_json({
                     "ok": True,
                     "verified": True,
                     "matched_token": res["matched_token"],
                     "course": course,
+                    "pinned_group_id": pinned_gid,
+                    "ranked_groups": ranked_groups,
+                })
+            return
+
+        if path == "/api/course/pin-group":
+            course_id = (body.get("course_id") or "").strip()
+            group_id = body.get("group_id")  # None to unpin
+            with STATE_LOCK:
+                res = lookup_course_by_identifier(course_id, APP_STATE["custom_courses"], session_mgr)
+                if not res.get("ok"):
+                    self._send_json(res, status=200)
+                    return
+
+                course = res["course"]
+                ckey = course["course_id"].lower()
+                if "pinned_groups" not in APP_STATE:
+                    APP_STATE["pinned_groups"] = {}
+
+                # Toggle off if clicking the already-pinned group, otherwise pin it
+                if not group_id or APP_STATE["pinned_groups"].get(ckey) == group_id:
+                    APP_STATE["pinned_groups"].pop(ckey, None)
+                    pinned_gid = None
+                    session_mgr.add_log("INFO", f"Manuelle Priorisierung für '{course['course_id']}' aufgehoben (Automatisches Score-Ranking aktiv).")
+                else:
+                    APP_STATE["pinned_groups"][ckey] = group_id
+                    pinned_gid = group_id
+                    grp_name = next((g["name"] for g in course.get("groups", []) if g.get("group_id") == group_id), group_id)
+                    session_mgr.add_log("SNIPER", f"📌 Übungsgruppe manuell als WUNSCH #1 gesetzt: '{grp_name}'")
+
+                save_state(APP_STATE)
+                ranked_groups = rank_course_groups(
+                    course.get("groups", []),
+                    APP_STATE["schedule"],
+                    APP_STATE["preferences"],
+                    pinned_group_id=pinned_gid,
+                )
+                self._send_json({
+                    "ok": True,
+                    "course": course,
+                    "pinned_group_id": pinned_gid,
                     "ranked_groups": ranked_groups,
                 })
             return
@@ -609,10 +654,12 @@ class CAUBotRequestHandler(SimpleHTTPRequestHandler):
                     return
 
                 course = res["course"]
+                pinned_gid = APP_STATE.get("pinned_groups", {}).get(course["course_id"].lower())
                 ranked_groups = rank_course_groups(
                     course.get("groups", []),
                     APP_STATE["schedule"],
                     APP_STATE["preferences"],
+                    pinned_group_id=pinned_gid,
                 )
                 valid_priorities = [g for g in ranked_groups if not g.get("is_conflict")]
 
