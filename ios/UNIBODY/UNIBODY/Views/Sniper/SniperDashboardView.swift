@@ -25,7 +25,7 @@ public struct SniperDashboardView: View {
                                 Image(systemName: "cross.circle.fill")
                                     .font(.title2)
                                     .foregroundColor(AeroTheme.emerald)
-                                Text("Dual-Platform Kurs-Sniper")
+                                Text("UNIBODY-Sniper")
                                     .font(.system(.title3, design: .rounded).weight(.bold))
                                     .foregroundColor(.white)
                                 Spacer()

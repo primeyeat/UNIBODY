@@ -128,7 +128,7 @@ public struct SettingsLoginView: View {
                                     .foregroundColor(.secondary)
                                 
                                 Picker("Plattform", selection: $selectedPlatform) {
-                                    Text("⚡ UNIBODY Dual-Platform (Beide)").tag("unibody")
+                                    Text("⚡ UNIBODY (Beide)").tag("unibody")
                                     Text("🏛️ lms.uni-kiel.de (OpenOlat)").tag("openolat")
                                     Text("💻 elearn.informatik.uni-kiel.de").tag("moodle")
                                 }
