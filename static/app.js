@@ -277,6 +277,10 @@ async function verifyAndRankCourse(queryId) {
 /* MARK OR SYNC ALREADY ENROLLED GROUPS (SO UNIBODY KNOWS WHAT YOU ALREADY BOOKED) */
 async function markGroupAsAlreadyEnrolled(groupId) {
   if (!appState.currentCourse) return;
+  const isUnenroll = !groupId || appState.currentEnrolledGroupId === groupId;
+  const previousGroup = appState.rankedGroups.find((g) => g.group_id === (appState.currentEnrolledGroupId || groupId)) || null;
+  const currentCourseRef = { ...appState.currentCourse };
+
   const res = await apiPost("/api/course/mark-enrolled", {
     course_id: appState.currentCourse.course_id,
     group_id: groupId,
@@ -290,6 +294,10 @@ async function markGroupAsAlreadyEnrolled(groupId) {
     renderRankedGroups();
     renderTimetable();
     await pollTelemetry();
+
+    if (isUnenroll) {
+      showUnenrollmentSuccessModal(currentCourseRef, previousGroup);
+    }
   }
 }
 
@@ -1089,6 +1097,23 @@ function bindUIEvents() {
     });
   }
 
+  // Unenrollment success modal: "Wochenplan ansehen" button
+  const btnNotifUnenrollSchedule = document.getElementById("btnNotifUnenrollSchedule");
+  if (btnNotifUnenrollSchedule) {
+    btnNotifUnenrollSchedule.addEventListener("click", () => {
+      document.getElementById("modalUnenrollmentSuccess").classList.add("hidden");
+      const schedCard = document.querySelector(".calendar-card");
+      if (schedCard) {
+        schedCard.scrollIntoView({ behavior: "smooth", block: "start" });
+        schedCard.style.boxShadow = "0 0 0 3px #f59e0b, 0 16px 40px rgba(245, 158, 11, 0.4)";
+        schedCard.style.transition = "box-shadow 0.3s ease";
+        setTimeout(() => {
+          schedCard.style.boxShadow = "";
+        }, 2400);
+      }
+    });
+  }
+
   // Enrollment locked modal: button handler
   const btnLockedArmCountdown = document.getElementById("btnLockedArmCountdown");
   if (btnLockedArmCountdown) {
@@ -1497,6 +1522,82 @@ function playSuccessChime() {
     gain2.connect(ctx.destination);
     osc2.start(now + 0.16);
     osc2.stop(now + 0.85);
+  } catch (e) {
+    console.debug("Web Audio chime could not play:", e);
+  }
+}
+
+function showUnenrollmentSuccessModal(course, group) {
+  if (!course && !group) return;
+  const grp = group || {};
+  const host = course ? (course.platform_host || "lms.uni-kiel.de") : "lms.uni-kiel.de";
+
+  const pillEl = document.getElementById("notifUnenrollPlatformPill");
+  if (pillEl) {
+    if (host.includes("elearn")) {
+      pillEl.textContent = `⚡ Moodle / Elearn (${host})`;
+    } else {
+      pillEl.textContent = `🏛️ OpenOlat (${host})`;
+    }
+  }
+
+  const titleEl = document.getElementById("notifUnenrollCourseTitle");
+  if (titleEl) {
+    titleEl.textContent = course ? (course.title || course.course_id) : "Modul";
+  }
+
+  const groupEl = document.getElementById("notifUnenrollGroupName");
+  if (groupEl) {
+    groupEl.textContent = grp.name ? `🚪 ${grp.name}` : "Übungsgruppe abgemeldet";
+  }
+
+  const timeEl = document.getElementById("notifUnenrollTime");
+  if (timeEl) {
+    if (grp.day_name && grp.start_time) {
+      timeEl.textContent = `${grp.day_name}, ${grp.start_time} – ${grp.end_time || ""} Uhr`;
+    } else {
+      timeEl.textContent = "Zeitslot im Wochenplan wieder freigegeben";
+    }
+  }
+
+  const roomEl = document.getElementById("notifUnenrollRoom");
+  if (roomEl) {
+    roomEl.textContent = grp.room || "Hörsaal / LMS";
+  }
+
+  const platEl = document.getElementById("notifUnenrollPlatform");
+  if (platEl) {
+    platEl.textContent = host;
+  }
+
+  const modal = document.getElementById("modalUnenrollmentSuccess");
+  if (modal) {
+    modal.classList.remove("hidden");
+  }
+
+  playUnenrollChime();
+}
+
+function playUnenrollChime() {
+  try {
+    const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+    if (!AudioContextClass) return;
+    const ctx = new AudioContextClass();
+    if (ctx.state === "suspended") {
+      ctx.resume();
+    }
+    const now = ctx.currentTime;
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = "sine";
+    osc.frequency.setValueAtTime(587.33, now); // D5
+    osc.frequency.exponentialRampToValueAtTime(392.00, now + 0.18); // G4 gentle down-tone
+    gain.gain.setValueAtTime(0.16, now);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.38);
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start(now);
+    osc.stop(now + 0.38);
   } catch (e) {
     console.debug("Web Audio chime could not play:", e);
   }

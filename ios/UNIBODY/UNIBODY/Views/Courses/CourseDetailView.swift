@@ -5,9 +5,21 @@ public struct CourseDetailView: View {
     public let course: Course
     
     @State private var showSniperSheet = false
+    @State private var showUnenrollSheet = false
+    @State private var unenrolledInfo: (course: String, group: String, time: String, room: String)? = nil
     
     private var enrolledGroupId: String? {
         appState.enrolledGroups[course.courseId]
+    }
+    
+    private func triggerUnenroll(grp: ExerciseGroup) {
+        let title = course.title
+        let gName = grp.name
+        let time = "\(grp.dayName), \(grp.startTime)–\(grp.endTime) Uhr"
+        let room = grp.room
+        appState.clearEnrollment(courseId: course.courseId)
+        unenrolledInfo = (course: title, group: gName, time: time, room: room)
+        showUnenrollSheet = true
     }
     
     public var body: some View {
@@ -102,7 +114,7 @@ public struct CourseDetailView: View {
                                 }
                                 Spacer()
                                 Button(role: .destructive) {
-                                    appState.clearEnrollment(courseId: course.courseId)
+                                    triggerUnenroll(grp: grp)
                                 } label: {
                                     Label("Austragen", systemImage: "xmark.circle.fill")
                                         .font(.caption.weight(.bold))
@@ -144,7 +156,7 @@ public struct CourseDetailView: View {
                                     appState.enrollInGroup(courseId: course.courseId, groupId: grp.groupId)
                                 },
                                 onClear: {
-                                    appState.clearEnrollment(courseId: course.courseId)
+                                    triggerUnenroll(grp: grp)
                                 }
                             )
                         }
@@ -157,6 +169,18 @@ public struct CourseDetailView: View {
         .navigationBarTitleDisplayMode(.inline)
         .sheet(isPresented: $showSniperSheet) {
             SniperConfigSheet(course: course)
+        }
+        .sheet(isPresented: $showUnenrollSheet) {
+            if let info = unenrolledInfo {
+                UnenrollSuccessModalView(
+                    courseTitle: info.course,
+                    groupName: info.group,
+                    timeSlot: info.time,
+                    room: info.room,
+                    platformHost: course.platformHost
+                )
+                .presentationDetents([.fraction(0.58), .medium])
+            }
         }
     }
 }
@@ -300,6 +324,118 @@ private struct SniperConfigSheet: View {
             }
             .onAppear {
                 prioritizedGroups = course.groups
+            }
+        }
+    }
+}
+
+// MARK: - Unenrollment Confirmation Modal View
+private struct UnenrollSuccessModalView: View {
+    @Environment(\.dismiss) var dismiss
+    let courseTitle: String
+    let groupName: String
+    let timeSlot: String
+    let room: String
+    let platformHost: String
+    
+    var body: some View {
+        NavigationStack {
+            ZStack {
+                Color(red: 0.02, green: 0.07, blue: 0.14).ignoresSafeArea()
+                
+                VStack(spacing: 16) {
+                    // Header Icon
+                    ZStack {
+                        Circle()
+                            .fill(Color.orange.opacity(0.18))
+                            .frame(width: 68, height: 68)
+                        Image(systemName: "door.right.hand.open")
+                            .font(.system(size: 32, weight: .bold))
+                            .foregroundColor(AeroTheme.solarOrange)
+                    }
+                    .padding(.top, 12)
+                    
+                    VStack(spacing: 4) {
+                        Text("Austragung abgeschlossen!")
+                            .font(.system(.title3, design: .rounded).weight(.bold))
+                            .foregroundColor(.white)
+                        Text("Du hast die Übungsgruppe verbindlich abgemeldet")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+                    
+                    // Card
+                    VStack(alignment: .leading, spacing: 10) {
+                        AeroBadge(platformHost, icon: platformHost.contains("elearn") ? "bolt.fill" : "building.columns.fill", color: AeroTheme.solarOrange)
+                        
+                        Text(courseTitle)
+                            .font(.system(.headline, design: .rounded).weight(.bold))
+                            .foregroundColor(.white)
+                            .lineLimit(2)
+                        
+                        Text(groupName)
+                            .font(.subheadline)
+                            .foregroundColor(AeroTheme.solarOrange)
+                        
+                        Divider().background(Color.white.opacity(0.15))
+                        
+                        VStack(spacing: 8) {
+                            HStack {
+                                Label("Freigegebener Slot:", systemImage: "calendar.badge.clock")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                                Spacer()
+                                Text(timeSlot)
+                                    .font(.caption.weight(.bold))
+                                    .foregroundColor(.white)
+                            }
+                            
+                            if !room.isEmpty {
+                                HStack {
+                                    Label("Bisheriger Raum:", systemImage: "mappin.circle.fill")
+                                        .font(.caption)
+                                        .foregroundColor(.secondary)
+                                    Spacer()
+                                    Text(room)
+                                        .font(.caption.weight(.bold))
+                                        .foregroundColor(.white)
+                                }
+                            }
+                            
+                            HStack {
+                                Label("Status:", systemImage: "checkmark.circle.fill")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                                Spacer()
+                                Text("Im Wochenplan freigegeben")
+                                    .font(.caption.weight(.bold))
+                                    .foregroundColor(AeroTheme.emerald)
+                            }
+                        }
+                    }
+                    .padding(16)
+                    .frutigerGlass(cornerRadius: 16)
+                    .padding(.horizontal)
+                    
+                    Spacer()
+                    
+                    Button {
+                        dismiss()
+                    } label: {
+                        Text("Fertig")
+                            .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.plain)
+                    .glossyButton(gradient: AeroTheme.oceanGradient, cornerRadius: 14)
+                    .padding(.horizontal)
+                    .padding(.bottom, 16)
+                }
+            }
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Schließen") { dismiss() }
+                }
             }
         }
     }

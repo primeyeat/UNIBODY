@@ -1808,6 +1808,122 @@ body.dark-mode .vault-toggles-row {
   box-shadow: 0 28px 70px rgba(16, 120, 60, 0.35), 0 0 35px rgba(52, 211, 153, 0.25), inset 0 1px 0 #ffffff;
 }
 
+/* UNENROLLMENT SUCCESS POPUP NOTIFICATION (FRUTIGER AERO) */
+.modal-unenroll-notification {
+  max-width: 540px;
+  animation: modalPopIn 0.28s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  border: 2px solid #ffffff;
+  outline: 2px solid rgba(245, 158, 11, 0.5);
+  box-shadow: 0 28px 70px rgba(180, 83, 9, 0.25), 0 0 35px rgba(251, 191, 36, 0.2), inset 0 1px 0 #ffffff;
+}
+
+.modal-header.unenroll-header {
+  background: linear-gradient(
+    180deg,
+    #ffffff 0%,
+    #fef3c7 48%,
+    #fde68a 52%,
+    #fef08a 100%
+  );
+  border-bottom: 1.5px solid rgba(245, 158, 11, 0.4);
+  padding: 16px 20px;
+}
+
+.unenroll-header-badge {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.unenroll-icon {
+  font-size: 2.2rem;
+  line-height: 1;
+  filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.15));
+}
+
+.unenroll-header h3 {
+  color: #78350f;
+  font-size: 1.12rem;
+  font-weight: 800;
+  margin: 0;
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.9);
+}
+
+.modal-body.unenroll-body {
+  padding: 18px 20px;
+}
+
+.unenroll-card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.unenroll-badge-pill {
+  align-self: flex-start;
+  background: rgba(245, 158, 11, 0.15);
+  color: #b45309;
+  border: 1px solid rgba(245, 158, 11, 0.4);
+  font-size: 0.72rem;
+  font-weight: 800;
+  padding: 3px 10px;
+  border-radius: 999px;
+}
+
+.unenroll-course-title {
+  font-size: 1.05rem;
+  font-weight: 800;
+  color: var(--text-primary);
+  margin: 0;
+}
+
+.unenroll-group-name {
+  font-size: 0.88rem;
+  font-weight: 700;
+  color: #b45309;
+}
+
+.unenroll-details-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  background: rgba(0, 0, 0, 0.03);
+  padding: 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+}
+
+body.dark-mode .modal-unenroll-notification {
+  border-color: rgba(245, 158, 11, 0.6);
+  outline-color: rgba(217, 119, 6, 0.4);
+  box-shadow: 0 28px 70px rgba(0, 0, 0, 0.75), 0 0 30px rgba(245, 158, 11, 0.25);
+}
+
+body.dark-mode .modal-header.unenroll-header {
+  background: linear-gradient(
+    180deg,
+    #451a03 0%,
+    #2b1202 50%,
+    #1c0a01 51%,
+    #3b1504 100%
+  );
+  border-bottom-color: rgba(245, 158, 11, 0.35);
+}
+
+body.dark-mode .unenroll-header h3 {
+  color: #fde68a;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.7);
+}
+
+body.dark-mode .unenroll-group-name {
+  color: #fcd34d;
+}
+
+body.dark-mode .unenroll-details-grid {
+  background: rgba(255, 255, 255, 0.04);
+  border-color: rgba(255, 255, 255, 0.08);
+}
+
 @keyframes modalPopIn {
   from {
     transform: scale(0.88) translateY(12px);

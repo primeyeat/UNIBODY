@@ -539,6 +539,62 @@
     </div>
   </div>
 
+  <!-- MODAL 5B: UNENROLLMENT SUCCESS NOTIFICATION POPUP -->
+  <div id="modalUnenrollmentSuccess" class="modal-backdrop hidden">
+    <div class="modal modal-unenroll-notification">
+      <div class="modal-header unenroll-header">
+        <div class="unenroll-header-badge">
+          <span class="unenroll-icon">🚪</span>
+          <div>
+            <h3>Austragung erfolgreich abgeschlossen!</h3>
+            <p class="subtitle-modal">UNIBODY hat deine Übungsgruppe verbindlich abgemeldet</p>
+          </div>
+        </div>
+        <button class="btn-close" data-close="modalUnenrollmentSuccess">&times;</button>
+      </div>
+      <div class="modal-body unenroll-body">
+        <div class="unenroll-card">
+          <div class="unenroll-badge-pill" id="notifUnenrollPlatformPill">🏛️ OpenOlat (lms.uni-kiel.de)</div>
+          <h4 class="unenroll-course-title" id="notifUnenrollCourseTitle">Kursname</h4>
+          <div class="unenroll-group-name" id="notifUnenrollGroupName">Übungsgruppe</div>
+
+          <div class="unenroll-details-grid">
+            <div class="detail-item">
+              <span class="detail-label">📅 Freigegebener Termin</span>
+              <span class="detail-val" id="notifUnenrollTime">Mittwoch, 16:15 – 17:45 Uhr</span>
+            </div>
+            <div class="detail-item">
+              <span class="detail-label">📍 Hörsaal / Raum</span>
+              <span class="detail-val" id="notifUnenrollRoom">HHP6 - R.EG.004</span>
+            </div>
+            <div class="detail-item">
+              <span class="detail-label">🌐 Plattform</span>
+              <span class="detail-val" id="notifUnenrollPlatform">lms.uni-kiel.de</span>
+            </div>
+            <div class="detail-item">
+              <span class="detail-label">⚡ Status</span>
+              <span class="detail-val" id="notifUnenrollStatus" style="color:#f59e0b;font-weight:700;">Erfolgreich abgemeldet</span>
+            </div>
+          </div>
+
+          <div class="chrome-closed-notice">
+            <span class="pulse-indicator" style="background:#f59e0b; box-shadow:0 0 10px #f59e0b;"></span>
+            <div>
+              <strong>Wochenplan &amp; Browser aktualisiert.</strong>
+              <p>Die Übungsgruppe wurde auf der universitären Plattform verlassen und der Zeitslot in deinem Wochenplan freigegeben.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-ghost" data-close="modalUnenrollmentSuccess">Schließen</button>
+        <button type="button" class="btn btn-primary" id="btnNotifUnenrollSchedule" data-close="modalUnenrollmentSuccess">
+          📅 Wochenplan ansehen
+        </button>
+      </div>
+    </div>
+  </div>
+
   <!-- MODAL 6: ENROLLMENT LOCKED / NOT YET OPEN NOTIFICATION POPUP -->
   <div id="modalEnrollmentLocked" class="modal-backdrop hidden">
     <div class="modal modal-locked-notification">
