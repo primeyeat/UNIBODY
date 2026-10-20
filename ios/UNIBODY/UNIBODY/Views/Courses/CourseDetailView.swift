@@ -6,6 +6,9 @@ public struct CourseDetailView: View {
     
     @State private var showSniperSheet = false
     @State private var showUnenrollSheet = false
+    @State private var isUnenrolling = false
+    @State private var showUnenrollError = false
+    @State private var unenrollErrorMessage = ""
     @State private var unenrolledInfo: (course: String, group: String, time: String, room: String)? = nil
     
     private var enrolledGroupId: String? {
@@ -13,13 +16,26 @@ public struct CourseDetailView: View {
     }
     
     private func triggerUnenroll(grp: ExerciseGroup) {
+        guard !isUnenrolling else { return }
+        isUnenrolling = true
         let title = course.title
         let gName = grp.name
         let time = "\(grp.dayName), \(grp.startTime)–\(grp.endTime) Uhr"
         let room = grp.room
-        appState.clearEnrollment(courseId: course.courseId)
-        unenrolledInfo = (course: title, group: gName, time: time, room: room)
-        showUnenrollSheet = true
+        
+        Task {
+            let result = await appState.clearEnrollmentAsync(courseId: course.courseId)
+            await MainActor.run {
+                isUnenrolling = false
+                if result.success {
+                    unenrolledInfo = (course: title, group: gName, time: time, room: room)
+                    showUnenrollSheet = true
+                } else {
+                    unenrollErrorMessage = result.message
+                    showUnenrollError = true
+                }
+            }
+        }
     }
     
     public var body: some View {
@@ -116,13 +132,28 @@ public struct CourseDetailView: View {
                                 Button(role: .destructive) {
                                     triggerUnenroll(grp: grp)
                                 } label: {
-                                    Label("Austragen", systemImage: "xmark.circle.fill")
+                                    if isUnenrolling {
+                                        HStack(spacing: 6) {
+                                            ProgressView()
+                                                .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                                                .scaleEffect(0.7)
+                                            Text("Prüfe Abmeldung...")
+                                        }
                                         .font(.caption.weight(.bold))
-                                        .padding(.horizontal, 12)
+                                        .padding(.horizontal, 10)
                                         .padding(.vertical, 6)
-                                        .background(Capsule().fill(Color.red.opacity(0.85)))
+                                        .background(Capsule().fill(Color.orange.opacity(0.85)))
                                         .foregroundColor(.white)
+                                    } else {
+                                        Label("Austragen", systemImage: "xmark.circle.fill")
+                                            .font(.caption.weight(.bold))
+                                            .padding(.horizontal, 12)
+                                            .padding(.vertical, 6)
+                                            .background(Capsule().fill(Color.red.opacity(0.85)))
+                                            .foregroundColor(.white)
+                                    }
                                 }
+                                .disabled(isUnenrolling)
                             }
                             
                             HStack(spacing: 12) {
@@ -152,6 +183,7 @@ public struct CourseDetailView: View {
                                 group: grp,
                                 courseId: course.courseId,
                                 isEnrolled: enrolledGroupId == grp.groupId,
+                                isUnenrolling: isUnenrolling,
                                 onEnroll: {
                                     appState.enrollInGroup(courseId: course.courseId, groupId: grp.groupId)
                                 },
@@ -167,6 +199,16 @@ public struct CourseDetailView: View {
         }
         .navigationTitle(course.courseId)
         .navigationBarTitleDisplayMode(.inline)
+        .alert("Austragung nicht bestätigt", isPresented: $showUnenrollError) {
+            Button("OK", role: .cancel) { }
+            Button("Nur aus Stundenplan entfernen", role: .destructive) {
+                Task {
+                    _ = await appState.clearEnrollmentAsync(courseId: course.courseId, force: true)
+                }
+            }
+        } message: {
+            Text(unenrollErrorMessage.isEmpty ? "Die Austragung konnte auf dem LMS nicht verifiziert werden. Google Chrome bleibt geöffnet." : "\(unenrollErrorMessage)\n\nGoogle Chrome bleibt zur manuellen Überprüfung geöffnet.")
+        }
         .sheet(isPresented: $showSniperSheet) {
             SniperConfigSheet(course: course)
         }
@@ -190,6 +232,7 @@ private struct GroupDetailCard: View {
     let group: ExerciseGroup
     let courseId: String
     let isEnrolled: Bool
+    var isUnenrolling: Bool = false
     let onEnroll: () -> Void
     let onClear: () -> Void
     
@@ -225,13 +268,23 @@ private struct GroupDetailCard: View {
                 
                 if isEnrolled {
                     Button(role: .destructive, action: onClear) {
-                        Label("Austragen", systemImage: "xmark.circle.fill")
-                            .font(.caption.weight(.bold))
-                            .padding(.horizontal, 10)
-                            .padding(.vertical, 6)
-                            .background(Capsule().fill(Color.red.opacity(0.85)))
-                            .foregroundColor(.white)
+                        if isUnenrolling {
+                            ProgressView()
+                                .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                                .scaleEffect(0.7)
+                                .padding(.horizontal, 10)
+                                .padding(.vertical, 6)
+                                .background(Capsule().fill(Color.orange.opacity(0.85)))
+                        } else {
+                            Label("Austragen", systemImage: "xmark.circle.fill")
+                                .font(.caption.weight(.bold))
+                                .padding(.horizontal, 10)
+                                .padding(.vertical, 6)
+                                .background(Capsule().fill(Color.red.opacity(0.85)))
+                                .foregroundColor(.white)
+                        }
                     }
+                    .disabled(isUnenrolling)
                 } else {
                     Button(action: onEnroll) {
                         Text("Eintragen")

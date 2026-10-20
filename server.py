@@ -634,6 +634,7 @@ class CAUBotRequestHandler(SimpleHTTPRequestHandler):
         if path == "/api/course/mark-enrolled":
             course_id = (body.get("course_id") or "").strip()
             group_id = body.get("group_id")  # None or same group_id to unmark
+            force = bool(body.get("force", False))
             with STATE_LOCK:
                 res = lookup_course_by_identifier(course_id, APP_STATE["custom_courses"], session_mgr)
                 if not res.get("ok"):
@@ -645,14 +646,79 @@ class CAUBotRequestHandler(SimpleHTTPRequestHandler):
                 if "enrolled_groups" not in APP_STATE:
                     APP_STATE["enrolled_groups"] = {}
 
-                if not group_id or APP_STATE["enrolled_groups"].get(ckey) == group_id:
-                    _apply_enrolled_group_to_state(course, None)
-                    enrolled_gid = None
-                    session_mgr.add_log("SUCCESS", f"Aus Kurs '{course['course_id']}' im Wochenplan ausgetragen. Starte Chrome für Live-Austragung auf {course.get('platform_host', 'LMS')}...")
-                    def _do_live_unenroll_mark():
-                        session_mgr.execute_live_unenrollment_via_cdp(course, group_id)
-                    threading.Thread(target=_do_live_unenroll_mark, daemon=True).start()
+                current_enrolled = APP_STATE["enrolled_groups"].get(ckey)
+                is_unenroll = not group_id or current_enrolled == group_id
+
+            if is_unenroll:
+                if force:
+                    with STATE_LOCK:
+                        _apply_enrolled_group_to_state(course, None)
+                        APP_STATE["enrolled_groups"].pop(ckey, None)
+                        save_state(APP_STATE)
+                        session_mgr.add_log("INFO", f"Kurs '{course['course_id']}' manuell ohne Browser-Check aus dem Wochenplan entfernt.")
+                        pinned_gid = APP_STATE.get("pinned_groups", {}).get(ckey)
+                        ranked_groups = rank_course_groups(
+                            course.get("groups", []),
+                            APP_STATE["schedule"],
+                            APP_STATE["preferences"],
+                            pinned_group_id=pinned_gid,
+                            course_id=course["course_id"],
+                            enrolled_group_id=None,
+                        )
+                        self._send_json({
+                            "ok": True,
+                            "unenroll_verified": True,
+                            "forced": True,
+                            "course": course,
+                            "pinned_group_id": pinned_gid,
+                            "enrolled_group_id": None,
+                            "enrolled_groups": APP_STATE["enrolled_groups"],
+                            "schedule": APP_STATE["schedule"],
+                            "ranked_groups": ranked_groups,
+                        })
+                    return
+
+                session_mgr.add_log("JOB", f"Starte sichere Live-Austragung für '{course['course_id']}' auf {course.get('platform_host', 'LMS')}...")
+                live_res = session_mgr.execute_live_unenrollment_via_cdp(course, current_enrolled)
+                if live_res.get("ok"):
+                    with STATE_LOCK:
+                        _apply_enrolled_group_to_state(course, None)
+                        APP_STATE["enrolled_groups"].pop(ckey, None)
+                        save_state(APP_STATE)
+                        session_mgr.add_log("SUCCESS", f"✅ Austragung für '{course['course_id']}' im Browser verifiziert und im Wochenplan freigegeben.")
+                        pinned_gid = APP_STATE.get("pinned_groups", {}).get(ckey)
+                        ranked_groups = rank_course_groups(
+                            course.get("groups", []),
+                            APP_STATE["schedule"],
+                            APP_STATE["preferences"],
+                            pinned_group_id=pinned_gid,
+                            course_id=course["course_id"],
+                            enrolled_group_id=None,
+                        )
+                        self._send_json({
+                            "ok": True,
+                            "unenroll_verified": True,
+                            "course": course,
+                            "pinned_group_id": pinned_gid,
+                            "enrolled_group_id": None,
+                            "enrolled_groups": APP_STATE["enrolled_groups"],
+                            "schedule": APP_STATE["schedule"],
+                            "ranked_groups": ranked_groups,
+                            "message": live_res.get("message", "Erfolgreich ausgetragen."),
+                        })
                 else:
+                    self._send_json({
+                        "ok": False,
+                        "unenroll_verified": False,
+                        "course": course,
+                        "enrolled_group_id": current_enrolled,
+                        "enrolled_groups": APP_STATE.get("enrolled_groups", {}),
+                        "schedule": APP_STATE["schedule"],
+                        "message": live_res.get("message", "Austragung konnte im Browser nicht verifiziert werden."),
+                    })
+                return
+            else:
+                with STATE_LOCK:
                     grp_obj = _apply_enrolled_group_to_state(course, group_id)
                     enrolled_gid = group_id
                     gname = grp_obj["name"] if grp_obj else group_id
@@ -660,30 +726,30 @@ class CAUBotRequestHandler(SimpleHTTPRequestHandler):
                         "SUCCESS",
                         f"✅ Manuell gebuchte Übung übernommen für '{course['course_id']}': '{gname}' -> Im Wochenplan blockiert!"
                     )
-
-                pinned_gid = APP_STATE.get("pinned_groups", {}).get(ckey)
-                save_state(APP_STATE)
-                ranked_groups = rank_course_groups(
-                    course.get("groups", []),
-                    APP_STATE["schedule"],
-                    APP_STATE["preferences"],
-                    pinned_group_id=pinned_gid,
-                    course_id=course["course_id"],
-                    enrolled_group_id=enrolled_gid,
-                )
-                self._send_json({
-                    "ok": True,
-                    "course": course,
-                    "pinned_group_id": pinned_gid,
-                    "enrolled_group_id": enrolled_gid,
-                    "enrolled_groups": APP_STATE["enrolled_groups"],
-                    "schedule": APP_STATE["schedule"],
-                    "ranked_groups": ranked_groups,
-                })
-            return
+                    pinned_gid = APP_STATE.get("pinned_groups", {}).get(ckey)
+                    save_state(APP_STATE)
+                    ranked_groups = rank_course_groups(
+                        course.get("groups", []),
+                        APP_STATE["schedule"],
+                        APP_STATE["preferences"],
+                        pinned_group_id=pinned_gid,
+                        course_id=course["course_id"],
+                        enrolled_group_id=enrolled_gid,
+                    )
+                    self._send_json({
+                        "ok": True,
+                        "course": course,
+                        "pinned_group_id": pinned_gid,
+                        "enrolled_group_id": enrolled_gid,
+                        "enrolled_groups": APP_STATE["enrolled_groups"],
+                        "schedule": APP_STATE["schedule"],
+                        "ranked_groups": ranked_groups,
+                    })
+                return
 
         if path == "/api/course/unenroll":
             course_id = (body.get("course_id") or "").strip()
+            force = bool(body.get("force", False))
             with STATE_LOCK:
                 res = lookup_course_by_identifier(course_id, APP_STATE["custom_courses"], session_mgr)
                 if not res.get("ok"):
@@ -692,21 +758,79 @@ class CAUBotRequestHandler(SimpleHTTPRequestHandler):
                 course = res["course"]
                 ckey = course["course_id"].lower()
                 prev_gid = APP_STATE.get("enrolled_groups", {}).get(ckey)
-                _apply_enrolled_group_to_state(course, None)
-                if "enrolled_groups" in APP_STATE:
-                    APP_STATE["enrolled_groups"].pop(ckey, None)
-                session_mgr.add_log("SUCCESS", f"Aus Kurs '{course['course_id']}' ausgetragen. Starte Chrome für Live-Austragung auf {course.get('platform_host', 'LMS')}...")
-                save_state(APP_STATE)
 
-                def _do_live_unenroll():
-                    session_mgr.execute_live_unenrollment_via_cdp(course, prev_gid)
-                threading.Thread(target=_do_live_unenroll, daemon=True).start()
+            if force:
+                with STATE_LOCK:
+                    _apply_enrolled_group_to_state(course, None)
+                    if "enrolled_groups" in APP_STATE:
+                        APP_STATE["enrolled_groups"].pop(ckey, None)
+                    save_state(APP_STATE)
+                    session_mgr.add_log("INFO", f"Kurs '{course['course_id']}' manuell ohne Browser-Check aus dem Wochenplan entfernt.")
+                    pinned_gid = APP_STATE.get("pinned_groups", {}).get(ckey)
+                    ranked_groups = rank_course_groups(
+                        course.get("groups", []),
+                        APP_STATE["schedule"],
+                        APP_STATE["preferences"],
+                        pinned_group_id=pinned_gid,
+                        course_id=course["course_id"],
+                        enrolled_group_id=None,
+                    )
+                    self._send_json({
+                        "ok": True,
+                        "unenroll_verified": True,
+                        "forced": True,
+                        "course_id": course["course_id"],
+                        "course": course,
+                        "enrolled_group_id": None,
+                        "pinned_group_id": pinned_gid,
+                        "enrolled_groups": APP_STATE.get("enrolled_groups", {}),
+                        "schedule": APP_STATE["schedule"],
+                        "ranked_groups": ranked_groups,
+                        "message": f"Aus Kurs '{course['course_id']}' im Wochenplan entfernt.",
+                    })
+                return
 
+            session_mgr.add_log("JOB", f"Starte sichere Live-Austragung für '{course['course_id']}' auf {course.get('platform_host', 'LMS')}...")
+            live_res = session_mgr.execute_live_unenrollment_via_cdp(course, prev_gid)
+
+            if live_res.get("ok"):
+                with STATE_LOCK:
+                    _apply_enrolled_group_to_state(course, None)
+                    if "enrolled_groups" in APP_STATE:
+                        APP_STATE["enrolled_groups"].pop(ckey, None)
+                    save_state(APP_STATE)
+                    session_mgr.add_log("SUCCESS", f"✅ Austragung für '{course['course_id']}' im Browser verifiziert und im Wochenplan freigegeben.")
+                    pinned_gid = APP_STATE.get("pinned_groups", {}).get(ckey)
+                    ranked_groups = rank_course_groups(
+                        course.get("groups", []),
+                        APP_STATE["schedule"],
+                        APP_STATE["preferences"],
+                        pinned_group_id=pinned_gid,
+                        course_id=course["course_id"],
+                        enrolled_group_id=None,
+                    )
+                    self._send_json({
+                        "ok": True,
+                        "unenroll_verified": True,
+                        "course_id": course["course_id"],
+                        "course": course,
+                        "enrolled_group_id": None,
+                        "pinned_group_id": pinned_gid,
+                        "enrolled_groups": APP_STATE.get("enrolled_groups", {}),
+                        "schedule": APP_STATE["schedule"],
+                        "ranked_groups": ranked_groups,
+                        "message": live_res.get("message", "Erfolgreich ausgetragen und verifiziert."),
+                    })
+            else:
                 self._send_json({
-                    "ok": True,
+                    "ok": False,
+                    "unenroll_verified": False,
                     "course_id": course["course_id"],
+                    "course": course,
+                    "enrolled_group_id": prev_gid,
                     "enrolled_groups": APP_STATE.get("enrolled_groups", {}),
                     "schedule": APP_STATE["schedule"],
+                    "message": live_res.get("message", "Austragung konnte im Browser nicht verifiziert werden."),
                 })
             return
 

@@ -3022,17 +3022,35 @@ setTimeout(runUnibodyAutoFill, 2200);
                 return 'NO_MODAL';
             })()
             """
-            time.sleep(1.2)
-            modal_res = cdp_eval(ws, modal_js)
-            if modal_res == "CONFIRMED_MODAL":
-                self.add_log("SUCCESS", "🏛️ OpenOlat: Bestätigungsdialog ('Möchten Sie sich wirklich austragen?') automatisch bestätigt!")
-                time.sleep(1.5)
+            confirmed_modal = False
+            for _ in range(6):
+                time.sleep(0.5)
+                m_res = cdp_eval(ws, modal_js)
+                if m_res == "CONFIRMED_MODAL":
+                    confirmed_modal = True
+                    self.add_log("SUCCESS", "🏛️ OpenOlat: Bestätigungsdialog ('Möchten Sie sich wirklich austragen?') automatisch bestätigt!")
+                    time.sleep(1.5)
+                    break
 
             if cancel_info.get("ok"):
-                self.add_log("SUCCESS", f"🎉 [OpenOlat] ECHTE AUSTRAGUNG ERFOLGREICH! Du wurdest aus dem Kurs '{course_id}' abgemeldet.")
-                time.sleep(1.5)
-                self.close_browser()
-                return {"ok": True, "message": f"Erfolgreich aus OpenOlat Kurs '{course_id}' ausgetragen."}
+                # Strict DOM verification that user is no longer enrolled
+                time.sleep(1.0)
+                verify_js = """
+                (function() {
+                    const table = document.querySelector('table.o_table, table.table');
+                    if (!table) return 'NO_TABLE_AFTER';
+                    const cancelA = table.querySelector('a[onclick*="cmd.enrolled.cancel"], a[onclick*="cmd.cancel"]');
+                    if (!cancelA) return 'VERIFIED_UNENROLLED';
+                    return 'STILL_HAS_CANCEL_BUTTON';
+                })()
+                """
+                v_res = cdp_eval(ws, verify_js)
+                self.add_log("INFO", f"🏛️ OpenOlat DOM-Verifizierung nach Austragung: {v_res}")
+                if v_res == "VERIFIED_UNENROLLED" or confirmed_modal:
+                    self.add_log("SUCCESS", f"🎉 [OpenOlat] ECHTE AUSTRAGUNG ERFOLGREICH & VERIFIZIERT! Du wurdest aus dem Kurs '{course_id}' abgemeldet.")
+                    time.sleep(1.0)
+                    self.close_browser()
+                    return {"ok": True, "verified": True, "message": f"Erfolgreich aus OpenOlat Kurs '{course_id}' ausgetragen."}
 
             # 5. Fallback: Check 'Meine Gruppen' (https://lms.uni-kiel.de/url/GroupsSite/0)
             self.add_log("INFO", f"🏛️ OpenOlat: Prüfe zentrale Gruppenübersicht 'Meine Gruppen' (https://lms.uni-kiel.de/url/GroupsSite/0)...")
@@ -3063,21 +3081,42 @@ setTimeout(runUnibodyAutoFill, 2200);
             gs_raw = cdp_eval(ws, groupsite_cancel_js)
             gs_info = json.loads(gs_raw) if gs_raw else {}
             self.add_log("INFO", f"🏛️ OpenOlat 'Meine Gruppen' Resultat: {gs_raw}")
-            time.sleep(1.2)
-            cdp_eval(ws, modal_js)
-            time.sleep(1.0)
 
             if gs_info.get("ok"):
-                self.add_log("SUCCESS", f"🎉 [OpenOlat] Über 'Meine Gruppen' erfolgreich aus Kurs '{course_id}' ausgetragen!")
-                time.sleep(1.5)
-                self.close_browser()
-                return {"ok": True, "message": f"Erfolgreich aus '{course_id}' ausgetragen."}
+                confirmed_gs_modal = False
+                for _ in range(6):
+                    time.sleep(0.5)
+                    m_res = cdp_eval(ws, modal_js)
+                    if m_res == "CONFIRMED_MODAL":
+                        confirmed_gs_modal = True
+                        self.add_log("SUCCESS", "🏛️ OpenOlat: Bestätigungsdialog in 'Meine Gruppen' bestätigt!")
+                        time.sleep(1.5)
+                        break
+
+                time.sleep(1.0)
+                gs_verify_js = f"""
+                (function() {{
+                    const table = document.querySelector('table.o_table, table.table');
+                    if (!table) return 'VERIFIED_NO_TABLE';
+                    const text = (table.innerText || '').toLowerCase();
+                    const cTarget = "{course_id}".toLowerCase();
+                    if (!text.includes(cTarget)) return 'VERIFIED_GONE';
+                    return 'STILL_IN_GROUPS_TABLE';
+                }})()
+                """
+                v_res = cdp_eval(ws, gs_verify_js)
+                self.add_log("INFO", f"🏛️ OpenOlat 'Meine Gruppen' Verifizierung: {v_res}")
+                if v_res in ("VERIFIED_GONE", "VERIFIED_NO_TABLE") or confirmed_gs_modal:
+                    self.add_log("SUCCESS", f"🎉 [OpenOlat] Über 'Meine Gruppen' erfolgreich aus Kurs '{course_id}' ausgetragen & verifiziert!")
+                    time.sleep(1.0)
+                    self.close_browser()
+                    return {"ok": True, "verified": True, "message": f"Erfolgreich aus '{course_id}' ausgetragen."}
 
             self.add_log(
                 "WARN",
                 f"⚠️ Auf OpenOlat konnte kein aktiver Austragen-Button für '{course_id}' gefunden werden. Google Chrome bleibt geöffnet, damit du den Kurs manuell einsehen kannst."
             )
-            return {"ok": False, "message": f"Kein aktiver Austragen-Button auf OpenOlat gefunden."}
+            return {"ok": False, "verified": False, "message": f"Kein aktiver Austragen-Button auf OpenOlat gefunden."}
 
         # -------------------------------------------------------------
         # PLATFORM B: Moodle (elearn.informatik.uni-kiel.de)
@@ -3136,17 +3175,35 @@ setTimeout(runUnibodyAutoFill, 2200);
                 return 'NO_MODAL';
             })()
             """
-            cdp_eval(ws, modal_js)
-            time.sleep(1.2)
-
             if del_res == "CLICKED_DELETE_CHOICE":
-                self.add_log("SUCCESS", f"🎉 [Moodle] ECHTE AUSTRAGUNG ERFOLGREICH! Auswahl aus Kurs '{course_id}' entfernt.")
-                time.sleep(1.5)
-                self.close_browser()
-                return {"ok": True, "message": f"Erfolgreich aus Moodle '{course_id}' ausgetragen."}
-            else:
-                self.add_log("WARN", f"⚠️ Auf Moodle kein 'Auswahl entfernen'-Button gefunden. Chrome bleibt geöffnet.")
-                return {"ok": False, "message": "Kein 'Auswahl entfernen'-Button auf Moodle gefunden."}
+                confirmed_modal = False
+                for _ in range(6):
+                    time.sleep(0.5)
+                    m_res = cdp_eval(ws, modal_js)
+                    if m_res == "CONFIRMED_MODAL":
+                        confirmed_modal = True
+                        self.add_log("SUCCESS", "💻 Moodle: Bestätigungsdialog automatisch bestätigt!")
+                        time.sleep(1.5)
+                        break
+
+                time.sleep(1.0)
+                moodle_verify_js = """
+                (function() {
+                    const delBtn = document.querySelector('input[type="submit"][name="deletechoice"], button[name="deletechoice"]');
+                    if (!delBtn) return 'VERIFIED_CHOICE_DELETED';
+                    return 'STILL_HAS_DELETE_BUTTON';
+                })()
+                """
+                v_res = cdp_eval(ws, moodle_verify_js)
+                self.add_log("INFO", f"💻 Moodle DOM-Verifizierung: {v_res}")
+                if v_res == "VERIFIED_CHOICE_DELETED" or confirmed_modal:
+                    self.add_log("SUCCESS", f"🎉 [Moodle] ECHTE AUSTRAGUNG ERFOLGREICH & VERIFIZIERT! Auswahl aus Kurs '{course_id}' entfernt.")
+                    time.sleep(1.0)
+                    self.close_browser()
+                    return {"ok": True, "verified": True, "message": f"Erfolgreich aus Moodle '{course_id}' ausgetragen."}
+
+            self.add_log("WARN", f"⚠️ Auf Moodle kein 'Auswahl entfernen'-Button gefunden. Chrome bleibt geöffnet.")
+            return {"ok": False, "verified": False, "message": "Kein 'Auswahl entfernen'-Button auf Moodle gefunden."}
 
 
 

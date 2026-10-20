@@ -345,6 +345,36 @@ public class AppState: ObservableObject {
         schedule.append(newEvent)
     }
     
+    /// Strictly verified async unenrollment: only removes from local state and triggers UI success if verified on the university LMS.
+    public func clearEnrollmentAsync(courseId: String, force: Bool = false) async -> (success: Bool, message: String) {
+        let server = serverURL
+        guard let host = await SyncService.shared.discoverActiveServer(preferredURL: server) else {
+            return (false, "UNIBODY Mac-Server nicht erreichbar. Bitte stelle sicher, dass UNIBODY auf deinem Rechner läuft.")
+        }
+        
+        let result = await SyncService.shared.postUnenroll(serverURL: host, courseId: courseId, force: force)
+        if result.success {
+            await MainActor.run {
+                let cidKey = courseId.lowercased()
+                enrolledGroups.removeValue(forKey: courseId)
+                enrolledGroups.removeValue(forKey: cidKey)
+                schedule.removeAll {
+                    ($0.courseId?.lowercased() == cidKey || $0.id.lowercased().contains(cidKey)) &&
+                    $0.type == "enrolled_exercise"
+                }
+                for i in 0..<courses.count {
+                    if courses[i].courseId.lowercased() == cidKey {
+                        courses[i].enrolledGroupId = nil
+                    }
+                }
+                #if canImport(UIKit)
+                UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                #endif
+            }
+        }
+        return result
+    }
+    
     public func clearEnrollment(courseId: String) {
         let cidKey = courseId.lowercased()
         enrolledGroups.removeValue(forKey: courseId)

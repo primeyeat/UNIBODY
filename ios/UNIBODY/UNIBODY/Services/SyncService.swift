@@ -121,19 +121,40 @@ public class SyncService {
         return UnivISParser.parseICS(text)
     }
     
-    /// Unenrolls a course on the local UNIBODY Core server
-    public func postUnenroll(serverURL: String, courseId: String) async -> Bool {
-        guard let url = URL(string: "\(serverURL)/api/course/unenroll") else { return false }
+    /// Unenrolls a course on the local UNIBODY Core server and strictly verifies DOM cancellation
+    public func postUnenroll(serverURL: String, courseId: String, force: Bool = false) async -> (success: Bool, message: String) {
+        guard let url = URL(string: "\(serverURL)/api/course/unenroll") else {
+            return (false, "Ungültige Server-URL.")
+        }
         var req = URLRequest(url: url)
         req.httpMethod = "POST"
         req.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        req.httpBody = try? JSONSerialization.data(withJSONObject: ["course_id": courseId])
-        req.timeoutInterval = 3.0
+        let payload: [String: Any] = ["course_id": courseId, "force": force]
+        req.httpBody = try? JSONSerialization.data(withJSONObject: payload)
+        req.timeoutInterval = 45.0
         do {
-            let (_, response) = try await URLSession.shared.data(for: req)
-            return (response as? HTTPURLResponse)?.statusCode == 200
+            let (data, response) = try await URLSession.shared.data(for: req)
+            guard (response as? HTTPURLResponse)?.statusCode == 200 else {
+                return (false, "Server antwortete mit Fehler.")
+            }
+            if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
+                let ok = json["ok"] as? Bool ?? false
+                let verified = json["unenroll_verified"] as? Bool ?? false
+                let msg = json["message"] as? String ?? ""
+                if ok && verified {
+                    return (true, msg.isEmpty ? "Erfolgreich ausgetragen und im LMS verifiziert." : msg)
+                } else {
+                    return (false, msg.isEmpty ? "Austragung konnte im Browser nicht verifiziert werden." : msg)
+                }
+            }
+            return (false, "Ungültige Server-Rückmeldung.")
         } catch {
-            return false
+            return (false, "Verbindungsfehler: \(error.localizedDescription)")
         }
+    }
+    
+    public func postUnenroll(serverURL: String, courseId: String) async -> Bool {
+        let (success, _) = await postUnenroll(serverURL: serverURL, courseId: courseId, force: false)
+        return success
     }
 }

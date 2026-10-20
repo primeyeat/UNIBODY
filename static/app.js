@@ -281,6 +281,80 @@ async function markGroupAsAlreadyEnrolled(groupId) {
   const previousGroup = appState.rankedGroups.find((g) => g.group_id === (appState.currentEnrolledGroupId || groupId)) || null;
   const currentCourseRef = { ...appState.currentCourse };
 
+  if (isUnenroll) {
+    const clearBtn = document.getElementById("btnClearEnrolledCurrent");
+    const origClearHtml = clearBtn ? clearBtn.innerHTML : "";
+    if (clearBtn) {
+      clearBtn.disabled = true;
+      clearBtn.innerHTML = "⏳ UNIBODY meldet im Browser ab...";
+      clearBtn.style.opacity = "0.75";
+      clearBtn.style.pointerEvents = "none";
+    }
+    const markBtns = document.querySelectorAll(".btn-mark-enrolled");
+    markBtns.forEach((b) => {
+      b.disabled = true;
+      b.style.pointerEvents = "none";
+    });
+
+    try {
+      const res = await apiPost("/api/course/unenroll", {
+        course_id: appState.currentCourse.course_id,
+      });
+
+      if (res && res.ok && res.unenroll_verified) {
+        appState.schedule = res.schedule || appState.schedule;
+        appState.enrolledGroups = res.enrolled_groups || appState.enrolledGroups;
+        appState.currentEnrolledGroupId = null;
+        appState.rankedGroups = res.ranked_groups || [];
+        renderCatalogChips();
+        renderRankedGroups();
+        renderTimetable();
+        await pollTelemetry();
+
+        // STRICT REQUIREMENT: Only show popup AFTER browser unenrollment is physically verified!
+        showUnenrollmentSuccessModal(currentCourseRef, previousGroup);
+      } else {
+        const errorMsg = (res && res.message) || "Die Austragung im Browser konnte nicht bestätigt werden.";
+        alert(
+          `⚠️ UNIBODY Live-Austragung:\n\n${errorMsg}\n\nGoogle Chrome bleibt für dich geöffnet, damit du den Status auf ${currentCourseRef.platform_host || "dem LMS"} direkt prüfen kannst.`
+        );
+        await pollTelemetry();
+
+        if (confirm("Möchtest du diesen Kurs trotzdem nur lokal aus deinem Wochenplan austragen (ohne LMS-Abmeldung)?")) {
+          const fRes = await apiPost("/api/course/unenroll", {
+            course_id: appState.currentCourse.course_id,
+            force: true,
+          });
+          if (fRes && fRes.ok) {
+            appState.schedule = fRes.schedule || appState.schedule;
+            appState.enrolledGroups = fRes.enrolled_groups || appState.enrolledGroups;
+            appState.currentEnrolledGroupId = null;
+            appState.rankedGroups = fRes.ranked_groups || [];
+            renderCatalogChips();
+            renderRankedGroups();
+            renderTimetable();
+            await pollTelemetry();
+          }
+        }
+      }
+    } catch (err) {
+      alert("⚠️ Netzwerkfehler beim Kommunizieren mit dem UNIBODY Backend.");
+    } finally {
+      if (clearBtn) {
+        clearBtn.disabled = false;
+        clearBtn.innerHTML = origClearHtml;
+        clearBtn.style.opacity = "1";
+        clearBtn.style.pointerEvents = "auto";
+      }
+      markBtns.forEach((b) => {
+        b.disabled = false;
+        b.style.pointerEvents = "auto";
+      });
+    }
+    return;
+  }
+
+  // Enrollment (marking group as booked):
   const res = await apiPost("/api/course/mark-enrolled", {
     course_id: appState.currentCourse.course_id,
     group_id: groupId,
@@ -294,10 +368,6 @@ async function markGroupAsAlreadyEnrolled(groupId) {
     renderRankedGroups();
     renderTimetable();
     await pollTelemetry();
-
-    if (isUnenroll) {
-      showUnenrollmentSuccessModal(currentCourseRef, previousGroup);
-    }
   }
 }
 
