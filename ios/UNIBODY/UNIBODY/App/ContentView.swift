@@ -6,26 +6,40 @@ public struct ContentView: View {
     public init() {}
     
     public var body: some View {
-        TabView {
-            ScheduleView()
-                .tabItem {
-                    Label("Wochenplan", systemImage: "calendar")
-                }
+        ZStack(alignment: .top) {
+            TabView {
+                ScheduleView()
+                    .tabItem {
+                        Label("Wochenplan", systemImage: "calendar")
+                    }
+                
+                CoursesView()
+                    .tabItem {
+                        Label("Module", systemImage: "books.vertical.fill")
+                    }
+                
+                SniperDashboardView()
+                    .tabItem {
+                        Label("Sniper", systemImage: "cross.circle.fill")
+                    }
+                
+                SettingsLoginView()
+                    .tabItem {
+                        Label("Login & Tresor", systemImage: "key.fill")
+                    }
+            }
             
-            CoursesView()
-                .tabItem {
-                    Label("Module", systemImage: "books.vertical.fill")
+            // Floating Dynamic Island Campus Map & Room Navigator
+            if let event = appState.activeNavEvent ?? (appState.isDynamicIslandActive ? appState.nextUpcomingEvent : nil) {
+                DynamicCampusIslandView(event: event) {
+                    appState.closeCampusNavigation()
                 }
-            
-            SniperDashboardView()
-                .tabItem {
-                    Label("Sniper", systemImage: "cross.circle.fill")
-                }
-            
-            SettingsLoginView()
-                .tabItem {
-                    Label("Login & Tresor", systemImage: "key.fill")
-                }
+                .zIndex(999)
+                .transition(.asymmetric(
+                    insertion: .move(edge: .top).combined(with: .opacity),
+                    removal: .move(edge: .top).combined(with: .opacity)
+                ))
+            }
         }
         .environmentObject(appState)
         .tint(AeroTheme.skyBlue)
