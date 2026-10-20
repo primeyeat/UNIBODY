@@ -1515,115 +1515,301 @@ setTimeout(runUnibodyAutoFill, 2200);
 
     def scan_enrolled_groups_via_cdp(self, all_courses: Dict[str, Dict[str, Any]]) -> Dict[str, Any]:
         """
-        UNIBODY Live Enrollment Scanner:
-        Inspects all open `lms.uni-kiel.de` (OpenOlat) and `elearn.informatik.uni-kiel.de` (Moodle) tabs via CDP
-        to detect which exercise groups the student has already manually enrolled in!
-        Looks for OpenOlat / Moodle group membership indicators ("Eingetragen", "Mitglied", "Austragen",
-        "Your choice", "Ihre Auswahl", checked radio/checkboxes, or highlighted group rows) and matches them
-        against the verified course catalog's time slots and group names.
+        UNIBODY Active Deep-Sync Crawler:
+        Automatically launches/connects to the UNIBODY Chrome session, opens BOTH
+        `https://lms.uni-kiel.de/url/GroupsSite/0` (OpenOlat "Meine Gruppen") AND
+        `https://elearn.informatik.uni-kiel.de/my/` (Moodle Dashboard & ChoiceGroups),
+        navigates into each active BusinessGroup / ChoiceGroup, extracts the exact weekday + time + room
+        description, and matches them against `all_courses`!
         """
         tabs = self._get_cdp_tabs()
+        if tabs is None:
+            self.add_log("INFO", "🫧 UNIBODY Deep-Sync: Starte Chrome-Session auf OpenOlat & Info-Moodle...")
+            self.launch_login_browser(target_url="unibody", force_auto_login=True)
+            time.sleep(2.2)
+            tabs = self._get_cdp_tabs()
+
         if not tabs:
             return {
                 "ok": False,
-                "error": "Der UNIBODY-Browser ist aktuell nicht geöffnet. Starte oben rechts zuerst den Browser-Login oder markiere deine Gruppe direkt per Klick auf '✓ Bereits gebucht'.",
+                "error": "Konnte UNIBODY Chrome-Session nicht erreichen.",
                 "detected": [],
             }
 
-        extract_js = """
-        (function() {
-          const enrolledLines = [];
-          const enrollmentKeywords = [
-            'eingetragen', 'angemeldet', 'mitglied', 'austragen', 'verlassen',
-            'ihre auswahl', 'meine gruppe', 'your choice', 'member', 'enrolled',
-            'abmelden', 'auswahl entfernen', 'leave group'
-          ];
-          const candidates = document.querySelectorAll('tr, .o_group_card, .group-item, .choice, .card, li, .form-check, .fitem');
-          for (const el of candidates) {
-            const txt = (el.innerText || '').trim();
-            if (!txt || txt.length > 600) continue;
-            const lower = txt.toLowerCase();
-            const hasCheckedInput = !!el.querySelector('input[type="radio"]:checked, input[type="checkbox"]:checked');
-            const hasKeyword = enrollmentKeywords.some(k => lower.includes(k));
-            if (hasCheckedInput || hasKeyword) {
-              enrolledLines.push(txt.replace(/\\s+/g, ' '));
-            }
-          }
-          return JSON.stringify({
-            url: window.location.href,
-            title: document.title,
-            enrolledLines: enrolledLines.slice(0, 80)
-          });
-        })();
-        """
+        # Ensure we are logged in on both platforms
+        creds = self.load_credentials(include_secret=True)
+        if creds.get("username") and creds.get("password"):
+            self.inject_autofill_into_tabs(force_submit=True)
+            time.sleep(1.2)
 
-        detected = []
-        scanned_tabs = 0
+        tabs = self._get_cdp_tabs() or []
+        olat_tab = next((t for t in tabs if "lms.uni-kiel.de" in (t.get("url") or "").lower()), None)
+        moodle_tab = next((t for t in tabs if "elearn.informatik" in (t.get("url") or "").lower()), None)
 
-        for t in tabs:
-            u = (t.get("url") or "").lower()
-            if not any(d in u for d in ["lms.uni-kiel.de", "elearn.informatik.uni-kiel.de"]):
-                continue
-            ws_url = t.get("webSocketDebuggerUrl")
-            if not ws_url:
-                continue
-            scanned_tabs += 1
-            res = self._cdp_send_command(ws_url, "Runtime.evaluate", {"expression": extract_js, "returnByValue": True})
-            val_str = res.get("result", {}).get("result", {}).get("value") if isinstance(res, dict) else None
-            if not val_str:
-                continue
+        if not olat_tab:
             try:
-                page_data = json.loads(val_str)
+                req_new = urllib.request.Request(f"http://127.0.0.1:{self.debug_port}/json/new?https://lms.uni-kiel.de/url/GroupsSite/0", method="PUT")
+                urllib.request.urlopen(req_new, timeout=1.5).read()
+                time.sleep(1.2)
             except Exception:
-                continue
+                pass
+        if not moodle_tab:
+            try:
+                req_new = urllib.request.Request(f"http://127.0.0.1:{self.debug_port}/json/new?https://elearn.informatik.uni-kiel.de/my/", method="PUT")
+                urllib.request.urlopen(req_new, timeout=1.5).read()
+                time.sleep(1.2)
+            except Exception:
+                pass
 
-            page_url = (page_data.get("url") or "").lower()
-            page_title = (page_data.get("title") or "").lower()
-            lines = page_data.get("enrolledLines") or []
+        tabs = self._get_cdp_tabs() or []
+        olat_tab = next((t for t in tabs if "lms.uni-kiel.de" in (t.get("url") or "").lower()), None)
+        moodle_tab = next((t for t in tabs if "elearn.informatik" in (t.get("url") or "").lower()), None)
 
-            for ckey, raw_course in all_courses.items():
-                course = enrich_course_with_unibody(raw_course)
-                cid = course["course_id"]
-                tokens = [tk.lower() for tk in course.get("verified_tokens", [])] + [cid.lower()]
-                course_matches_page = any(tk in page_url or tk in page_title for tk in tokens if len(tk) >= 3)
+        detected: List[Dict[str, Any]] = []
+        raw_findings: List[Dict[str, str]] = []
 
-                for grp in course.get("groups", []):
-                    g_day = grp.get("day_name", "").lower()
-                    g_day_short = g_day[:2]
-                    g_start = grp.get("start_time", "")
-                    g_end = grp.get("end_time", "")
-                    for line in lines:
-                        l_low = line.lower()
-                        if not course_matches_page and not any(tk in l_low for tk in tokens if len(tk) >= 4):
-                            continue
-                        if g_start and g_start in l_low and (g_day in l_low or g_day_short in l_low):
-                            detected.append({
-                                "course_id": cid,
-                                "group_id": grp["group_id"],
-                                "group_name": grp["name"],
-                                "day_name": grp["day_name"],
-                                "start_time": g_start,
-                                "end_time": g_end,
-                                "source_url": page_data.get("url"),
-                            })
+        def match_course_and_group(course_hint: str, group_title: str, detail_text: str, source_url: str):
+            combined = f"{course_hint} {group_title} {detail_text}".lower()
+            # Extract only the description block if present so header numbers don't confuse parse_german_timeslot
+            desc_clean = detail_text
+            if "Beschreibung" in detail_text:
+                desc_clean = detail_text.split("Beschreibung", 1)[1]
+            slot = parse_german_timeslot(f"{group_title} {desc_clean}")
+            has_group_keyword = bool(re.search(r"\b(?:übung|gruppe|gr\.?|tutorium|praktikum)\b", group_title, re.IGNORECASE))
+            if not slot and not has_group_keyword:
+                return
+
+            # 1. Identify which course in `all_courses` this belongs to
+            matched_course = None
+            for ckey, raw_c in all_courses.items():
+                c = enrich_course_with_unibody(raw_c)
+                cid_low = c["course_id"].lower()
+                title_low = (c.get("title") or "").lower()
+                tokens = [tk.lower() for tk in c.get("verified_tokens", [])] + [cid_low]
+                if any(tk in combined for tk in tokens if len(tk) >= 4) or (
+                    "betriebswirtschaft" in combined and "bwl" in cid_low
+                ) or (
+                    "mathematik für die informatik a" in combined and "math-a" in cid_low
+                ) or (
+                    "wirtschaftsinformatik" in combined and "ewinf" in cid_low
+                ) or (
+                    "einführung in die informatik" in combined and "infeinf" in cid_low
+                ):
+                    matched_course = c
+                    break
+
+            if not matched_course:
+                return
+
+            cid = matched_course["course_id"]
+            groups = matched_course.get("groups", [])
+            if not groups:
+                return
+
+            # 2. Match exact exercise group inside `matched_course["groups"]` by parsed day + start_time
+            matched_grp = None
+            if slot:
+                for g in groups:
+                    if int(g.get("day", -1)) == int(slot["day"]) and g.get("start_time") == slot["start_time"]:
+                        matched_grp = g
+                        break
+                if not matched_grp:
+                    for g in groups:
+                        if int(g.get("day", -1)) == int(slot["day"]):
+                            matched_grp = g
                             break
+
+            # Fallback: match by group number (e.g. "Gruppe 2" or "Gr. 05") if no time slot in description
+            if not matched_grp:
+                m_num = re.search(r"(?:gruppe|gr\.?|übung|tutorium)\s*0*(\d+)", group_title, re.IGNORECASE)
+                if m_num:
+                    idx = int(m_num.group(1)) - 1
+                    if 0 <= idx < len(groups):
+                        matched_grp = groups[idx]
+
+            if matched_grp:
+                if not any(d["course_id"] == cid for d in detected):
+                    detected.append({
+                        "course_id": cid,
+                        "group_id": matched_grp["group_id"],
+                        "group_name": matched_grp["name"],
+                        "lms_group_name": group_title,
+                        "day_name": matched_grp["day_name"],
+                        "start_time": matched_grp["start_time"],
+                        "end_time": matched_grp["end_time"],
+                        "source_url": source_url,
+                    })
+
+        # ---------------------------------------------------------------------
+        # PART A: Crawl OpenOlat (`lms.uni-kiel.de/url/GroupsSite/0`)
+        # ---------------------------------------------------------------------
+        if olat_tab and olat_tab.get("webSocketDebuggerUrl"):
+            ws_olat = olat_tab["webSocketDebuggerUrl"]
+            self.add_log("INFO", "🏛️ UNIBODY Deep-Sync: Öffne OpenOlat 'Meine Gruppen' (lms.uni-kiel.de/url/GroupsSite/0)...")
+            self._cdp_send_command(ws_olat, "Page.navigate", {"url": "https://lms.uni-kiel.de/url/GroupsSite/0"})
+            time.sleep(1.7)
+
+            # If OpenOlat redirected to /dmz/ login, auto-login first
+            if creds.get("username") and creds.get("password"):
+                self.inject_autofill_into_tabs(force_submit=True)
+
+            extract_olat_groups_js = """
+            (function() {
+              const items = [];
+              const rows = document.querySelectorAll('table tbody tr');
+              for (const tr of rows) {
+                const bgLink = tr.querySelector('a[href*="BusinessGroup/"]');
+                const courseLink = tr.querySelector('a[href*="Repository/"], a[href*="RepositoryEntry/"]');
+                if (bgLink) {
+                  items.push({
+                    groupName: (bgLink.innerText || '').trim(),
+                    bgUrl: bgLink.href,
+                    courseName: courseLink ? (courseLink.innerText || '').trim() : (tr.innerText || '').trim()
+                  });
+                }
+              }
+              return JSON.stringify(items);
+            })();
+            """
+            res_olat = self._cdp_send_command(ws_olat, "Runtime.evaluate", {"expression": extract_olat_groups_js, "returnByValue": True})
+            val_olat = res_olat.get("result", {}).get("result", {}).get("value") if isinstance(res_olat, dict) else None
+            olat_groups = []
+            if val_olat:
+                try:
+                    olat_groups = json.loads(val_olat)
+                except Exception:
+                    olat_groups = []
+
+            for item in olat_groups:
+                g_name = item.get("groupName") or ""
+                c_name = item.get("courseName") or ""
+                bg_url = item.get("bgUrl") or ""
+                if not bg_url:
+                    continue
+                # Skip pure lecture main groups like "EBWL 26/27" if there's no "Übung" / "Gr" / "Tutorium", though we still check description
+                self._cdp_send_command(ws_olat, "Page.navigate", {"url": bg_url})
+                time.sleep(1.1)
+                res_bg = self._cdp_send_command(
+                    ws_olat,
+                    "Runtime.evaluate",
+                    {
+                        "expression": "JSON.stringify({desc: document.querySelector('#o_main_container')?.innerText || document.body?.innerText || ''})",
+                        "returnByValue": True,
+                    },
+                )
+                val_bg = res_bg.get("result", {}).get("result", {}).get("value") if isinstance(res_bg, dict) else None
+                desc_text = ""
+                if val_bg:
+                    try:
+                        desc_text = json.loads(val_bg).get("desc", "")
+                    except Exception:
+                        pass
+                raw_findings.append({"platform": "lms.uni-kiel.de", "group": g_name, "course": c_name, "desc": desc_text[:200]})
+                match_course_and_group(c_name, g_name, desc_text, bg_url)
+
+            # Navigate back to GroupsSite overview so user sees a clean table
+            if olat_groups:
+                self._cdp_send_command(ws_olat, "Page.navigate", {"url": "https://lms.uni-kiel.de/url/GroupsSite/0"})
+
+        # ---------------------------------------------------------------------
+        # PART B: Crawl Moodle (`elearn.informatik.uni-kiel.de/my/`)
+        # ---------------------------------------------------------------------
+        if moodle_tab and moodle_tab.get("webSocketDebuggerUrl"):
+            ws_moodle = moodle_tab["webSocketDebuggerUrl"]
+            self.add_log("INFO", "💻 UNIBODY Deep-Sync: Prüfe eingeschriebene Kurse & Gruppenwahl auf elearn.informatik.uni-kiel.de...")
+            self._cdp_send_command(ws_moodle, "Page.navigate", {"url": "https://elearn.informatik.uni-kiel.de/my/"})
+            time.sleep(1.5)
+
+            extract_moodle_courses_js = """
+            (function() {
+              const links = Array.from(document.querySelectorAll('a[href*="course/view.php?id="]'));
+              const seen = new Set();
+              const out = [];
+              for (const a of links) {
+                if (!seen.has(a.href)) {
+                  seen.add(a.href);
+                  out.push({ title: (a.innerText || '').replace(/\\s+/g, ' ').trim(), url: a.href });
+                }
+              }
+              return JSON.stringify(out);
+            })();
+            """
+            res_mc = self._cdp_send_command(ws_moodle, "Runtime.evaluate", {"expression": extract_moodle_courses_js, "returnByValue": True})
+            val_mc = res_mc.get("result", {}).get("result", {}).get("value") if isinstance(res_mc, dict) else None
+            moodle_courses = []
+            if val_mc:
+                try:
+                    moodle_courses = json.loads(val_mc)
+                except Exception:
+                    moodle_courses = []
+
+            for mc in moodle_courses[:5]:
+                c_url = mc.get("url")
+                c_title = mc.get("title") or ""
+                if not c_url or "fachschaft" in c_title.lower():
+                    continue
+                self._cdp_send_command(ws_moodle, "Page.navigate", {"url": c_url})
+                time.sleep(1.2)
+                extract_cg_js = """
+                (function() {
+                  const links = Array.from(document.querySelectorAll('a[href*="mod/choicegroup/view.php"], a[href*="mod/choice/view.php"]'));
+                  return JSON.stringify(links.map(a => ({ title: (a.innerText || '').trim(), url: a.href })));
+                })();
+                """
+                res_cg = self._cdp_send_command(ws_moodle, "Runtime.evaluate", {"expression": extract_cg_js, "returnByValue": True})
+                val_cg = res_cg.get("result", {}).get("result", {}).get("value") if isinstance(res_cg, dict) else None
+                cg_links = []
+                if val_cg:
+                    try:
+                        cg_links = json.loads(val_cg)
+                    except Exception:
+                        cg_links = []
+
+                for cg in cg_links[:2]:
+                    cg_url = cg.get("url")
+                    if not cg_url:
+                        continue
+                    self._cdp_send_command(ws_moodle, "Page.navigate", {"url": cg_url})
+                    time.sleep(1.1)
+                    check_selected_js = """
+                    (function() {
+                      const checked = document.querySelector('form input[type="radio"]:checked, form input[type="checkbox"]:checked');
+                      if (checked) {
+                        const row = checked.closest('tr, .fitem, li, div');
+                        return JSON.stringify({ chosen: row ? row.innerText.replace(/\\s+/g, ' ').trim() : checked.value });
+                      }
+                      const bodyTxt = document.querySelector('#region-main, main')?.innerText || '';
+                      const m = bodyTxt.match(/(?:Ihre Auswahl|Your choice|Mitglied in)[:\\s]+([^\\n]+)/i);
+                      return JSON.stringify({ chosen: m ? m[1].trim() : '' });
+                    })();
+                    """
+                    res_sel = self._cdp_send_command(ws_moodle, "Runtime.evaluate", {"expression": check_selected_js, "returnByValue": True})
+                    val_sel = res_sel.get("result", {}).get("result", {}).get("value") if isinstance(res_sel, dict) else None
+                    if val_sel:
+                        try:
+                            chosen_txt = json.loads(val_sel).get("chosen") or ""
+                            if chosen_txt:
+                                match_course_and_group(c_title, chosen_txt, chosen_txt, cg_url)
+                        except Exception:
+                            pass
 
         if detected:
             for d in detected:
                 self.add_log(
                     "SUCCESS",
-                    f"🔄 UNIBODY Live-Sync: Bereits gebuchte Übung für '{d['course_id']}' im Browser erkannt -> {d['group_name']}"
+                    f"✅ UNIBODY Deep-Sync: Gebuchte Übung gefunden für '{d['course_id']}' ({d.get('lms_group_name')}) -> {d['group_name']}!"
                 )
         else:
             self.add_log(
                 "INFO",
-                f"🔍 UNIBODY Live-Sync: {scanned_tabs} CAU-Tab(s) gescannt (Öffne im Browser die Kurs-/Gruppenseite oder klicke direkt bei deiner Gruppe auf '✓ Bereits gebucht')."
+                "🔍 UNIBODY Deep-Sync abgeschlossen: Keine aktiven Übungsgruppen-Buchungen auf OpenOlat / Moodle gefunden."
             )
 
         return {
             "ok": True,
-            "scanned_tabs": scanned_tabs,
+            "scanned_tabs": len(tabs),
             "detected": detected,
+            "raw_findings": raw_findings,
         }
 
 

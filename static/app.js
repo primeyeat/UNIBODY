@@ -288,7 +288,7 @@ async function syncEnrolledGroupsFromBrowser() {
   const btn = document.getElementById("btnSyncEnrolledGroups");
   if (btn) {
     btn.disabled = true;
-    btn.textContent = "🔄 Scanne Browser-Tabs...";
+    btn.textContent = "🔄 UNIBODY prüft OpenOlat & eLearn...";
   }
   try {
     const res = await apiPost("/api/course/sync-enrolled", {});
@@ -304,16 +304,16 @@ async function syncEnrolledGroupsFromBrowser() {
     if (btn) {
       const count = (res.detected || []).length;
       btn.textContent = count > 0
-        ? `✅ ${count} Buchung(en) erkannt!`
-        : "ℹ️ Klicke unten bei deiner Gruppe auf '✓ Bereits gebucht'";
+        ? `✅ ${count} gebuchte Übung(en) importiert!`
+        : "ℹ️ Keine aktiven Übungen gefunden";
       setTimeout(() => {
-        btn.textContent = "🔄 Gebuchte Übungen erkennen";
+        btn.textContent = "🔄 UNIBODY Deep-Sync (Gebuchte Übungen holen)";
         btn.disabled = false;
-      }, 3200);
+      }, 3500);
     }
   } catch (e) {
     if (btn) {
-      btn.textContent = "🔄 Gebuchte Übungen erkennen";
+      btn.textContent = "🔄 UNIBODY Deep-Sync (Gebuchte Übungen holen)";
       btn.disabled = false;
     }
   }
