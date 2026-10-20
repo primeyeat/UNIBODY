@@ -376,6 +376,30 @@ public class AppState: ObservableObject {
         jobs.insert(job, at: 0)
     }
     
+    public func fetchBookedExercisesFromOnlineAccounts() async {
+        guard !username.isEmpty, !password.isEmpty else {
+            syncMessage = "⚠️ Bitte gib zuerst deine CAU-Kennung und dein Passwort ein."
+            return
+        }
+        
+        isSyncing = true
+        defer { isSyncing = false }
+        
+        let results = await CAUOnlineAccountFetcher.shared.fetchBookedExercises(
+            username: username,
+            password: password,
+            knownCourses: courses
+        )
+        
+        for r in results {
+            enrollInGroup(courseId: r.courseId, groupId: r.groupId)
+        }
+        
+        self.lastSyncDate = Date()
+        let count = results.count
+        syncMessage = "✅ Online via CAU-Accounts geladen: \(count) belegte Übung\(count == 1 ? "" : "en") aktiv!"
+    }
+    
     public func syncWithLocalServer(customURL: String? = nil) async {
         isSyncing = true
         defer { isSyncing = false }

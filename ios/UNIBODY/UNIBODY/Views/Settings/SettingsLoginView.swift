@@ -160,6 +160,35 @@ public struct SettingsLoginView: View {
                             }
                             .tint(AeroTheme.skyBlue)
                             
+                            // Primary Internet Account Fetch Button
+                            Button {
+                                appState.saveCredentials(
+                                    username: inputUsername,
+                                    password: inputPassword,
+                                    defaultPlatform: selectedPlatform,
+                                    autoFill: autoFill,
+                                    autoSubmit: autoSubmit
+                                )
+                                Task {
+                                    await appState.fetchBookedExercisesFromOnlineAccounts()
+                                }
+                            } label: {
+                                HStack {
+                                    if appState.isSyncing {
+                                        ProgressView()
+                                            .tint(.white)
+                                    } else {
+                                        Image(systemName: "icloud.and.arrow.down.fill")
+                                    }
+                                    Text(appState.isSyncing ? "Lade aus CAU-Accounts..." : "Aus CAU-Accounts laden (OpenOlat & Moodle)")
+                                }
+                                .frame(maxWidth: .infinity)
+                                .glossyButton(gradient: AeroTheme.oceanGradient, cornerRadius: 14)
+                            }
+                            .buttonStyle(.plain)
+                            .disabled(inputUsername.trimmingCharacters(in: .whitespaces).isEmpty || appState.isSyncing)
+                            .padding(.top, 4)
+                            
                             // Save Button
                             Button {
                                 withAnimation {
@@ -180,14 +209,15 @@ public struct SettingsLoginView: View {
                             } label: {
                                 HStack {
                                     Image(systemName: "checkmark.shield.fill")
-                                    Text("Zugangsdaten speichern & aktivieren")
+                                    Text("Nur Zugangsdaten im Tresor sichern")
                                 }
+                                .font(.caption.weight(.semibold))
+                                .foregroundColor(AeroTheme.skyBlue)
                                 .frame(maxWidth: .infinity)
-                                .glossyButton(gradient: AeroTheme.auroraGradient, cornerRadius: 14)
+                                .padding(.vertical, 4)
                             }
                             .buttonStyle(.plain)
                             .disabled(inputUsername.trimmingCharacters(in: .whitespaces).isEmpty)
-                            .padding(.top, 6)
                             
                             if appState.isVaultSaved {
                                 Button(role: .destructive) {
