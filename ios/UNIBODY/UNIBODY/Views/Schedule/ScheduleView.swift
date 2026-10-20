@@ -18,29 +18,32 @@ public struct ScheduleView: View {
     public var body: some View {
         NavigationStack {
             ZStack {
-                // Background ambient Frutiger Aero backdrop
-                LinearGradient(
-                    colors: [
-                        Color(red: 0.02, green: 0.08, blue: 0.16),
-                        Color(red: 0.01, green: 0.04, blue: 0.1)
-                    ],
-                    startPoint: .top,
-                    endPoint: .bottom
-                )
+                // Background ambient Frutiger Aero backdrop (hardware rasterized)
+                ZStack {
+                    LinearGradient(
+                        colors: [
+                            Color(red: 0.02, green: 0.08, blue: 0.16),
+                            Color(red: 0.01, green: 0.04, blue: 0.1)
+                        ],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                    
+                    // Ambient lighting orbs
+                    Circle()
+                        .fill(AeroTheme.skyBlue.opacity(0.18))
+                        .frame(width: 320, height: 320)
+                        .blur(radius: 80)
+                        .offset(x: -120, y: -200)
+                    
+                    Circle()
+                        .fill(AeroTheme.auroraGreen.opacity(0.15))
+                        .frame(width: 280, height: 280)
+                        .blur(radius: 70)
+                        .offset(x: 140, y: 150)
+                }
+                .drawingGroup()
                 .ignoresSafeArea()
-                
-                // Ambient lighting orbs
-                Circle()
-                    .fill(AeroTheme.skyBlue.opacity(0.18))
-                    .frame(width: 320, height: 320)
-                    .blur(radius: 80)
-                    .offset(x: -120, y: -200)
-                
-                Circle()
-                    .fill(AeroTheme.auroraGreen.opacity(0.15))
-                    .frame(width: 280, height: 280)
-                    .blur(radius: 70)
-                    .offset(x: 140, y: 150)
                 
                 VStack(spacing: 0) {
                     // Day Selector Tabs
