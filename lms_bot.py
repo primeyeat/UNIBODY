@@ -1069,6 +1069,15 @@ class CAUBrowserSessionManager:
     return 'CLICKED_SSO_REDIRECT';
   }}
 
+  // 3b. If Moodle (`elearn.informatik.uni-kiel.de/login/index.php`) says "You are already logged in" / "bereits angemeldet", redirect to `/my/`
+  if (host.includes('elearn.informatik') && url.includes('/login/')) {{
+    const bt = (document.body ? document.body.innerText : '').toLowerCase();
+    if (bt.includes('already logged in') || bt.includes('bereits angemeldet')) {{
+      window.location.replace('https://elearn.informatik.uni-kiel.de/my/');
+      return 'CLICKED_SSO_REDIRECT';
+    }}
+  }}
+
   // 4. If on Moodle (elearn.informatik.uni-kiel.de) or CAU SSO page without visible login fields:
   //    Automatically click the "CAU-Login / Shibboleth / Anmelden" link if not authenticated yet!
   if (CFG.autoSubmit && !olatForm) {{
@@ -1344,7 +1353,7 @@ setTimeout(runUnibodyAutoFill, 2200);
         if pref_plat == "unibody":
             urls_to_open = [
                 "https://lms.uni-kiel.de",
-                "https://elearn.informatik.uni-kiel.de/login/index.php",
+                "https://elearn.informatik.uni-kiel.de/my/",
             ]
         else:
             urls_to_open = [pref_plat]
