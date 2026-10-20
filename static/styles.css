@@ -1461,6 +1461,17 @@ body.dark-mode .group-card.rank-1 {
   background: linear-gradient(90deg, rgba(22, 115, 58, 0.55) 0%, rgba(12, 46, 82, 0.88) 70%);
 }
 
+.group-card.already-enrolled-card {
+  border: 2px solid #00bfa5;
+  box-shadow: 0 6px 20px rgba(0, 191, 165, 0.25), inset 0 1px 0 #ffffff;
+}
+
+body.dark-mode .group-card.already-enrolled-card {
+  border-color: #42f5d4;
+  background: linear-gradient(90deg, rgba(0, 150, 136, 0.42) 0%, rgba(12, 46, 82, 0.88) 70%);
+  box-shadow: 0 6px 20px rgba(66, 245, 212, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.18);
+}
+
 body.dark-mode .group-card.conflict {
   background: linear-gradient(90deg, rgba(130, 18, 38, 0.45) 0%, rgba(12, 32, 56, 0.85) 100%);
   border-color: rgba(255, 90, 110, 0.55);

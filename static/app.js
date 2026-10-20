@@ -19,8 +19,10 @@ let appState = {
     latest_time: "16:30",
     preferred_free_days: [4],
   },
+  enrolledGroups: {},
   catalog: [],
   currentCourse: null,
+  currentEnrolledGroupId: null,
   rankedGroups: [],
   highlightedGroupId: null,
   icsStagedEvents: [],
@@ -83,6 +85,7 @@ async function fetchInitialState() {
   if (!data.ok) return;
   appState.schedule = data.schedule || [];
   appState.preferences = data.preferences || appState.preferences;
+  appState.enrolledGroups = data.enrolled_groups || {};
   appState.catalog = data.catalog || [];
   if (data.credentials) {
     appState.credentials = data.credentials;
@@ -179,9 +182,14 @@ function renderCatalogChips() {
     if (appState.currentCourse && appState.currentCourse.course_id === c.course_id) {
       btn.classList.add("active");
     }
+    const ckey = (c.course_id || "").toLowerCase();
+    const hasEnrolled = Boolean((appState.enrolledGroups && appState.enrolledGroups[ckey]) || c.enrolled_group_id);
     const platIcon = c.platform_id === "elearn_inf" ? "💻 elearn.inf" : "🏛️ lms";
-    btn.title = `UNIBODY routet diesen Kurs automatisch auf ${c.platform_host || "lms.uni-kiel.de"}`;
-    btn.innerHTML = `<strong>${c.course_id}</strong> <span style="opacity:0.85;font-size:0.68rem;">[${platIcon}]</span>`;
+    const bookedDot = hasEnrolled ? " ✅" : "";
+    btn.title = hasEnrolled
+      ? `${c.course_id}: Du hast hier bereits eine Übungsgruppe gebucht (${c.platform_host || "lms.uni-kiel.de"})`
+      : `UNIBODY routet diesen Kurs automatisch auf ${c.platform_host || "lms.uni-kiel.de"}`;
+    btn.innerHTML = `<strong>${c.course_id}${bookedDot}</strong> <span style="opacity:0.85;font-size:0.68rem;">[${platIcon}]</span>`;
     btn.addEventListener("click", () => {
       document.getElementById("courseQueryInput").value = c.course_id;
       verifyAndRankCourse(c.course_id);
@@ -197,6 +205,7 @@ async function verifyAndRankCourse(queryId) {
 
   if (!res.ok) {
     appState.currentCourse = null;
+    appState.currentEnrolledGroupId = null;
     appState.rankedGroups = [];
     banner.className = "verification-banner error";
     banner.innerHTML = `<div>🛡️ <strong>${res.error}</strong></div>`;
@@ -207,6 +216,12 @@ async function verifyAndRankCourse(queryId) {
   }
 
   appState.currentCourse = res.course;
+  appState.currentEnrolledGroupId = res.enrolled_group_id || null;
+  if (appState.currentCourse && appState.currentCourse.course_id) {
+    const ck = appState.currentCourse.course_id.toLowerCase();
+    if (res.enrolled_group_id) appState.enrolledGroups[ck] = res.enrolled_group_id;
+    else delete appState.enrolledGroups[ck];
+  }
   appState.rankedGroups = res.ranked_groups || [];
   document.getElementById("enrollModeSelect").value = res.course.enrollment_mode || "sniper";
 
@@ -250,6 +265,60 @@ async function verifyAndRankCourse(queryId) {
   renderTimetable();
 }
 
+/* MARK OR SYNC ALREADY ENROLLED GROUPS (SO UNIBODY KNOWS WHAT YOU ALREADY BOOKED) */
+async function markGroupAsAlreadyEnrolled(groupId) {
+  if (!appState.currentCourse) return;
+  const res = await apiPost("/api/course/mark-enrolled", {
+    course_id: appState.currentCourse.course_id,
+    group_id: groupId,
+  });
+  if (res.ok) {
+    appState.schedule = res.schedule || appState.schedule;
+    appState.enrolledGroups = res.enrolled_groups || appState.enrolledGroups;
+    appState.currentEnrolledGroupId = res.enrolled_group_id || null;
+    appState.rankedGroups = res.ranked_groups || [];
+    renderCatalogChips();
+    renderRankedGroups();
+    renderTimetable();
+    await pollTelemetry();
+  }
+}
+
+async function syncEnrolledGroupsFromBrowser() {
+  const btn = document.getElementById("btnSyncEnrolledGroups");
+  if (btn) {
+    btn.disabled = true;
+    btn.textContent = "🔄 Scanne Browser-Tabs...";
+  }
+  try {
+    const res = await apiPost("/api/course/sync-enrolled", {});
+    if (res.schedule) appState.schedule = res.schedule;
+    if (res.enrolled_groups) appState.enrolledGroups = res.enrolled_groups;
+    if (appState.currentCourse) {
+      await verifyAndRankCourse(appState.currentCourse.course_id);
+    } else {
+      renderCatalogChips();
+      renderTimetable();
+    }
+    await pollTelemetry();
+    if (btn) {
+      const count = (res.detected || []).length;
+      btn.textContent = count > 0
+        ? `✅ ${count} Buchung(en) erkannt!`
+        : "ℹ️ Klicke unten bei deiner Gruppe auf '✓ Bereits gebucht'";
+      setTimeout(() => {
+        btn.textContent = "🔄 Gebuchte Übungen erkennen";
+        btn.disabled = false;
+      }, 3200);
+    }
+  } catch (e) {
+    if (btn) {
+      btn.textContent = "🔄 Gebuchte Übungen erkennen";
+      btn.disabled = false;
+    }
+  }
+}
+
 /* RENDER RANKED EXERCISE GROUPS */
 async function pinGroupAsRank1(groupId) {
   if (!appState.currentCourse) return;
@@ -260,6 +329,7 @@ async function pinGroupAsRank1(groupId) {
   if (res.ok) {
     appState.rankedGroups = res.ranked_groups || [];
     appState.pinnedGroupId = res.pinned_group_id || null;
+    appState.currentEnrolledGroupId = res.enrolled_group_id || appState.currentEnrolledGroupId;
     renderRankedGroups();
     renderTimetable();
     const firstCard = document.querySelector("#rankedGroupsContainer .group-card.rank-1");
@@ -275,18 +345,57 @@ async function pinGroupAsRank1(groupId) {
 
 function renderRankedGroups() {
   const container = document.getElementById("rankedGroupsContainer");
+  const enrolledBanner = document.getElementById("currentCourseEnrolledBanner");
   container.innerHTML = "";
 
   if (!appState.currentCourse) {
+    if (enrolledBanner) enrolledBanner.classList.add("hidden");
     container.innerHTML = `<div style="padding:18px;text-align:center;color:#525c68;font-size:0.85rem;">Bitte gib oben eine verifizierte Kurs-ID ein, um die optimalen Übungsgruppen zu berechnen.</div>`;
     return;
+  }
+
+  const enrolledGrp = appState.rankedGroups.find((g) => g.is_enrolled || g.group_id === appState.currentEnrolledGroupId);
+  const rank1Grp = appState.rankedGroups.find((g) => g.rank === 1);
+
+  if (enrolledBanner) {
+    if (enrolledGrp) {
+      const isAlreadyOptimal = rank1Grp && rank1Grp.group_id === enrolledGrp.group_id;
+      enrolledBanner.classList.remove("hidden");
+      enrolledBanner.innerHTML = `
+        <div style="flex:1;">
+          <div>
+            ✅ <strong>Bereits gebuchte Übung in ${appState.currentCourse.course_id}:</strong>
+            <span>${enrolledGrp.name} (${enrolledGrp.day_name}, ${enrolledGrp.start_time}–${enrolledGrp.end_time} Uhr · ${enrolledGrp.display_score}% Match)</span>
+          </div>
+          <div style="font-size:0.76rem;margin-top:3px;opacity:0.95;">
+            ${
+              isAlreadyOptimal
+                ? "🎉 <strong>Perfekt!</strong> Deine bereits gebuchte Gruppe ist gleichzeitig Platz #1 im Optimizer. Der Termin ist fest im Wochenplan für alle anderen Kurse reserviert."
+                : `💡 <strong>Upgrade möglich:</strong> <strong>${rank1Grp ? rank1Grp.name : "Eine andere Gruppe"}</strong> hätte einen höheren Score (${rank1Grp ? rank1Grp.display_score : ""}% statt ${enrolledGrp.display_score}%). Du kannst per Sniper automatisch auf die bessere Gruppe wechseln!`
+            }
+          </div>
+        </div>
+        <button type="button" id="btnClearEnrolledCurrent" class="btn btn-xs btn-outline" title="Markierung als gebuchte Gruppe wieder aufheben">
+          ✕ Buchung aufheben
+        </button>
+      `;
+      const clearBtn = document.getElementById("btnClearEnrolledCurrent");
+      if (clearBtn) {
+        clearBtn.addEventListener("click", () => {
+          markGroupAsAlreadyEnrolled(null);
+        });
+      }
+    } else {
+      enrolledBanner.classList.add("hidden");
+    }
   }
 
   appState.rankedGroups.forEach((g) => {
     const card = document.createElement("div");
     const isRank1 = g.rank === 1;
     const isPinned = Boolean(g.is_pinned);
-    card.className = `group-card ${isRank1 ? "rank-1" : ""} ${g.is_conflict ? "conflict" : ""}`;
+    const isEnrolled = Boolean(g.is_enrolled || g.group_id === appState.currentEnrolledGroupId);
+    card.className = `group-card ${isRank1 ? "rank-1" : ""} ${g.is_conflict ? "conflict" : ""} ${isEnrolled ? "already-enrolled-card" : ""}`;
     card.title = g.is_conflict
       ? "Zeitkonflikt mit deinem Stundenplan"
       : isPinned
@@ -298,11 +407,19 @@ function renderRankedGroups() {
       .map((r) => `<span class="reason-pill">${r}</span>`)
       .join("");
 
+    const enrolledBadge = isEnrolled
+      ? `<span style="background:linear-gradient(180deg,#42f5d4 0%,#00bfa5 50%,#008e7b 100%);color:#002b24;font-size:0.7rem;padding:2px 9px;border-radius:99px;margin-left:6px;font-weight:900;border:1px solid #00796b;box-shadow:0 2px 6px rgba(0,191,165,0.35);">✅ Aktuell gebucht (Im Kalender aktiv)</span>`
+      : "";
+
     const pinBadge = isPinned
       ? `<span style="background:linear-gradient(180deg,#52eb68 0%,#1db933 50%,#0e8a21 100%);color:#ffffff;font-size:0.7rem;padding:2px 8px;border-radius:99px;margin-left:6px;font-weight:900;border:1px solid #0b6e1a;">📌 Manuell Priorisiert (Wunsch #1)</span>`
       : isRank1
       ? `<span style="color:#0f8a22;font-size:0.8rem;font-weight:900;margin-left:4px;">🏆 (Bester Platz)</span>`
       : `<span style="font-size:0.72rem;color:#35658a;margin-left:6px;">👆 Klick = als #1 priorisieren</span>`;
+
+    const enrollToggleBtnStyle = isEnrolled
+      ? "background:linear-gradient(180deg,#42f5d4 0%,#00bfa5 100%);color:#002b24;border:1px solid #00897b;font-weight:800;padding:4px 10px;border-radius:999px;font-size:0.71rem;cursor:pointer;margin-top:6px;display:inline-flex;align-items:center;gap:4px;"
+      : "background:rgba(0,140,230,0.12);color:inherit;border:1px solid rgba(0,150,240,0.4);font-weight:700;padding:4px 10px;border-radius:999px;font-size:0.71rem;cursor:pointer;margin-top:6px;display:inline-flex;align-items:center;gap:4px;";
 
     card.innerHTML = `
       <div class="group-left">
@@ -310,7 +427,7 @@ function renderRankedGroups() {
           <span>${rankText}</span>
         </div>
         <div class="group-info">
-          <h4>${g.name} ${pinBadge}</h4>
+          <h4>${g.name} ${enrolledBadge} ${pinBadge}</h4>
           <div class="group-meta">
             🗓️ <strong>${g.day_name}, ${g.start_time} – ${g.end_time} Uhr</strong> · 📍 ${g.room || "CAU"} ${g.tutor ? `· 👤 ${g.tutor}` : ""}
           </div>
@@ -320,8 +437,19 @@ function renderRankedGroups() {
       <div class="group-right">
         <div class="score-circle">${g.is_conflict ? "Blockiert" : `${g.display_score}% Match`}</div>
         <div class="spots-tag">${g.spots_free} / ${g.spots_total} Plätze frei</div>
+        <button type="button" class="btn-mark-enrolled" style="${enrollToggleBtnStyle}" title="Klicke hier, wenn du dich in diese Übungsgruppe schon manuell auf OpenOlat/Moodle eingetragen hast – UNIBODY trägt sie sofort fest in deinen Stundenplan ein!">
+          ${isEnrolled ? "✅ Bereits gebucht (Aktiv)" : "☑️ Schon manuell gebucht?"}
+        </button>
       </div>
     `;
+
+    const markBtn = card.querySelector(".btn-mark-enrolled");
+    if (markBtn) {
+      markBtn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        markGroupAsAlreadyEnrolled(g.group_id);
+      });
+    }
 
     if (!g.is_conflict) {
       card.addEventListener("click", () => {
@@ -455,9 +583,11 @@ function renderTimetable() {
       const res = await apiPost("/api/schedule/delete", { id: ev.id });
       if (res.ok) {
         appState.schedule = res.schedule;
+        if (res.enrolled_groups) appState.enrolledGroups = res.enrolled_groups;
         if (appState.currentCourse) {
           await verifyAndRankCourse(appState.currentCourse.course_id);
         } else {
+          renderCatalogChips();
           renderTimetable();
         }
       }
@@ -472,6 +602,8 @@ function renderTimetable() {
   appState.rankedGroups.forEach((g) => {
     const dayIdx = Number(g.day);
     if (dayIdx < 0 || dayIdx > 4) return;
+    // Skip rendering a duplicate candidate overlay for the group that is already rendered as an enrolled_exercise block
+    if (g.is_enrolled || g.group_id === appState.currentEnrolledGroupId) return;
     const isHovered = appState.highlightedGroupId === g.group_id;
     if (g.is_conflict && !isHovered) return;
 
@@ -548,6 +680,14 @@ function renderTimetable() {
 
 /* EVENT BINDINGS */
 function bindUIEvents() {
+  // Sync already enrolled groups from open browser tabs
+  const syncEnrolledBtn = document.getElementById("btnSyncEnrolledGroups");
+  if (syncEnrolledBtn) {
+    syncEnrolledBtn.addEventListener("click", () => {
+      syncEnrolledGroupsFromBrowser();
+    });
+  }
+
   // Course lookup
   document.getElementById("btnVerifyCourse").addEventListener("click", () => {
     const q = document.getElementById("courseQueryInput").value;

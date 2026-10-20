@@ -203,6 +203,7 @@ def load_state() -> Dict[str, Any]:
                     "preferences": {**DEFAULT_PREFERENCES, **data.get("preferences", {})},
                     "custom_courses": data.get("custom_courses", {}),
                     "pinned_groups": data.get("pinned_groups", {}),
+                    "enrolled_groups": data.get("enrolled_groups", {}),
                     "jobs": data.get("jobs", []),
                 }
         except Exception:
@@ -212,6 +213,7 @@ def load_state() -> Dict[str, Any]:
         "preferences": dict(DEFAULT_PREFERENCES),
         "custom_courses": {},
         "pinned_groups": {},
+        "enrolled_groups": {},
         "jobs": [],
     }
 
@@ -223,6 +225,50 @@ def save_state(state: Dict[str, Any]):
 
 APP_STATE = load_state()
 STATE_LOCK = threading.Lock()
+
+
+def _apply_enrolled_group_to_state(course: Dict[str, Any], group_id: Optional[str]) -> Optional[Dict[str, Any]]:
+    """
+    Marks `group_id` as the user's already-booked exercise group for `course` (or clears it if None),
+    and synchronizes the `enrolled-<course_id>` block in `APP_STATE["schedule"]` so all other courses
+    automatically avoid overlapping with this booked exercise!
+    """
+    cid = course["course_id"]
+    ckey = cid.lower()
+    sched_entry_id = f"enrolled-{ckey}"
+    if "enrolled_groups" not in APP_STATE:
+        APP_STATE["enrolled_groups"] = {}
+
+    # Remove any previous enrolled block for this course (case-insensitive)
+    APP_STATE["schedule"] = [
+        e for e in APP_STATE["schedule"]
+        if str(e.get("id", "")).lower() != sched_entry_id
+        and not (e.get("type") == "enrolled_exercise" and str(e.get("course_id", "")).lower() == ckey)
+    ]
+
+    if not group_id:
+        APP_STATE["enrolled_groups"].pop(ckey, None)
+        return None
+
+    grp = next((g for g in course.get("groups", []) if g.get("group_id") == group_id), None)
+    if not grp:
+        return None
+
+    APP_STATE["enrolled_groups"][ckey] = group_id
+    APP_STATE["schedule"].append({
+        "id": f"enrolled-{cid}",
+        "course_id": cid,
+        "group_id": group_id,
+        "title": f"✅ {cid}: {grp['name']}",
+        "day": grp["day"],
+        "day_name": grp["day_name"],
+        "start_time": grp["start_time"],
+        "end_time": grp["end_time"],
+        "room": grp.get("room", "LMS"),
+        "type": "enrolled_exercise",
+        "enabled": True,
+    })
+    return grp
 
 
 def execute_enrollment_job(job_id: str, simulate_first_choice_full: bool = False):
@@ -325,13 +371,20 @@ def execute_enrollment_job(job_id: str, simulate_first_choice_full: bool = False
             else f"[{platform_host}] Prioritäten 1–{min(3, len(priorities))} gespeichert (Top-Wunsch: {enrolled_group['name']})"
         )
 
-        # Add to schedule if not already present
-        existing_ids = {e.get("id") for e in APP_STATE["schedule"]}
-        sched_entry_id = f"enrolled-{course_id}"
-        # Replace any previous enrollment of the same course
-        APP_STATE["schedule"] = [e for e in APP_STATE["schedule"] if e.get("id") != sched_entry_id]
+        if "enrolled_groups" not in APP_STATE:
+            APP_STATE["enrolled_groups"] = {}
+        APP_STATE["enrolled_groups"][course_id.lower()] = enrolled_group.get("group_id")
+
+        sched_entry_id = f"enrolled-{course_id.lower()}"
+        APP_STATE["schedule"] = [
+            e for e in APP_STATE["schedule"]
+            if str(e.get("id", "")).lower() != sched_entry_id
+            and not (e.get("type") == "enrolled_exercise" and str(e.get("course_id", "")).lower() == course_id.lower())
+        ]
         APP_STATE["schedule"].append({
-            "id": sched_entry_id,
+            "id": f"enrolled-{course_id}",
+            "course_id": course_id,
+            "group_id": enrolled_group.get("group_id"),
             "title": f"✅ {course_id}: {enrolled_group['name']}",
             "day": enrolled_group["day"],
             "day_name": enrolled_group["day_name"],
@@ -376,8 +429,10 @@ class CAUBotRequestHandler(SimpleHTTPRequestHandler):
             with STATE_LOCK:
                 catalog_summary = []
                 all_courses = {**BUILTIN_CAU_COURSES, **APP_STATE["custom_courses"]}
+                enrolled_map = APP_STATE.get("enrolled_groups", {})
                 for k, raw_c in all_courses.items():
                     c = enrich_course_with_unibody(raw_c)
+                    ckey = c["course_id"].lower()
                     catalog_summary.append({
                         "course_id": c["course_id"],
                         "univis_id": c.get("univis_id", ""),
@@ -392,11 +447,13 @@ class CAUBotRequestHandler(SimpleHTTPRequestHandler):
                         "enrollment_mode": c.get("enrollment_mode", "sniper"),
                         "enrollment_opens_at": c.get("enrollment_opens_at", ""),
                         "group_count": len(c.get("groups", [])),
+                        "enrolled_group_id": enrolled_map.get(ckey),
                     })
                 self._send_json({
                     "ok": True,
                     "schedule": APP_STATE["schedule"],
                     "preferences": APP_STATE["preferences"],
+                    "enrolled_groups": enrolled_map,
                     "catalog": catalog_summary,
                     "jobs": APP_STATE["jobs"],
                     "credentials": session_mgr.load_credentials(include_secret=False),
@@ -462,11 +519,22 @@ class CAUBotRequestHandler(SimpleHTTPRequestHandler):
             return
 
         if path == "/api/schedule/delete":
-            ev_id = body.get("id")
+            ev_id = str(body.get("id") or "")
             with STATE_LOCK:
+                for e in APP_STATE["schedule"]:
+                    if e.get("id") == ev_id:
+                        cid_del = (e.get("course_id") or "").lower()
+                        if not cid_del and ev_id.lower().startswith("enrolled-"):
+                            cid_del = ev_id[9:].lower()
+                        if cid_del and "enrolled_groups" in APP_STATE:
+                            APP_STATE["enrolled_groups"].pop(cid_del, None)
                 APP_STATE["schedule"] = [e for e in APP_STATE["schedule"] if e.get("id") != ev_id]
                 save_state(APP_STATE)
-            self._send_json({"ok": True, "schedule": APP_STATE["schedule"]})
+            self._send_json({
+                "ok": True,
+                "schedule": APP_STATE["schedule"],
+                "enrolled_groups": APP_STATE.get("enrolled_groups", {}),
+            })
             return
 
         if path == "/api/schedule/toggle":
@@ -506,12 +574,16 @@ class CAUBotRequestHandler(SimpleHTTPRequestHandler):
                     return
 
                 course = res["course"]
-                pinned_gid = APP_STATE.get("pinned_groups", {}).get(course["course_id"].lower())
+                ckey = course["course_id"].lower()
+                pinned_gid = APP_STATE.get("pinned_groups", {}).get(ckey)
+                enrolled_gid = APP_STATE.get("enrolled_groups", {}).get(ckey)
                 ranked_groups = rank_course_groups(
                     course.get("groups", []),
                     APP_STATE["schedule"],
                     APP_STATE["preferences"],
                     pinned_group_id=pinned_gid,
+                    course_id=course["course_id"],
+                    enrolled_group_id=enrolled_gid,
                 )
                 self._send_json({
                     "ok": True,
@@ -519,6 +591,7 @@ class CAUBotRequestHandler(SimpleHTTPRequestHandler):
                     "matched_token": res["matched_token"],
                     "course": course,
                     "pinned_group_id": pinned_gid,
+                    "enrolled_group_id": enrolled_gid,
                     "ranked_groups": ranked_groups,
                 })
             return
@@ -548,18 +621,86 @@ class CAUBotRequestHandler(SimpleHTTPRequestHandler):
                     grp_name = next((g["name"] for g in course.get("groups", []) if g.get("group_id") == group_id), group_id)
                     session_mgr.add_log("SNIPER", f"📌 Übungsgruppe manuell als WUNSCH #1 gesetzt: '{grp_name}'")
 
+                enrolled_gid = APP_STATE.get("enrolled_groups", {}).get(ckey)
                 save_state(APP_STATE)
                 ranked_groups = rank_course_groups(
                     course.get("groups", []),
                     APP_STATE["schedule"],
                     APP_STATE["preferences"],
                     pinned_group_id=pinned_gid,
+                    course_id=course["course_id"],
+                    enrolled_group_id=enrolled_gid,
                 )
                 self._send_json({
                     "ok": True,
                     "course": course,
                     "pinned_group_id": pinned_gid,
+                    "enrolled_group_id": enrolled_gid,
                     "ranked_groups": ranked_groups,
+                })
+            return
+
+        if path == "/api/course/mark-enrolled":
+            course_id = (body.get("course_id") or "").strip()
+            group_id = body.get("group_id")  # None or same group_id to unmark
+            with STATE_LOCK:
+                res = lookup_course_by_identifier(course_id, APP_STATE["custom_courses"], session_mgr)
+                if not res.get("ok"):
+                    self._send_json(res, status=200)
+                    return
+
+                course = res["course"]
+                ckey = course["course_id"].lower()
+                if "enrolled_groups" not in APP_STATE:
+                    APP_STATE["enrolled_groups"] = {}
+
+                if not group_id or APP_STATE["enrolled_groups"].get(ckey) == group_id:
+                    _apply_enrolled_group_to_state(course, None)
+                    enrolled_gid = None
+                    session_mgr.add_log("INFO", f"Gebuchte Übung für '{course['course_id']}' aus Stundenplan entfernt.")
+                else:
+                    grp_obj = _apply_enrolled_group_to_state(course, group_id)
+                    enrolled_gid = group_id
+                    gname = grp_obj["name"] if grp_obj else group_id
+                    session_mgr.add_log(
+                        "SUCCESS",
+                        f"✅ Manuell gebuchte Übung übernommen für '{course['course_id']}': '{gname}' -> Im Wochenplan blockiert!"
+                    )
+
+                pinned_gid = APP_STATE.get("pinned_groups", {}).get(ckey)
+                save_state(APP_STATE)
+                ranked_groups = rank_course_groups(
+                    course.get("groups", []),
+                    APP_STATE["schedule"],
+                    APP_STATE["preferences"],
+                    pinned_group_id=pinned_gid,
+                    course_id=course["course_id"],
+                    enrolled_group_id=enrolled_gid,
+                )
+                self._send_json({
+                    "ok": True,
+                    "course": course,
+                    "pinned_group_id": pinned_gid,
+                    "enrolled_group_id": enrolled_gid,
+                    "enrolled_groups": APP_STATE["enrolled_groups"],
+                    "schedule": APP_STATE["schedule"],
+                    "ranked_groups": ranked_groups,
+                })
+            return
+
+        if path == "/api/course/sync-enrolled":
+            with STATE_LOCK:
+                all_courses = {**BUILTIN_CAU_COURSES, **APP_STATE["custom_courses"]}
+                scan_res = session_mgr.scan_enrolled_groups_via_cdp(all_courses)
+                for d in scan_res.get("detected", []):
+                    c_res = lookup_course_by_identifier(d["course_id"], APP_STATE["custom_courses"], None)
+                    if c_res.get("ok"):
+                        _apply_enrolled_group_to_state(c_res["course"], d["group_id"])
+                save_state(APP_STATE)
+                self._send_json({
+                    **scan_res,
+                    "enrolled_groups": APP_STATE.get("enrolled_groups", {}),
+                    "schedule": APP_STATE["schedule"],
                 })
             return
 
@@ -727,12 +868,16 @@ class CAUBotRequestHandler(SimpleHTTPRequestHandler):
                     return
 
                 course = res["course"]
-                pinned_gid = APP_STATE.get("pinned_groups", {}).get(course["course_id"].lower())
+                ckey = course["course_id"].lower()
+                pinned_gid = APP_STATE.get("pinned_groups", {}).get(ckey)
+                enrolled_gid = APP_STATE.get("enrolled_groups", {}).get(ckey)
                 ranked_groups = rank_course_groups(
                     course.get("groups", []),
                     APP_STATE["schedule"],
                     APP_STATE["preferences"],
                     pinned_group_id=pinned_gid,
+                    course_id=course["course_id"],
+                    enrolled_group_id=enrolled_gid,
                 )
                 valid_priorities = [g for g in ranked_groups if not g.get("is_conflict")]
 

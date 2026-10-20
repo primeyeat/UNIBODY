@@ -199,7 +199,9 @@ def parse_ics_content(ics_text: str) -> List[Dict[str, Any]]:
 def evaluate_group_candidate(
     candidate: Dict[str, Any],
     fixed_schedule: List[Dict[str, Any]],
-    preferences: Dict[str, Any]
+    preferences: Dict[str, Any],
+    course_id: Optional[str] = None,
+    enrolled_group_id: Optional[str] = None,
 ) -> Dict[str, Any]:
     """
     Scores a candidate tutorial group against the student's active schedule and preferences.
@@ -232,8 +234,19 @@ def evaluate_group_candidate(
     preferred_free_days = set(preferences.get("preferred_free_days", [4]))  # Default Friday (4)
     min_break_mins = int(preferences.get("min_break_minutes", 15))  # c.t. buffer
 
-    # Active schedule events
-    active_events = [e for e in fixed_schedule if e.get("enabled", True)]
+    # Active schedule events (exclude an already-enrolled exercise of the SAME course so it doesn't conflict with itself!)
+    cid_lower = (course_id or "").lower()
+    active_events = [
+        e for e in fixed_schedule
+        if e.get("enabled", True)
+        and not (
+            cid_lower
+            and (
+                str(e.get("id", "")).lower() == f"enrolled-{cid_lower}"
+                or (e.get("type") == "enrolled_exercise" and str(e.get("course_id", "")).lower() == cid_lower)
+            )
+        )
+    ]
     same_day_events = [e for e in active_events if int(e.get("day", -1)) == day]
 
     conflicts = []
@@ -394,20 +407,34 @@ def rank_course_groups(
     fixed_schedule: List[Dict[str, Any]],
     preferences: Dict[str, Any],
     pinned_group_id: Optional[str] = None,
+    course_id: Optional[str] = None,
+    enrolled_group_id: Optional[str] = None,
 ) -> List[Dict[str, Any]]:
     """
     Evaluates all tutorial groups of a course and returns them sorted from best (Rank 1) to worst.
     If pinned_group_id is provided (when the user clicks a group in the timetable or list),
     that group is promoted to Rank #1 (Wunsch #1).
+    If enrolled_group_id is provided (when the user already booked a group manually or via sync),
+    that group is marked with `is_enrolled = True` so the user sees both their current group and if a better one exists!
     """
     evaluated = [
-        evaluate_group_candidate(g, fixed_schedule, preferences)
+        evaluate_group_candidate(
+            g,
+            fixed_schedule,
+            preferences,
+            course_id=course_id,
+            enrolled_group_id=enrolled_group_id,
+        )
         for g in groups
     ]
 
     for item in evaluated:
         is_pinned = bool(pinned_group_id and item.get("group_id") == pinned_group_id)
+        is_enrolled = bool(enrolled_group_id and item.get("group_id") == enrolled_group_id)
         item["is_pinned"] = is_pinned
+        item["is_enrolled"] = is_enrolled
+        if is_enrolled:
+            item["reasons"] = ["✅ BEREITS GEBUCHT: Du bist aktuell in dieser Übungsgruppe eingeschrieben!"] + item.get("reasons", [])
         if is_pinned:
             item["reasons"] = ["📌 Manuell als Wunsch #1 priorisiert (Kalender-/Listen-Auswahl)"] + item.get("reasons", [])
 

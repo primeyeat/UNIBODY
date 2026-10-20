@@ -234,9 +234,12 @@
             <span class="step-pill">SCHRITT 3</span>
             <h2>Berechnetes Übungsgruppen-Ranking &amp; Auto-Einschreibung</h2>
           </div>
-          <div class="mode-switch" style="display:flex;align-items:center;gap:8px;">
+          <div class="mode-switch" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+            <button type="button" id="btnSyncEnrolledGroups" class="btn btn-xs btn-outline" title="Scannt deine offenen lms.uni-kiel.de &amp; elearn.informatik Tabs nach Übungsgruppen, in denen du schon eingeschrieben bist, oder markiere unten direkt '✓ Bereits gebucht'">
+              🔄 Gebuchte Übungen erkennen
+            </button>
             <button type="button" id="btnEditCurrentGroups" class="btn btn-xs btn-outline" title="Übungsgruppen dieses Kurses direkt aus OpenOlat / Moodle / UnivIS einfügen oder anpassen">
-              ✏️ Gruppenzeiten anpassen / aus LMS einfügen
+              ✏️ Gruppenzeiten anpassen
             </button>
             <select id="enrollModeSelect">
               <option value="sniper">🎯 First-Come-First-Served Sniper (Platz 1 + Auto-Fallback)</option>
@@ -244,6 +247,9 @@
             </select>
           </div>
         </div>
+
+        <!-- Already Enrolled Status Banner (shown when user already has a group in this course) -->
+        <div id="currentCourseEnrolledBanner" class="verification-banner verified hidden" style="margin-bottom:10px;"></div>
 
         <!-- Action Bar for Sniper / Priority Execution -->
         <div class="sniper-action-bar">

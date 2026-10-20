@@ -1513,6 +1513,119 @@ setTimeout(runUnibodyAutoFill, 2200);
         })
         return self.session_state
 
+    def scan_enrolled_groups_via_cdp(self, all_courses: Dict[str, Dict[str, Any]]) -> Dict[str, Any]:
+        """
+        UNIBODY Live Enrollment Scanner:
+        Inspects all open `lms.uni-kiel.de` (OpenOlat) and `elearn.informatik.uni-kiel.de` (Moodle) tabs via CDP
+        to detect which exercise groups the student has already manually enrolled in!
+        Looks for OpenOlat / Moodle group membership indicators ("Eingetragen", "Mitglied", "Austragen",
+        "Your choice", "Ihre Auswahl", checked radio/checkboxes, or highlighted group rows) and matches them
+        against the verified course catalog's time slots and group names.
+        """
+        tabs = self._get_cdp_tabs()
+        if not tabs:
+            return {
+                "ok": False,
+                "error": "Der UNIBODY-Browser ist aktuell nicht geöffnet. Starte oben rechts zuerst den Browser-Login oder markiere deine Gruppe direkt per Klick auf '✓ Bereits gebucht'.",
+                "detected": [],
+            }
+
+        extract_js = """
+        (function() {
+          const enrolledLines = [];
+          const enrollmentKeywords = [
+            'eingetragen', 'angemeldet', 'mitglied', 'austragen', 'verlassen',
+            'ihre auswahl', 'meine gruppe', 'your choice', 'member', 'enrolled',
+            'abmelden', 'auswahl entfernen', 'leave group'
+          ];
+          const candidates = document.querySelectorAll('tr, .o_group_card, .group-item, .choice, .card, li, .form-check, .fitem');
+          for (const el of candidates) {
+            const txt = (el.innerText || '').trim();
+            if (!txt || txt.length > 600) continue;
+            const lower = txt.toLowerCase();
+            const hasCheckedInput = !!el.querySelector('input[type="radio"]:checked, input[type="checkbox"]:checked');
+            const hasKeyword = enrollmentKeywords.some(k => lower.includes(k));
+            if (hasCheckedInput || hasKeyword) {
+              enrolledLines.push(txt.replace(/\\s+/g, ' '));
+            }
+          }
+          return JSON.stringify({
+            url: window.location.href,
+            title: document.title,
+            enrolledLines: enrolledLines.slice(0, 80)
+          });
+        })();
+        """
+
+        detected = []
+        scanned_tabs = 0
+
+        for t in tabs:
+            u = (t.get("url") or "").lower()
+            if not any(d in u for d in ["lms.uni-kiel.de", "elearn.informatik.uni-kiel.de"]):
+                continue
+            ws_url = t.get("webSocketDebuggerUrl")
+            if not ws_url:
+                continue
+            scanned_tabs += 1
+            res = self._cdp_send_command(ws_url, "Runtime.evaluate", {"expression": extract_js, "returnByValue": True})
+            val_str = res.get("result", {}).get("result", {}).get("value") if isinstance(res, dict) else None
+            if not val_str:
+                continue
+            try:
+                page_data = json.loads(val_str)
+            except Exception:
+                continue
+
+            page_url = (page_data.get("url") or "").lower()
+            page_title = (page_data.get("title") or "").lower()
+            lines = page_data.get("enrolledLines") or []
+
+            for ckey, raw_course in all_courses.items():
+                course = enrich_course_with_unibody(raw_course)
+                cid = course["course_id"]
+                tokens = [tk.lower() for tk in course.get("verified_tokens", [])] + [cid.lower()]
+                course_matches_page = any(tk in page_url or tk in page_title for tk in tokens if len(tk) >= 3)
+
+                for grp in course.get("groups", []):
+                    g_day = grp.get("day_name", "").lower()
+                    g_day_short = g_day[:2]
+                    g_start = grp.get("start_time", "")
+                    g_end = grp.get("end_time", "")
+                    for line in lines:
+                        l_low = line.lower()
+                        if not course_matches_page and not any(tk in l_low for tk in tokens if len(tk) >= 4):
+                            continue
+                        if g_start and g_start in l_low and (g_day in l_low or g_day_short in l_low):
+                            detected.append({
+                                "course_id": cid,
+                                "group_id": grp["group_id"],
+                                "group_name": grp["name"],
+                                "day_name": grp["day_name"],
+                                "start_time": g_start,
+                                "end_time": g_end,
+                                "source_url": page_data.get("url"),
+                            })
+                            break
+
+        if detected:
+            for d in detected:
+                self.add_log(
+                    "SUCCESS",
+                    f"🔄 UNIBODY Live-Sync: Bereits gebuchte Übung für '{d['course_id']}' im Browser erkannt -> {d['group_name']}"
+                )
+        else:
+            self.add_log(
+                "INFO",
+                f"🔍 UNIBODY Live-Sync: {scanned_tabs} CAU-Tab(s) gescannt (Öffne im Browser die Kurs-/Gruppenseite oder klicke direkt bei deiner Gruppe auf '✓ Bereits gebucht')."
+            )
+
+        return {
+            "ok": True,
+            "scanned_tabs": scanned_tabs,
+            "detected": detected,
+        }
+
 
 def lookup_course_by_identifier(
     query_id: str,
