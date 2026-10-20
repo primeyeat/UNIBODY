@@ -24,6 +24,14 @@ let appState = {
   rankedGroups: [],
   highlightedGroupId: null,
   icsStagedEvents: [],
+  credentials: {
+    username: "",
+    has_password: false,
+    default_platform: "https://lms.uni-kiel.de",
+    auto_fill: true,
+    auto_submit: true,
+    use_keychain: true,
+  },
 };
 
 function timeToMinutes(tStr) {
@@ -76,12 +84,65 @@ async function fetchInitialState() {
   appState.schedule = data.schedule || [];
   appState.preferences = data.preferences || appState.preferences;
   appState.catalog = data.catalog || [];
+  if (data.credentials) {
+    appState.credentials = data.credentials;
+    syncCredentialsUI(data.credentials, true);
+  }
 
   syncPreferencesUI();
   renderCatalogChips();
   renderTimetable();
   renderLogs(data.logs || []);
   updateBrowserBadge(data.browser_status);
+}
+
+function syncCredentialsUI(creds, isInitial = false) {
+  if (!creds) return;
+  const userEl = document.getElementById("credUsername");
+  const passEl = document.getElementById("credPassword");
+  const platEl = document.getElementById("credPlatform");
+  const fillEl = document.getElementById("credAutoFill");
+  const subEl = document.getElementById("credAutoSubmit");
+  const keyEl = document.getElementById("credUseKeychain");
+  const badgeEl = document.getElementById("vaultSavedBadge");
+  const topBtn = document.getElementById("btnToggleAccountPanel");
+  const formBody = document.getElementById("formCredentials");
+  const collapseBtn = document.getElementById("btnCollapseVault");
+
+  if (userEl && (isInitial || !document.activeElement || document.activeElement !== userEl)) {
+    userEl.value = creds.username || "";
+  }
+  if (passEl && (isInitial || !document.activeElement || document.activeElement !== passEl)) {
+    passEl.value = creds.has_password ? "••••••••" : "";
+  }
+  if (platEl && creds.default_platform) {
+    platEl.value = creds.default_platform;
+  }
+  if (fillEl) fillEl.checked = creds.auto_fill !== false;
+  if (subEl) subEl.checked = creds.auto_submit !== false;
+  if (keyEl) keyEl.checked = creds.use_keychain !== false;
+
+  const isSaved = Boolean(creds.username && creds.has_password);
+  if (badgeEl) {
+    if (isSaved) {
+      badgeEl.className = "vault-badge saved";
+      badgeEl.textContent = `🔒 Gespeichert: ${creds.username} (${creds.keychain_active ? "macOS Keychain" : "Tresor"} · Auto-Login aktiv)`;
+    } else {
+      badgeEl.className = "vault-badge unsaved";
+      badgeEl.textContent = "Noch kein Account gespeichert";
+    }
+  }
+  if (topBtn) {
+    topBtn.textContent = isSaved
+      ? `🔑 Auto-Login: ${creds.username}`
+      : "🔑 CAU Account hinterlegen";
+  }
+
+  // On initial load, if credentials are already saved, collapse the form so it stays compact
+  if (isInitial && isSaved && formBody && collapseBtn) {
+    formBody.classList.add("collapsed");
+    collapseBtn.textContent = "⚙️ Bearbeiten / Ausklappen";
+  }
 }
 
 function syncPreferencesUI() {
@@ -512,13 +573,116 @@ function bindUIEvents() {
     });
   });
 
-  // Launch CAU Shibboleth SSO Chrome window
+  // Launch CAU Shibboleth SSO Chrome window (with Auto-Login if credentials saved)
   document.getElementById("btnLaunchBrowser").addEventListener("click", async () => {
-    const targetUrl = appState.currentCourse ? appState.currentCourse.url : "https://lms.uni-kiel.de";
-    const res = await apiPost("/api/browser/launch", { url: targetUrl });
+    const plat = document.getElementById("credPlatform")?.value || "https://lms.uni-kiel.de";
+    const targetUrl = appState.currentCourse ? appState.currentCourse.url : plat;
+    const res = await apiPost("/api/browser/launch", {
+      url: targetUrl,
+      force_auto_login: true,
+    });
     if (res.status) updateBrowserBadge(res.status);
     await pollTelemetry();
   });
+
+  // CAU Account Vault handlers
+  const formCreds = document.getElementById("formCredentials");
+  const collapseBtn = document.getElementById("btnCollapseVault");
+  const topAccountBtn = document.getElementById("btnToggleAccountPanel");
+  const pwToggleBtn = document.getElementById("btnTogglePwVisibility");
+
+  function toggleVaultCollapse(forceOpen = false) {
+    if (!formCreds || !collapseBtn) return;
+    if (forceOpen) {
+      formCreds.classList.remove("collapsed");
+    } else {
+      formCreds.classList.toggle("collapsed");
+    }
+    const isCollapsed = formCreds.classList.contains("collapsed");
+    collapseBtn.textContent = isCollapsed ? "⚙️ Bearbeiten / Ausklappen" : "🔽 Einklappen";
+  }
+
+  if (collapseBtn) {
+    collapseBtn.addEventListener("click", () => toggleVaultCollapse(false));
+  }
+  if (topAccountBtn) {
+    topAccountBtn.addEventListener("click", () => {
+      toggleVaultCollapse(true);
+      const card = document.getElementById("accountVaultCard");
+      if (card) card.scrollIntoView({ behavior: "smooth", block: "start" });
+      document.getElementById("credUsername")?.focus();
+    });
+  }
+  if (pwToggleBtn) {
+    pwToggleBtn.addEventListener("click", () => {
+      const pwInput = document.getElementById("credPassword");
+      if (!pwInput) return;
+      pwInput.type = pwInput.type === "password" ? "text" : "password";
+      pwToggleBtn.textContent = pwInput.type === "password" ? "👁️" : "🙈";
+    });
+  }
+
+  async function saveAccountCredentials(launchBrowserNow = false) {
+    const username = document.getElementById("credUsername").value.trim();
+    const password = document.getElementById("credPassword").value;
+    const default_platform = document.getElementById("credPlatform").value;
+    const auto_fill = document.getElementById("credAutoFill").checked;
+    const auto_submit = document.getElementById("credAutoSubmit").checked;
+    const use_keychain = document.getElementById("credUseKeychain").checked;
+
+    if (!username) {
+      alert("Bitte gib deine CAU-Kennung (z. B. stu123456) ein!");
+      return;
+    }
+
+    const res = await apiPost("/api/credentials/save", {
+      username,
+      password,
+      default_platform,
+      auto_fill,
+      auto_submit,
+      use_keychain,
+      launch_browser: launchBrowserNow,
+    });
+
+    if (!res.ok) {
+      alert(res.error || "Fehler beim Speichern der Login-Daten.");
+      return;
+    }
+
+    appState.credentials = res.credentials;
+    syncCredentialsUI(res.credentials, false);
+    if (res.browser_status) updateBrowserBadge(res.browser_status);
+    await pollTelemetry();
+  }
+
+  if (formCreds) {
+    formCreds.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      await saveAccountCredentials(false);
+    });
+  }
+
+  const btnSaveAndLogin = document.getElementById("btnSaveAndAutoLogin");
+  if (btnSaveAndLogin) {
+    btnSaveAndLogin.addEventListener("click", async () => {
+      await saveAccountCredentials(true);
+    });
+  }
+
+  const btnClearCreds = document.getElementById("btnClearCreds");
+  if (btnClearCreds) {
+    btnClearCreds.addEventListener("click", async () => {
+      const res = await apiPost("/api/credentials/clear", {});
+      if (res.ok) {
+        appState.credentials = res.credentials;
+        syncCredentialsUI(res.credentials, false);
+        document.getElementById("credPassword").value = "";
+        if (res.browser_status) updateBrowserBadge(res.browser_status);
+        await pollTelemetry();
+      }
+    });
+  }
 
   // Execute Immediate Sniper / Priority Enrollment
   document.getElementById("btnExecuteNow").addEventListener("click", () => {
@@ -769,13 +933,19 @@ function updateBrowserBadge(status) {
   const text = document.getElementById("ssoStatusText");
   if (status.logged_in) {
     badge.className = "sso-badge connected";
-    text.textContent = "CAU SSO: Verbunden (lms.uni-kiel.de)";
+    text.textContent = status.saved_username
+      ? `CAU SSO: Verbunden (${status.saved_username})`
+      : "CAU SSO: Verbunden (lms.uni-kiel.de)";
   } else if (status.browser_running) {
     badge.className = "sso-badge";
-    text.textContent = "Chrome offen: Bitte im Fenster einloggen";
+    text.textContent = status.has_credentials
+      ? `Auto-Fill aktiv (${status.saved_username})`
+      : "Chrome offen: Bitte im Fenster einloggen";
   } else {
     badge.className = "sso-badge";
-    text.textContent = "Shibboleth SSO: Bereit";
+    text.textContent = status.has_credentials
+      ? `SSO bereit (${status.saved_username} gespeichert)`
+      : "Shibboleth SSO: Bereit";
   }
 }
 

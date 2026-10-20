@@ -1544,3 +1544,113 @@ body.dark-mode .ics-item {
   background: rgba(12, 42, 74, 0.85);
   border-color: rgba(100, 210, 255, 0.25);
 }
+
+/* ============================================================================
+   CAU ACCOUNT & AUTO-LOGIN VAULT CARD (FRUTIGER AERO + DARK MODE)
+   ============================================================================ */
+.account-vault-card {
+  border: 2px solid rgba(255, 255, 255, 0.92);
+  background: linear-gradient(
+    165deg,
+    rgba(255, 255, 255, 0.9) 0%,
+    rgba(218, 248, 255, 0.82) 55%,
+    rgba(205, 250, 225, 0.78) 100%
+  );
+}
+
+.vault-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.73rem;
+  font-weight: 800;
+  padding: 4px 11px;
+  border-radius: 999px;
+  border: 1px solid rgba(0, 120, 200, 0.35);
+}
+
+.vault-badge.unsaved {
+  background: linear-gradient(180deg, #fff6d6 0%, #ffe08a 100%);
+  color: #6b4400;
+  border-color: #d99b16;
+}
+
+.vault-badge.saved {
+  background: linear-gradient(
+    180deg,
+    #74f584 0%,
+    #25c93f 49%,
+    #109c27 51%,
+    #35db50 100%
+  );
+  color: #ffffff;
+  text-shadow: 0 1px 2px rgba(0, 50, 10, 0.75);
+  border-color: #0d7a1f;
+  box-shadow: 0 2px 8px rgba(16, 156, 39, 0.35), inset 0 1px 1px rgba(255, 255, 255, 0.85);
+}
+
+.vault-form-body {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.vault-form-body.collapsed {
+  display: none;
+}
+
+.vault-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1.15fr;
+  gap: 10px;
+}
+
+@media (max-width: 900px) {
+  .vault-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.password-input-wrap {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.password-input-wrap input {
+  flex: 1;
+}
+
+.vault-toggles-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  padding: 8px 12px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.68);
+  border: 1px solid rgba(0, 140, 225, 0.28);
+}
+
+.vault-actions-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  margin-top: 2px;
+}
+
+body.dark-mode .account-vault-card {
+  background: linear-gradient(
+    165deg,
+    rgba(16, 56, 96, 0.88) 0%,
+    rgba(8, 34, 64, 0.9) 60%,
+    rgba(10, 52, 58, 0.88) 100%
+  );
+  border-color: rgba(110, 225, 255, 0.55);
+}
+
+body.dark-mode .vault-toggles-row {
+  background: rgba(6, 24, 46, 0.78);
+  border-color: rgba(100, 210, 255, 0.32);
+}
+

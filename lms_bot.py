@@ -16,6 +16,9 @@ import re
 import html
 import time
 import json
+import socket
+import base64
+import struct
 import subprocess
 import threading
 import urllib.request
@@ -496,13 +499,20 @@ def fetch_live_univis_course(query_str: str, semester: str = "2026w") -> Optiona
     }
 
 
+KEYCHAIN_SERVICE_NAME = "CAU-LMS-Sniper-Vault"
+
+
 class CAUBrowserSessionManager:
     """
-    Manages the dedicated Google Chrome browser profile for CAU Shibboleth SSO & LMS automation.
+    Manages the dedicated Google Chrome browser profile, CAU Account Vault (macOS Keychain + local vault),
+    and automatic Shibboleth SSO / OpenOlat / Moodle Auto-Fill & Auto-Login engine.
     """
 
     def __init__(self, profile_dir: str):
         self.profile_dir = profile_dir
+        self.data_dir = os.path.dirname(profile_dir)
+        self.creds_file = os.path.join(self.data_dir, "credentials.json")
+        self.ext_dir = os.path.join(self.data_dir, "cau_autofill_ext")
         self.debug_port = 9222
         self.chrome_process: Optional[subprocess.Popen] = None
         self.session_state = {
@@ -511,11 +521,21 @@ class CAUBrowserSessionManager:
             "current_url": None,
             "current_title": None,
             "last_checked": None,
-            "user_hint": "Nicht verbunden – Klicke auf 'CAU Login-Browser starten', um dich einmalig via SSO einzuloggen.",
+            "user_hint": "Nicht verbunden – Hinterlege deinen CAU Account für 1-Klick Auto-Login.",
         }
         self.logs: List[Dict[str, str]] = []
         self._lock = threading.Lock()
-        self.add_log("SYSTEM", "CAU LMS Sniper & Live-UnivIS XML Engine (Semester 2026w) initialisiert.")
+        self._last_autofill_url: str = ""
+        self._last_autofill_ts: float = 0.0
+
+        os.makedirs(self.data_dir, exist_ok=True)
+        self._write_chrome_extension()
+
+        self.add_log("SYSTEM", "CAU LMS Sniper, Auto-Login Tresor & Live-UnivIS XML Engine (Semester 2026w) initialisiert.")
+
+        # Start background watcher that auto-fills open Chrome CAU login pages via CDP
+        self._watcher_thread = threading.Thread(target=self._autofill_watcher_loop, daemon=True)
+        self._watcher_thread.start()
 
     def add_log(self, level: str, message: str):
         with self._lock:
@@ -527,6 +547,584 @@ class CAUBrowserSessionManager:
             })
             if len(self.logs) > 250:
                 self.logs = self.logs[-250:]
+
+    # -------------------------------------------------------------------------
+    # CAU CREDENTIAL VAULT (macOS Keychain + git-ignored 0600 JSON fallback)
+    # -------------------------------------------------------------------------
+    def _save_to_macos_keychain(self, username: str, password: str) -> bool:
+        if not username or not password:
+            return False
+        try:
+            res = subprocess.run(
+                [
+                    "security",
+                    "add-generic-password",
+                    "-U",
+                    "-a", username,
+                    "-s", KEYCHAIN_SERVICE_NAME,
+                    "-w", password,
+                ],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                timeout=3.0,
+            )
+            return res.returncode == 0
+        except Exception:
+            return False
+
+    def _read_from_macos_keychain(self, username: str) -> Optional[str]:
+        if not username:
+            return None
+        try:
+            res = subprocess.run(
+                [
+                    "security",
+                    "find-generic-password",
+                    "-a", username,
+                    "-s", KEYCHAIN_SERVICE_NAME,
+                    "-w",
+                ],
+                capture_output=True,
+                text=True,
+                timeout=2.5,
+            )
+            if res.returncode == 0 and res.stdout.strip():
+                return res.stdout.strip()
+        except Exception:
+            pass
+        return None
+
+    def _delete_from_macos_keychain(self, username: str):
+        if not username:
+            return
+        try:
+            subprocess.run(
+                [
+                    "security",
+                    "delete-generic-password",
+                    "-a", username,
+                    "-s", KEYCHAIN_SERVICE_NAME,
+                ],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                timeout=2.5,
+            )
+        except Exception:
+            pass
+
+    def load_credentials(self, include_secret: bool = False) -> Dict[str, Any]:
+        default_meta = {
+            "username": "",
+            "has_password": False,
+            "default_platform": "https://lms.uni-kiel.de",
+            "auto_fill": True,
+            "auto_submit": True,
+            "use_keychain": True,
+            "keychain_active": False,
+            "updated_at": None,
+        }
+        if not os.path.exists(self.creds_file):
+            return default_meta
+
+        try:
+            with open(self.creds_file, "r", encoding="utf-8") as f:
+                data = json.load(f)
+        except Exception:
+            return default_meta
+
+        username = (data.get("username") or "").strip()
+        use_keychain = bool(data.get("use_keychain", True))
+        stored_pw = ""
+
+        # Try macOS Keychain first if enabled
+        keychain_pw = self._read_from_macos_keychain(username) if (use_keychain and username) else None
+        if keychain_pw:
+            stored_pw = keychain_pw
+            keychain_active = True
+        else:
+            b64_pw = data.get("password_b64") or ""
+            if b64_pw:
+                try:
+                    stored_pw = base64.b64decode(b64_pw.encode("ascii")).decode("utf-8")
+                except Exception:
+                    stored_pw = ""
+            keychain_active = bool(data.get("keychain_active", False))
+
+        result = {
+            "username": username,
+            "has_password": bool(stored_pw),
+            "default_platform": data.get("default_platform") or "https://lms.uni-kiel.de",
+            "auto_fill": bool(data.get("auto_fill", True)),
+            "auto_submit": bool(data.get("auto_submit", True)),
+            "use_keychain": use_keychain,
+            "keychain_active": keychain_active,
+            "updated_at": data.get("updated_at"),
+        }
+        if include_secret:
+            result["password"] = stored_pw
+        return result
+
+    def save_credentials(
+        self,
+        username: str,
+        password: Optional[str],
+        default_platform: str = "https://lms.uni-kiel.de",
+        auto_fill: bool = True,
+        auto_submit: bool = True,
+        use_keychain: bool = True,
+    ) -> Dict[str, Any]:
+        username = (username or "").strip()
+        existing = self.load_credentials(include_secret=True)
+
+        # If user didn't re-type password (or sent masked placeholder) keep existing password
+        if password is None or password == "" or password == "••••••••":
+            final_pw = existing.get("password", "")
+        else:
+            final_pw = password
+
+        keychain_ok = False
+        if use_keychain and username and final_pw:
+            keychain_ok = self._save_to_macos_keychain(username, final_pw)
+
+        payload = {
+            "username": username,
+            "password_b64": base64.b64encode(final_pw.encode("utf-8")).decode("ascii") if final_pw else "",
+            "default_platform": default_platform or "https://lms.uni-kiel.de",
+            "auto_fill": bool(auto_fill),
+            "auto_submit": bool(auto_submit),
+            "use_keychain": bool(use_keychain),
+            "keychain_active": keychain_ok,
+            "updated_at": datetime.now().strftime("%d.%m.%Y %H:%M:%S"),
+        }
+
+        os.makedirs(self.data_dir, exist_ok=True)
+        with open(self.creds_file, "w", encoding="utf-8") as f:
+            json.dump(payload, f, ensure_ascii=False, indent=2)
+        try:
+            os.chmod(self.creds_file, 0o600)
+        except Exception:
+            pass
+
+        # Regenerate the Chrome Auto-Fill extension with latest credentials
+        self._write_chrome_extension()
+        self._last_autofill_url = ""
+
+        storage_label = "macOS Schlüsselbund (Keychain) + Lokal" if keychain_ok else "Lokalem Tresor (0600)"
+        self.add_log(
+            "SUCCESS",
+            f"🔐 CAU Login-Daten für '{username}' gespeichert ({storage_label} · Auto-Fill: {'AN' if auto_fill else 'AUS'} · Auto-Login: {'AN' if auto_submit else 'AUS'})."
+        )
+        return self.load_credentials(include_secret=False)
+
+    def clear_credentials(self) -> Dict[str, Any]:
+        existing = self.load_credentials(include_secret=False)
+        if existing.get("username"):
+            self._delete_from_macos_keychain(existing["username"])
+        if os.path.exists(self.creds_file):
+            try:
+                os.remove(self.creds_file)
+            except Exception:
+                pass
+        self._write_chrome_extension()
+        self.add_log("INFO", "🗑️ Gespeicherte CAU Login-Daten aus Tresor & macOS Schlüsselbund entfernt.")
+        return self.load_credentials(include_secret=False)
+
+    # -------------------------------------------------------------------------
+    # AUTO-FILL & AUTO-LOGIN JAVASCRIPT + CHROME EXTENSION + CDP ENGINE
+    # -------------------------------------------------------------------------
+    def _build_autofill_js(self, creds: Dict[str, Any], force_submit: bool = False) -> str:
+        username = creds.get("username") or ""
+        password = creds.get("password") or ""
+        auto_fill = bool(creds.get("auto_fill", True))
+        auto_submit = bool(creds.get("auto_submit", True)) or force_submit
+
+        if not username or not password or not auto_fill:
+            return "(function(){ return 'DISABLED_OR_EMPTY'; })();"
+
+        cfg_json = json.dumps({
+            "username": username,
+            "password": password,
+            "autoSubmit": auto_submit,
+            "forceSubmit": force_submit,
+        })
+
+        return f"""
+(function() {{
+  const CFG = {cfg_json};
+  const host = (window.location.hostname || '').toLowerCase();
+  const url = (window.location.href || '').toLowerCase();
+  if (!host.includes('uni-kiel.de') && !host.includes('dfn.de')) return 'NOT_CAU';
+
+  function setNativeValue(el, val) {{
+    if (!el) return false;
+    try {{
+      el.focus();
+      const proto = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value');
+      if (proto && proto.set) {{
+        proto.set.call(el, val);
+      }} else {{
+        el.value = val;
+      }}
+      el.dispatchEvent(new Event('input', {{ bubbles: true }}));
+      el.dispatchEvent(new Event('change', {{ bubbles: true }}));
+      return true;
+    }} catch (e) {{
+      el.value = val;
+      return true;
+    }}
+  }}
+
+  function showAeroBanner(text, isWarn) {{
+    let badge = document.getElementById('cau-sniper-autofill-badge');
+    if (!badge) {{
+      badge = document.createElement('div');
+      badge.id = 'cau-sniper-autofill-badge';
+      badge.style.cssText = [
+        'position:fixed',
+        'top:14px',
+        'right:14px',
+        'z-index:2147483647',
+        'padding:10px 16px',
+        'border-radius:14px',
+        'font-family:"Trebuchet MS","Segoe UI",sans-serif',
+        'font-size:13px',
+        'font-weight:bold',
+        'color:#ffffff',
+        'box-shadow:0 8px 24px rgba(0,80,160,0.38), inset 0 1px 1px rgba(255,255,255,0.85)',
+        'border:1px solid rgba(255,255,255,0.75)',
+        'backdrop-filter:blur(10px)',
+        'transition:all 0.25s ease',
+        'pointer-events:none'
+      ].join(';');
+      document.body.appendChild(badge);
+    }}
+    badge.style.background = isWarn
+      ? 'linear-gradient(180deg, #ffb84d 0%, #f07800 50%, #c85a00 100%)'
+      : 'linear-gradient(180deg, #52eb68 0%, #1db933 50%, #0e8a21 90%, #2ce048 100%)';
+    badge.textContent = text;
+  }}
+
+  function hasLoginErrorOnPage() {{
+    const errSelectors = ['.form-error', '.output-message.error', '.alert-danger', '.o_error', '#loginerrormessage', '.error'];
+    for (const sel of errSelectors) {{
+      const el = document.querySelector(sel);
+      if (el && el.offsetParent !== null && (el.innerText || '').trim().length > 3) {{
+        return true;
+      }}
+    }}
+    const bodyText = (document.body ? document.body.innerText : '').toLowerCase();
+    return (
+      bodyText.includes('anmeldung fehlgeschlagen') ||
+      bodyText.includes('passwort falsch') ||
+      bodyText.includes('ungültige anmeldedaten') ||
+      bodyText.includes('login failed') ||
+      bodyText.includes('authentication failed')
+    );
+  }}
+
+  // 1. Check for visible username & password fields (CAU Shibboleth IdP, OpenOlat direct, or Moodle direct)
+  const userSelectors = [
+    'input[name="j_username"]',
+    'input#username',
+    'input[name="username"]',
+    'input[name*="fiooldap_login_name"]',
+    'input[id*="fiooldap_login_name"]',
+    'input[name="userid"]',
+    'input[type="text"][autocomplete*="user"]'
+  ];
+  const passSelectors = [
+    'input[name="j_password"]',
+    'input#password',
+    'input[name="password"]',
+    'input[name*="fiooldap_login_pass"]',
+    'input[id*="fiooldap_login_pass"]',
+    'input[type="password"]'
+  ];
+
+  let userInput = null;
+  for (const s of userSelectors) {{
+    const el = document.querySelector(s);
+    if (el && el.offsetParent !== null) {{ userInput = el; break; }}
+  }}
+  let passInput = null;
+  for (const s of passSelectors) {{
+    const el = document.querySelector(s);
+    if (el && el.offsetParent !== null) {{ passInput = el; break; }}
+  }}
+
+  if (passInput) {{
+    if (!userInput) {{
+      const form = passInput.closest('form') || document;
+      userInput = form.querySelector('input[type="text"], input[type="email"]');
+    }}
+    let changed = false;
+    if (userInput && userInput.value !== CFG.username) {{
+      setNativeValue(userInput, CFG.username);
+      changed = true;
+    }}
+    if (passInput.value !== CFG.password) {{
+      setNativeValue(passInput, CFG.password);
+      changed = true;
+    }}
+
+    const pageHasErr = hasLoginErrorOnPage();
+    if (pageHasErr && !CFG.forceSubmit) {{
+      showAeroBanner('⚠️ CAU Sniper: Felder ausgefüllt (Auto-Submit pausiert wegen Fehlermeldung)', true);
+      return 'FILLED_PAUSED_ON_ERROR';
+    }}
+
+    const lastSubmitTs = parseInt(sessionStorage.getItem('cau_sniper_submit_ts') || '0', 10);
+    const now = Date.now();
+    const recentlySubmitted = (now - lastSubmitTs) < 7000;
+
+    if (CFG.autoSubmit && (!recentlySubmitted || CFG.forceSubmit)) {{
+      sessionStorage.setItem('cau_sniper_submit_ts', String(now));
+      showAeroBanner('🫧 CAU Kurs-Sniper: Auto-Login als ' + CFG.username + ' wird ausgeführt...', false);
+
+      const submitSelectors = [
+        'button[name="_eventId_proceed"]',
+        'input[name="_eventId_proceed"]',
+        'button#loginbtn',
+        'button[type="submit"]',
+        'input[type="submit"]',
+        'button.o_button_login'
+      ];
+      const scope = (passInput.closest('form') || document);
+      let submitBtn = null;
+      for (const s of submitSelectors) {{
+        const btn = scope.querySelector(s) || document.querySelector(s);
+        if (btn && btn.offsetParent !== null) {{ submitBtn = btn; break; }}
+      }}
+      setTimeout(() => {{
+        if (submitBtn) {{
+          submitBtn.click();
+        }} else if (passInput.closest('form')) {{
+          passInput.closest('form').submit();
+        }}
+      }}, 220);
+      return 'FILLED_AND_SUBMITTED';
+    }} else {{
+      showAeroBanner('🫧 CAU Kurs-Sniper: Login für ' + CFG.username + ' automatisch ausgefüllt!', false);
+      return changed ? 'FILLED_ONLY' : 'ALREADY_FILLED';
+    }}
+  }}
+
+  // 2. If on OpenOlat (lms.uni-kiel.de) or Moodle (elearn) landing page without visible password field:
+  //    Automatically click the "CAU-Login / Shibboleth SSO" button if autoSubmit is active!
+  if (CFG.autoSubmit) {{
+    const lastRedirectTs = parseInt(sessionStorage.getItem('cau_sniper_sso_redirect_ts') || '0', 10);
+    if (Date.now() - lastRedirectTs > 5000 || CFG.forceSubmit) {{
+      const ssoLinks = Array.from(document.querySelectorAll('a, button'));
+      for (const el of ssoLinks) {{
+        if (el.offsetParent === null) continue;
+        const href = (el.getAttribute('href') || '').toLowerCase();
+        const txt = (el.innerText || el.value || '').toLowerCase();
+        if (
+          href.includes('shibboleth') ||
+          href.includes('idp.uni-kiel.de') ||
+          txt.includes('shibboleth') ||
+          txt.includes('cau-login') ||
+          txt.includes('cau login') ||
+          (host.includes('lms.uni-kiel.de') && txt.includes('login') && !url.includes('/auth/'))
+        ) {{
+          sessionStorage.setItem('cau_sniper_sso_redirect_ts', String(Date.now()));
+          showAeroBanner('🫧 CAU Kurs-Sniper: Weiterleitung zum CAU Single Sign-On...', false);
+          el.click();
+          return 'CLICKED_SSO_REDIRECT';
+        }}
+      }}
+    }}
+  }}
+
+  return 'NO_LOGIN_FORM';
+}})();
+"""
+
+    def _write_chrome_extension(self):
+        """
+        Writes a lightweight Manifest V3 Chrome Extension into `data/cau_autofill_ext`
+        so Chrome also has native content-script Auto-Fill on `*.uni-kiel.de`.
+        """
+        try:
+            os.makedirs(self.ext_dir, exist_ok=True)
+            manifest = {
+                "manifest_version": 3,
+                "name": "CAU Kiel LMS Sniper Auto-Login",
+                "version": "1.0.0",
+                "description": "Automatisches Ausfüllen & Anmelden für lms.uni-kiel.de, elearn.uni-kiel.de und idp.uni-kiel.de",
+                "permissions": ["storage"],
+                "host_permissions": [
+                    "https://*.uni-kiel.de/*",
+                    "https://*.dfn.de/*"
+                ],
+                "content_scripts": [
+                    {
+                        "matches": [
+                            "https://*.uni-kiel.de/*",
+                            "https://*.dfn.de/*"
+                        ],
+                        "js": ["content.js"],
+                        "run_at": "document_idle"
+                    }
+                ]
+            }
+            with open(os.path.join(self.ext_dir, "manifest.json"), "w", encoding="utf-8") as f:
+                json.dump(manifest, f, indent=2)
+
+            creds = self.load_credentials(include_secret=True)
+            js_code = self._build_autofill_js(creds, force_submit=False)
+            content_js = f"""
+// CAU Kiel LMS Sniper Auto-Fill Content Script
+setTimeout(() => {{
+  try {{ {js_code} }} catch (e) {{ console.warn('CAU Sniper AutoFill error:', e); }}
+}}, 250);
+"""
+            with open(os.path.join(self.ext_dir, "content.js"), "w", encoding="utf-8") as f:
+                f.write(content_js)
+        except Exception as e:
+            self.add_log("WARN", f"Konnte Auto-Fill Extension nicht aktualisieren: {e}")
+
+    def _cdp_send_command(self, ws_url: str, method: str, params: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        """
+        Zero-dependency Python stdlib WebSocket client for Chrome DevTools Protocol (CDP).
+        Connects to `ws://127.0.0.1:9222/devtools/page/...` and sends a single JSON-RPC command.
+        """
+        try:
+            parsed = urllib.parse.urlparse(ws_url)
+            host = parsed.hostname or "127.0.0.1"
+            port = parsed.port or self.debug_port
+            path = parsed.path or "/"
+
+            sock = socket.create_connection((host, port), timeout=1.5)
+            try:
+                key = base64.b64encode(os.urandom(16)).decode("ascii")
+                handshake = (
+                    f"GET {path} HTTP/1.1\r\n"
+                    f"Host: {host}:{port}\r\n"
+                    "Upgrade: websocket\r\n"
+                    "Connection: Upgrade\r\n"
+                    f"Sec-WebSocket-Key: {key}\r\n"
+                    "Sec-WebSocket-Version: 13\r\n\r\n"
+                )
+                sock.sendall(handshake.encode("ascii"))
+
+                resp_buf = b""
+                while b"\r\n\r\n" not in resp_buf:
+                    chunk = sock.recv(1024)
+                    if not chunk:
+                        return None
+                    resp_buf += chunk
+
+                if b"101" not in resp_buf.split(b"\r\n", 1)[0]:
+                    return None
+
+                payload_bytes = json.dumps({"id": 1, "method": method, "params": params}).encode("utf-8")
+                mask_key = os.urandom(4)
+                header = bytearray([0x81])  # FIN + Text frame
+                length = len(payload_bytes)
+                if length < 126:
+                    header.append(0x80 | length)
+                elif length < 65536:
+                    header.append(0x80 | 126)
+                    header.extend(struct.pack("!H", length))
+                else:
+                    header.append(0x80 | 127)
+                    header.extend(struct.pack("!Q", length))
+
+                header.extend(mask_key)
+                masked_payload = bytearray(b ^ mask_key[i % 4] for i, b in enumerate(payload_bytes))
+                sock.sendall(header + masked_payload)
+
+                # Read response frame
+                first2 = sock.recv(2)
+                if len(first2) < 2:
+                    return None
+                r_len = first2[1] & 0x7F
+                if r_len == 126:
+                    r_len = struct.unpack("!H", sock.recv(2))[0]
+                elif r_len == 127:
+                    r_len = struct.unpack("!Q", sock.recv(8))[0]
+
+                data_buf = b""
+                while len(data_buf) < r_len:
+                    part = sock.recv(min(4096, r_len - len(data_buf)))
+                    if not part:
+                        break
+                    data_buf += part
+
+                return json.loads(data_buf.decode("utf-8", errors="ignore"))
+            finally:
+                sock.close()
+        except Exception:
+            return None
+
+    def inject_autofill_into_tabs(self, force_submit: bool = False, navigate_url: Optional[str] = None) -> str:
+        """
+        Evaluates the CAU Auto-Fill & Auto-Login script inside all active uni-kiel.de Chrome tabs via CDP.
+        """
+        tabs = self._get_cdp_tabs()
+        if not tabs:
+            return "NO_BROWSER"
+
+        creds = self.load_credentials(include_secret=True)
+        target_tab = None
+        for t in tabs:
+            u = (t.get("url") or "").lower()
+            if "uni-kiel.de" in u or "dfn.de" in u:
+                target_tab = t
+                break
+        if not target_tab:
+            target_tab = tabs[0]
+
+        ws_url = target_tab.get("webSocketDebuggerUrl")
+        if not ws_url:
+            return "NO_WS_URL"
+
+        if navigate_url:
+            self._cdp_send_command(ws_url, "Page.navigate", {"url": navigate_url})
+            time.sleep(1.1)
+
+        if not creds.get("username") or not creds.get("password"):
+            return "NO_CREDENTIALS"
+
+        js_expr = self._build_autofill_js(creds, force_submit=force_submit)
+        res = self._cdp_send_command(ws_url, "Runtime.evaluate", {"expression": js_expr, "returnByValue": True})
+        val = (
+            res.get("result", {}).get("result", {}).get("value", "EXECUTED")
+            if isinstance(res, dict)
+            else "CDP_SENT"
+        )
+        if val in ("FILLED_AND_SUBMITTED", "FILLED_ONLY", "CLICKED_SSO_REDIRECT"):
+            now = time.time()
+            if now - self._last_autofill_ts > 4.0 or force_submit:
+                self._last_autofill_ts = now
+                if val == "FILLED_AND_SUBMITTED":
+                    self.add_log("SUCCESS", f"⚡ Auto-Login im Browser ausgeführt für '{creds['username']}'!")
+                elif val == "FILLED_ONLY":
+                    self.add_log("INFO", f"🔑 Login-Felder im Browser für '{creds['username']}' automatisch ausgefüllt.")
+                elif val == "CLICKED_SSO_REDIRECT":
+                    self.add_log("INFO", "🌐 Automatische Weiterleitung zum CAU Shibboleth SSO geklickt...")
+        return str(val)
+
+    def _autofill_watcher_loop(self):
+        """
+        Background daemon thread that monitors the open Chrome window and automatically fills in
+        CAU Shibboleth / OpenOlat / Moodle login forms whenever they appear.
+        """
+        while True:
+            try:
+                creds = self.load_credentials(include_secret=True)
+                if creds.get("auto_fill") and creds.get("username") and creds.get("password"):
+                    tabs = self._get_cdp_tabs()
+                    if tabs:
+                        for t in tabs:
+                            u = (t.get("url") or "").lower()
+                            if any(d in u for d in ["idp.uni-kiel.de", "lms.uni-kiel.de", "elearn.uni-kiel.de", "elearn.informatik.uni-kiel.de", "wayf.dfn.de"]):
+                                self.inject_autofill_into_tabs(force_submit=False)
+                                break
+            except Exception:
+                pass
+            time.sleep(1.2)
 
     def find_chrome_binary(self) -> Optional[str]:
         candidates = [
@@ -540,17 +1138,26 @@ class CAUBrowserSessionManager:
                 return path
         return None
 
-    def launch_login_browser(self, target_url: str = "https://lms.uni-kiel.de") -> Dict[str, Any]:
+    def launch_login_browser(self, target_url: Optional[str] = None, force_auto_login: bool = False) -> Dict[str, Any]:
         chrome_bin = self.find_chrome_binary()
         if not chrome_bin:
             self.add_log("ERROR", "Google Chrome wurde nicht unter /Applications gefunden.")
             return {"ok": False, "error": "Google Chrome nicht gefunden."}
 
         os.makedirs(self.profile_dir, exist_ok=True)
+        self._write_chrome_extension()
+
+        creds = self.load_credentials(include_secret=True)
+        if not target_url:
+            target_url = creds.get("default_platform") or "https://lms.uni-kiel.de"
 
         tabs = self._get_cdp_tabs()
         if tabs is not None:
-            self.add_log("INFO", f"Browser-Session läuft bereits ({len(tabs)} offene Tabs).")
+            self.add_log("INFO", f"Browser-Session läuft bereits – führe Auto-Login auf {target_url} aus...")
+            self.inject_autofill_into_tabs(
+                force_submit=force_auto_login or bool(creds.get("auto_submit")),
+                navigate_url=target_url if force_auto_login else None,
+            )
             self.check_status()
             return {"ok": True, "status": self.session_state}
 
@@ -558,6 +1165,9 @@ class CAUBrowserSessionManager:
             chrome_bin,
             f"--user-data-dir={self.profile_dir}",
             f"--remote-debugging-port={self.debug_port}",
+            "--remote-allow-origins=*",
+            "--disable-features=DisableLoadExtensionCommandLineSwitch",
+            f"--load-extension={self.ext_dir}",
             "--no-first-run",
             "--no-default-browser-check",
             target_url,
@@ -569,8 +1179,13 @@ class CAUBrowserSessionManager:
                 stderr=subprocess.DEVNULL,
             )
             self.add_log("SUCCESS", f"Sichtbares Chrome-Fenster gestartet -> {target_url}")
-            self.add_log("INFO", "Bitte im geöffneten Fenster mit deiner CAU stu-Kennung (Shibboleth SSO) anmelden.")
-            time.sleep(1.2)
+            if creds.get("username") and creds.get("password"):
+                self.add_log("INFO", f"🔑 Auto-Login aktiv für Account '{creds['username']}' – Login-Formular wird beim Laden automatisch ausgefüllt.")
+            else:
+                self.add_log("INFO", "Bitte im geöffneten Fenster mit deiner CAU stu-Kennung anmelden (oder hinterlege deine Login-Daten im Sniper für Auto-Login).")
+            time.sleep(1.5)
+            if creds.get("username") and creds.get("password"):
+                self.inject_autofill_into_tabs(force_submit=force_auto_login or bool(creds.get("auto_submit")))
             self.check_status()
             return {"ok": True, "status": self.session_state}
         except Exception as e:
@@ -589,6 +1204,7 @@ class CAUBrowserSessionManager:
     def check_status(self) -> Dict[str, Any]:
         tabs = self._get_cdp_tabs()
         now_str = datetime.now().strftime("%H:%M:%S")
+        creds_meta = self.load_credentials(include_secret=False)
         if tabs is None:
             self.session_state.update({
                 "browser_running": False,
@@ -596,7 +1212,13 @@ class CAUBrowserSessionManager:
                 "current_url": None,
                 "current_title": None,
                 "last_checked": now_str,
-                "user_hint": "Browser ist noch nicht gestartet.",
+                "saved_username": creds_meta.get("username") or "",
+                "has_credentials": bool(creds_meta.get("username") and creds_meta.get("has_password")),
+                "user_hint": (
+                    f"Auto-Login bereit für {creds_meta['username']}"
+                    if (creds_meta.get("username") and creds_meta.get("has_password"))
+                    else "Browser ist noch nicht gestartet."
+                ),
             })
             return self.session_state
 
@@ -616,7 +1238,7 @@ class CAUBrowserSessionManager:
         is_lms_authenticated = (
             ("lms.uni-kiel.de" in url.lower() or "elearn.uni-kiel.de" in url.lower() or "elearn.informatik.uni-kiel.de" in url.lower())
             and not is_shibboleth_login
-            and ("auth/" in url.lower() or "my" in url.lower() or "course" in url.lower() or "olat" in title.lower())
+            and ("auth/" in url.lower() or "my" in url.lower() or "course" in url.lower() or "olat" in title.lower() or "dashboard" in title.lower())
         )
 
         self.session_state.update({
@@ -625,10 +1247,16 @@ class CAUBrowserSessionManager:
             "current_url": url,
             "current_title": title,
             "last_checked": now_str,
+            "saved_username": creds_meta.get("username") or "",
+            "has_credentials": bool(creds_meta.get("username") and creds_meta.get("has_password")),
             "user_hint": (
-                "Verbunden & Authentifiziert auf lms.uni-kiel.de"
+                "Verbunden & Authentifiziert auf CAU LMS"
                 if is_lms_authenticated
-                else "Browser offen – Bitte im Chrome-Fenster bei CAU Shibboleth einloggen."
+                else (
+                    f"Auto-Fill aktiv ({creds_meta['username']}) – Login läuft..."
+                    if (creds_meta.get("username") and creds_meta.get("has_password"))
+                    else "Browser offen – Bitte bei CAU Shibboleth einloggen."
+                )
             ),
         })
         return self.session_state

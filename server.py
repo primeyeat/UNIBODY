@@ -385,6 +385,7 @@ class CAUBotRequestHandler(SimpleHTTPRequestHandler):
                     "preferences": APP_STATE["preferences"],
                     "catalog": catalog_summary,
                     "jobs": APP_STATE["jobs"],
+                    "credentials": session_mgr.load_credentials(include_secret=False),
                     "browser_status": session_mgr.check_status(),
                     "logs": session_mgr.logs[-60:],
                 })
@@ -394,6 +395,7 @@ class CAUBotRequestHandler(SimpleHTTPRequestHandler):
             self._send_json({
                 "ok": True,
                 "browser_status": session_mgr.check_status(),
+                "credentials": session_mgr.load_credentials(include_secret=False),
                 "logs": session_mgr.logs[-80:],
                 "jobs": APP_STATE["jobs"],
                 "schedule": APP_STATE["schedule"],
@@ -646,9 +648,54 @@ class CAUBotRequestHandler(SimpleHTTPRequestHandler):
             self._send_json({"ok": True, "course": course})
             return
 
+        if path == "/api/credentials/save":
+            username = (body.get("username") or "").strip()
+            password = body.get("password")
+            default_platform = body.get("default_platform") or "https://lms.uni-kiel.de"
+            auto_fill = bool(body.get("auto_fill", True))
+            auto_submit = bool(body.get("auto_submit", True))
+            use_keychain = bool(body.get("use_keychain", True))
+            launch_now = bool(body.get("launch_browser", False))
+
+            if not username:
+                self._send_json({"ok": False, "error": "Bitte gib deine CAU-Kennung (z. B. stu123456) ein."})
+                return
+
+            creds_meta = session_mgr.save_credentials(
+                username=username,
+                password=password,
+                default_platform=default_platform,
+                auto_fill=auto_fill,
+                auto_submit=auto_submit,
+                use_keychain=use_keychain,
+            )
+
+            if launch_now:
+                session_mgr.launch_login_browser(target_url=default_platform, force_auto_login=True)
+            else:
+                # If browser is already open on a login page, immediately inject updated credentials
+                session_mgr.inject_autofill_into_tabs(force_submit=auto_submit)
+
+            self._send_json({
+                "ok": True,
+                "credentials": creds_meta,
+                "browser_status": session_mgr.check_status(),
+            })
+            return
+
+        if path == "/api/credentials/clear":
+            creds_meta = session_mgr.clear_credentials()
+            self._send_json({
+                "ok": True,
+                "credentials": creds_meta,
+                "browser_status": session_mgr.check_status(),
+            })
+            return
+
         if path == "/api/browser/launch":
-            target_url = body.get("url") or "https://lms.uni-kiel.de"
-            res = session_mgr.launch_login_browser(target_url=target_url)
+            target_url = body.get("url")
+            force_auto_login = bool(body.get("force_auto_login", True))
+            res = session_mgr.launch_login_browser(target_url=target_url, force_auto_login=force_auto_login)
             self._send_json(res)
             return
 

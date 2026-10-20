@@ -21,11 +21,14 @@
       <button id="btnToggleDarkMode" class="btn btn-outline" title="Zwischen Frutiger Aero Daylight und Deep Ocean Aurora Dark Mode wechseln">
         🌙 Dark Mode
       </button>
+      <button id="btnToggleAccountPanel" class="btn btn-outline" title="CAU Login-Daten (stu-Kennung & Passwort) für OpenOlat / eLearn speichern & Auto-Login verwalten">
+        🔑 CAU Account hinterlegen
+      </button>
       <div id="ssoBadge" class="sso-badge disconnected">
         <span class="dot"></span>
         <span id="ssoStatusText">Shibboleth SSO: Bereit</span>
       </div>
-      <button id="btnLaunchBrowser" class="btn btn-outline" title="Öffnet ein sichtbares Google Chrome Fenster für deinen CAU Single Sign-On Login">
+      <button id="btnLaunchBrowser" class="btn btn-outline" title="Öffnet das Google Chrome Fenster und füllt deine CAU Login-Daten automatisch aus">
         🌐 CAU Login-Browser starten (SSO)
       </button>
     </div>
@@ -35,6 +38,92 @@
   <main class="workspace">
     <!-- LEFT COLUMN: COURSE ID SNIPER + PREFERENCES + RANKED GROUPS -->
     <section class="left-panel">
+      <!-- 0. CAU ACCOUNT & AUTO-LOGIN VAULT CARD -->
+      <div class="card account-vault-card" id="accountVaultCard">
+        <div class="card-header">
+          <div>
+            <span class="step-pill" id="vaultStatusPill">AUTO-LOGIN TRESOR</span>
+            <h2>🔐 CAU Account &amp; Auto-Fill (OpenOlat / eLearn / Shibboleth)</h2>
+          </div>
+          <div style="display:flex;gap:6px;align-items:center;">
+            <span id="vaultSavedBadge" class="vault-badge unsaved">Noch kein Account gespeichert</span>
+            <button type="button" id="btnCollapseVault" class="btn btn-xs btn-ghost" title="Formular ein-/ausklappen">
+              🔽 Einklappen
+            </button>
+          </div>
+        </div>
+
+        <form id="formCredentials" class="vault-form-body">
+          <p class="helper-text">
+            Speichere deine <strong>CAU-Kennung (z.&nbsp;B. <code>stu123456</code>)</strong> und dein Passwort sicher im <strong>macOS Schlüsselbund (Keychain)</strong>. Sobald sich <code>lms.uni-kiel.de</code> (OpenOlat), <code>elearn.uni-kiel.de</code> (Moodle) oder <code>idp.uni-kiel.de</code> (Shibboleth) öffnet, füllt der Sniper deine Daten vollautomatisch aus und loggt dich ein!
+          </p>
+
+          <div class="vault-grid">
+            <div class="form-group">
+              <label for="credUsername">CAU-Kennung / Login-Name *</label>
+              <input
+                type="text"
+                id="credUsername"
+                placeholder="z. B. stu241234 oder su..."
+                autocomplete="username"
+                required
+              />
+            </div>
+
+            <div class="form-group">
+              <label for="credPassword">Passwort (macOS Keychain) *</label>
+              <div class="password-input-wrap">
+                <input
+                  type="password"
+                  id="credPassword"
+                  placeholder="Dein CAU / Shibboleth Passwort..."
+                  autocomplete="current-password"
+                />
+                <button type="button" id="btnTogglePwVisibility" class="btn btn-xs btn-ghost" title="Passwort anzeigen/verbergen">
+                  👁️
+                </button>
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label for="credPlatform">Standard-Plattform beim Start</label>
+              <select id="credPlatform">
+                <option value="https://lms.uni-kiel.de">OpenOlat CAU (lms.uni-kiel.de)</option>
+                <option value="https://elearn.uni-kiel.de">Moodle CAU (elearn.uni-kiel.de)</option>
+                <option value="https://elearn.informatik.uni-kiel.de">Moodle Informatik (elearn.informatik.uni-kiel.de)</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="vault-toggles-row">
+            <label class="checkbox-inline">
+              <input type="checkbox" id="credAutoFill" checked />
+              <span>✨ Login-Felder im Browser automatisch ausfüllen (Auto-Fill)</span>
+            </label>
+            <label class="checkbox-inline">
+              <input type="checkbox" id="credAutoSubmit" checked />
+              <span>⚡ Automatisch auf „Anmelden“ klicken (1-Klick Auto-Login)</span>
+            </label>
+            <label class="checkbox-inline">
+              <input type="checkbox" id="credUseKeychain" checked />
+              <span>🍏 Im macOS Schlüsselbund sichern</span>
+            </label>
+          </div>
+
+          <div class="vault-actions-row">
+            <button type="submit" id="btnSaveCreds" class="btn btn-primary">
+              💾 Login-Daten speichern
+            </button>
+            <button type="button" id="btnSaveAndAutoLogin" class="btn btn-accent">
+              🚀 Speichern &amp; sofort Auto-Login im Browser starten
+            </button>
+            <button type="button" id="btnClearCreds" class="btn btn-xs btn-ghost" style="margin-left:auto;">
+              🗑️ Gespeicherte Daten löschen
+            </button>
+          </div>
+        </form>
+      </div>
+
       <!-- 1. STRICT COURSE ID LOOKUP CARD -->
       <div class="card highlight-card">
         <div class="card-header">
