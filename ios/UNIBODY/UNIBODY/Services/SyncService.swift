@@ -121,6 +121,71 @@ public class SyncService {
         return UnivISParser.parseICS(text)
     }
     
+    /// Enrolls into an exercise group on the UNIBODY Core server with real-time CDP verification
+    public func postEnroll(serverURL: String, courseId: String, groupId: String, force: Bool = false) async -> (success: Bool, message: String, enrolledGroup: ExerciseGroup?) {
+        guard let url = URL(string: "\(serverURL)/api/course/enroll") else {
+            return (false, "Ungültige Server-URL.", nil)
+        }
+        var req = URLRequest(url: url)
+        req.httpMethod = "POST"
+        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        let payload: [String: Any] = [
+            "course_id": courseId,
+            "group_id": groupId,
+            "force": force
+        ]
+        req.httpBody = try? JSONSerialization.data(withJSONObject: payload)
+        req.timeoutInterval = 45.0
+        do {
+            let (data, response) = try await URLSession.shared.data(for: req)
+            guard (response as? HTTPURLResponse)?.statusCode == 200 else {
+                return (false, "Server antwortete mit Fehler.", nil)
+            }
+            if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
+                let ok = json["ok"] as? Bool ?? false
+                let verified = json["enroll_verified"] as? Bool ?? false
+                let msg = json["message"] as? String ?? ""
+                
+                var enrolledGroupObj: ExerciseGroup? = nil
+                if let rawGrp = json["enrolled_group"] as? [String: Any] {
+                    let gId = (rawGrp["group_id"] as? String) ?? groupId
+                    let name = (rawGrp["name"] as? String) ?? "Übungsgruppe"
+                    let day = (rawGrp["day"] as? Int) ?? 0
+                    let dayName = (rawGrp["day_name"] as? String) ?? "Montag"
+                    let start = (rawGrp["start_time"] as? String) ?? ""
+                    let end = (rawGrp["end_time"] as? String) ?? ""
+                    let room = (rawGrp["room"] as? String) ?? ""
+                    let tutor = (rawGrp["tutor"] as? String) ?? ""
+                    let spotsFree = (rawGrp["spots_free"] as? Int) ?? 0
+                    let spotsTotal = (rawGrp["spots_total"] as? Int) ?? 0
+                    let weekType = (rawGrp["week_type"] as? String) ?? "all"
+                    enrolledGroupObj = ExerciseGroup(
+                        groupId: gId,
+                        name: name,
+                        day: day,
+                        dayName: dayName,
+                        startTime: start,
+                        endTime: end,
+                        room: room,
+                        tutor: tutor,
+                        spotsFree: spotsFree,
+                        spotsTotal: spotsTotal,
+                        weekType: weekType
+                    )
+                }
+                
+                if ok && verified {
+                    return (true, msg.isEmpty ? "Erfolgreich im LMS eingetragen und verifiziert." : msg, enrolledGroupObj)
+                } else {
+                    return (false, msg.isEmpty ? "Einschreibung konnte im Browser nicht verifiziert werden." : msg, nil)
+                }
+            }
+            return (false, "Ungültige Server-Rückmeldung.", nil)
+        } catch {
+            return (false, "Verbindungsfehler: \(error.localizedDescription)", nil)
+        }
+    }
+    
     /// Unenrolls a course on the local UNIBODY Core server and strictly verifies DOM cancellation
     public func postUnenroll(serverURL: String, courseId: String, force: Bool = false) async -> (success: Bool, message: String) {
         guard let url = URL(string: "\(serverURL)/api/course/unenroll") else {

@@ -328,20 +328,31 @@ public class AppState: ObservableObject {
     }
     
     public func enrollInGroup(courseId: String, groupId: String) {
-        guard let course = courses.first(where: { $0.courseId == courseId }),
-              let group = course.groups.first(where: { $0.groupId == groupId }) else { return }
-        
+        let cidKey = courseId.lowercased()
         enrolledGroups[courseId] = groupId
+        enrolledGroups[cidKey] = groupId
         
         // Remove prior enrolled event for this course
-        schedule.removeAll { $0.courseId == courseId && $0.type == "enrolled_exercise" }
+        schedule.removeAll {
+            ($0.courseId?.lowercased() == cidKey || $0.courseId == courseId || $0.id.lowercased().contains(cidKey)) &&
+            $0.type == "enrolled_exercise"
+        }
+        
+        for i in 0..<courses.count {
+            if courses[i].courseId.lowercased() == cidKey || courses[i].courseId == courseId {
+                courses[i].enrolledGroupId = groupId
+            }
+        }
+        
+        guard let course = courses.first(where: { $0.courseId.lowercased() == cidKey || $0.courseId == courseId }),
+              let group = course.groups.first(where: { $0.groupId == groupId }) else { return }
         
         // Add newly enrolled exercise to schedule
         let newEvent = ScheduleEvent(
-            id: "enrolled-\(courseId)",
-            courseId: courseId,
+            id: "enrolled-\(course.courseId)",
+            courseId: course.courseId,
             groupId: groupId,
-            title: "✅ \(courseId): \(group.name)",
+            title: "✅ \(course.courseId): \(group.name)",
             day: group.day,
             dayName: group.dayName,
             startTime: group.startTime,
@@ -352,6 +363,40 @@ public class AppState: ObservableObject {
             weekType: group.weekType
         )
         schedule.append(newEvent)
+        
+        #if canImport(UIKit)
+        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+        #endif
+    }
+    
+    /// Real-time live enrollment on the university platform (OpenOlat / Moodle) via CDP bot
+    public func enrollInGroupAsync(courseId: String, groupId: String, force: Bool = false) async -> (success: Bool, message: String) {
+        let server = serverURL
+        guard let host = await SyncService.shared.discoverActiveServer(preferredURL: server) else {
+            if force {
+                await MainActor.run {
+                    enrollInGroup(courseId: courseId, groupId: groupId)
+                }
+                return (true, "Gruppe direkt im Wochenplan gebucht (Offline-Modus).")
+            }
+            return (false, "UNIBODY Mac-Server nicht erreichbar. Bitte stelle sicher, dass UNIBODY auf deinem Rechner läuft.")
+        }
+        
+        let result = await SyncService.shared.postEnroll(serverURL: host, courseId: courseId, groupId: groupId, force: force)
+        if result.success {
+            await MainActor.run {
+                enrollInGroup(courseId: courseId, groupId: groupId)
+                #if canImport(UIKit)
+                UINotificationFeedbackGenerator().notificationOccurred(.success)
+                #endif
+            }
+        } else if force {
+            await MainActor.run {
+                enrollInGroup(courseId: courseId, groupId: groupId)
+            }
+            return (true, "Gruppe manuell im Wochenplan gebucht.")
+        }
+        return (result.success, result.message)
     }
     
     /// Strictly verified async unenrollment: only removes from local state and triggers UI success if verified on the university LMS.

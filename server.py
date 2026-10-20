@@ -834,6 +834,114 @@ class CAUBotRequestHandler(SimpleHTTPRequestHandler):
                 })
             return
 
+        if path == "/api/course/enroll":
+            course_id = (body.get("course_id") or "").strip()
+            group_id = (body.get("group_id") or "").strip()
+            force = bool(body.get("force", False))
+            mode = body.get("mode", "sniper")
+
+            with STATE_LOCK:
+                res = lookup_course_by_identifier(course_id, APP_STATE["custom_courses"], session_mgr)
+                if not res.get("ok"):
+                    self._send_json(res, status=200)
+                    return
+                course = res["course"]
+                ckey = course["course_id"].lower()
+                target_group = next((g for g in course.get("groups", []) if str(g.get("group_id", "")).lower() == group_id.lower()), None)
+                if not target_group and course.get("groups"):
+                    target_group = course["groups"][0]
+
+            if force or not target_group:
+                with STATE_LOCK:
+                    enrolled_gid = target_group.get("group_id") if target_group else group_id
+                    grp_obj = _apply_enrolled_group_to_state(course, enrolled_gid)
+                    gname = target_group.get("name", enrolled_gid) if target_group else enrolled_gid
+                    session_mgr.add_log(
+                        "SUCCESS",
+                        f"✅ Übung '{gname}' für '{course['course_id']}' direkt im Wochenplan gebucht (Offline-Modus)."
+                    )
+                    pinned_gid = APP_STATE.get("pinned_groups", {}).get(ckey)
+                    save_state(APP_STATE)
+                    ranked_groups = rank_course_groups(
+                        course.get("groups", []),
+                        APP_STATE["schedule"],
+                        APP_STATE["preferences"],
+                        pinned_group_id=pinned_gid,
+                        course_id=course["course_id"],
+                        enrolled_group_id=enrolled_gid,
+                    )
+                    self._send_json({
+                        "ok": True,
+                        "enroll_verified": True,
+                        "forced": True,
+                        "course": course,
+                        "enrolled_group_id": enrolled_gid,
+                        "enrolled_group": target_group,
+                        "enrolled_groups": APP_STATE["enrolled_groups"],
+                        "schedule": APP_STATE["schedule"],
+                        "ranked_groups": ranked_groups,
+                        "message": f"Erfolgreich in '{gname}' eingetragen.",
+                    })
+                return
+
+            # Live enrollment via CDP in real-time
+            session_mgr.add_log(
+                "JOB",
+                f"🚀 Starte blitzschnelle Live-Einschreibung für '{course['course_id']}' in '{target_group['name']}'..."
+            )
+            other_groups = [g for g in course.get("groups", []) if str(g.get("group_id", "")).lower() != target_group["group_id"].lower()]
+            job_payload = {
+                "course_id": course["course_id"],
+                "course_url": course.get("url") or f"https://{course.get('platform_host', 'lms.uni-kiel.de')}",
+                "platform_host": course.get("platform_host", "lms.uni-kiel.de"),
+                "platform_id": course.get("platform_id", "openolat"),
+                "mode": mode,
+                "priorities": [target_group] + other_groups[:2],
+            }
+
+            live_res = session_mgr.execute_live_enrollment_via_cdp(job_payload, simulate_first_choice_full=False)
+            if live_res.get("ok"):
+                enrolled_grp = live_res.get("enrolled_group") or target_group
+                actual_gid = enrolled_grp.get("group_id") or target_group.get("group_id")
+                with STATE_LOCK:
+                    _apply_enrolled_group_to_state(course, actual_gid)
+                    save_state(APP_STATE)
+                    session_mgr.add_log(
+                        "SUCCESS",
+                        f"✅ Live-Einschreibung verifiziert: '{enrolled_grp.get('name', actual_gid)}' fest im Wochenplan eingetragen!"
+                    )
+                    pinned_gid = APP_STATE.get("pinned_groups", {}).get(ckey)
+                    ranked_groups = rank_course_groups(
+                        course.get("groups", []),
+                        APP_STATE["schedule"],
+                        APP_STATE["preferences"],
+                        pinned_group_id=pinned_gid,
+                        course_id=course["course_id"],
+                        enrolled_group_id=actual_gid,
+                    )
+                    self._send_json({
+                        "ok": True,
+                        "enroll_verified": True,
+                        "course": course,
+                        "enrolled_group_id": actual_gid,
+                        "enrolled_group": enrolled_grp,
+                        "enrolled_groups": APP_STATE["enrolled_groups"],
+                        "schedule": APP_STATE["schedule"],
+                        "ranked_groups": ranked_groups,
+                        "message": live_res.get("message", f"Erfolgreich in '{enrolled_grp.get('name')}' eingetragen."),
+                    })
+            else:
+                self._send_json({
+                    "ok": False,
+                    "enroll_verified": False,
+                    "course": course,
+                    "enrolled_group_id": None,
+                    "enrolled_groups": APP_STATE.get("enrolled_groups", {}),
+                    "schedule": APP_STATE["schedule"],
+                    "message": live_res.get("message", "Einschreibung konnte im Browser nicht verifiziert werden."),
+                })
+            return
+
         if path == "/api/course/sync-enrolled":
             with STATE_LOCK:
                 all_courses = {**BUILTIN_CAU_COURSES, **APP_STATE["custom_courses"]}
@@ -1031,6 +1139,12 @@ class CAUBotRequestHandler(SimpleHTTPRequestHandler):
                     enrolled_group_id=enrolled_gid,
                 )
                 valid_priorities = [g for g in ranked_groups if not g.get("is_conflict")]
+                requested_gid = (body.get("group_id") or "").strip()
+                if requested_gid:
+                    matched_req = next((g for g in course.get("groups", []) if str(g.get("group_id", "")).lower() == requested_gid.lower()), None)
+                    if matched_req:
+                        other_prios = [g for g in valid_priorities if str(g.get("group_id", "")).lower() != requested_gid.lower()]
+                        valid_priorities = [matched_req] + other_prios
 
                 job_id = f"job-{uuid.uuid4().hex[:6]}"
                 job_entry = {

@@ -2215,7 +2215,8 @@ setTimeout(runUnibodyAutoFill, 2200);
             """
             nav_res = cdp_eval(ws, nav_js)
             self.add_log("INFO", f"🏛️ OpenOlat Navigation: {nav_res}")
-            time.sleep(1.8)
+            if nav_res != 'TABLE_ALREADY_VISIBLE':
+                time.sleep(1.0)
 
             # Check if clicking 'Übung' exposed a sub-item like 'Anmeldung'
             sub_check_js = """
@@ -2236,7 +2237,7 @@ setTimeout(runUnibodyAutoFill, 2200);
             sub_res = cdp_eval(ws, sub_check_js)
             if "CLICKED_SUB" in str(sub_res):
                 self.add_log("INFO", f"🏛️ OpenOlat Untermenü aufgerufen: {sub_res}")
-                time.sleep(1.8)
+                time.sleep(1.0)
 
             # Scrape live table rows
             scrape_olat_js = """
@@ -2458,6 +2459,7 @@ setTimeout(runUnibodyAutoFill, 2200);
                     "SUCCESS",
                     f"🎉 [{platform_host}] EINSCHREIBUNG ERFOLGREICH! Bestätigt in '{grp['name']}' (Token: {token})."
                 )
+                self.close_browser()
                 return {
                     "ok": True,
                     "already_enrolled": False,
@@ -2765,6 +2767,7 @@ setTimeout(runUnibodyAutoFill, 2200);
                         "SUCCESS",
                         f"🎉 [elearn.informatik] EINSCHREIBUNG ERFOLGREICH! Gewählt: '{grp['name']}' (Token: {token})."
                     )
+                    self.close_browser()
                     return {
                         "ok": True,
                         "already_enrolled": False,
@@ -2939,7 +2942,8 @@ setTimeout(runUnibodyAutoFill, 2200);
             """
             nav_res = cdp_eval(ws, nav_js)
             self.add_log("INFO", f"🏛️ OpenOlat Kurs-Navigation: {nav_res}")
-            time.sleep(2.0)
+            if nav_res != 'TABLE_ALREADY_VISIBLE':
+                time.sleep(1.0)
 
             # Check for sub-item if clicking 'Übung' expanded an 'Anmeldung' node
             sub_check_js = """
@@ -2960,7 +2964,7 @@ setTimeout(runUnibodyAutoFill, 2200);
             sub_res = cdp_eval(ws, sub_check_js)
             if "CLICKED_SUB" in str(sub_res):
                 self.add_log("INFO", f"🏛️ OpenOlat Untermenü aufgerufen: {sub_res}")
-                time.sleep(2.0)
+                time.sleep(1.0)
 
             # 3. Look for the enrollment table and execute cancel click
             cancel_click_js = """
