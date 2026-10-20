@@ -41,18 +41,18 @@ session_mgr = CAUBrowserSessionManager(profile_dir=CHROME_PROFILE_DIR)
 DEFAULT_SCHEDULE = [
     {
         "id": "lec-einf-1",
-        "title": "VL infEInf-01a: Einführung in die Informatik",
+        "title": "VL infEInf-02a/01a [#080058]: Einführung in die Informatik",
         "day": 0,
         "day_name": "Montag",
         "start_time": "14:00",
         "end_time": "16:00",
-        "room": "Online / CAP3",
+        "room": "Online-Veranstaltung",
         "type": "lecture",
         "enabled": True,
     },
     {
         "id": "lec-bwl-1",
-        "title": "VL BWL-EinfBWL: Einführung in die BWL",
+        "title": "VL BWL-EinfBWL [#030225]: Einführung in die BWL",
         "day": 1,
         "day_name": "Dienstag",
         "start_time": "12:15",
@@ -63,7 +63,7 @@ DEFAULT_SCHEDULE = [
     },
     {
         "id": "lec-matha-1",
-        "title": "VL Inf-Math-A: Mathematik für die Informatik A",
+        "title": "VL Inf-Math-A [#060107]: Mathematik für die Informatik A",
         "day": 2,
         "day_name": "Mittwoch",
         "start_time": "08:15",
@@ -74,7 +74,7 @@ DEFAULT_SCHEDULE = [
     },
     {
         "id": "lec-ewinf-1",
-        "title": "VL infEWInf-01a: Einführung in die Wirtschaftsinformatik",
+        "title": "VL infEWInf-01a [#080038]: Einführung in die Wirtschaftsinformatik",
         "day": 3,
         "day_name": "Donnerstag",
         "start_time": "10:15",
@@ -85,7 +85,7 @@ DEFAULT_SCHEDULE = [
     },
     {
         "id": "lec-matha-2",
-        "title": "VL Inf-Math-A: Mathematik für die Informatik A",
+        "title": "VL Inf-Math-A [#060107]: Mathematik für die Informatik A",
         "day": 4,
         "day_name": "Freitag",
         "start_time": "10:15",
@@ -96,7 +96,7 @@ DEFAULT_SCHEDULE = [
     },
     {
         "id": "lec-einf-2",
-        "title": "VL infEInf-01a: Einführung in die Informatik",
+        "title": "VL infEInf-02a/01a [#080058]: Einführung in die Informatik",
         "day": 4,
         "day_name": "Freitag",
         "start_time": "12:00",
