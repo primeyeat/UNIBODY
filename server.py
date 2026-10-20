@@ -648,7 +648,10 @@ class CAUBotRequestHandler(SimpleHTTPRequestHandler):
                 if not group_id or APP_STATE["enrolled_groups"].get(ckey) == group_id:
                     _apply_enrolled_group_to_state(course, None)
                     enrolled_gid = None
-                    session_mgr.add_log("INFO", f"Gebuchte Übung für '{course['course_id']}' aus Stundenplan entfernt.")
+                    session_mgr.add_log("SUCCESS", f"Aus Kurs '{course['course_id']}' im Wochenplan ausgetragen. Starte Chrome für Live-Austragung auf {course.get('platform_host', 'LMS')}...")
+                    def _do_live_unenroll_mark():
+                        session_mgr.execute_live_unenrollment_via_cdp(course, group_id)
+                    threading.Thread(target=_do_live_unenroll_mark, daemon=True).start()
                 else:
                     grp_obj = _apply_enrolled_group_to_state(course, group_id)
                     enrolled_gid = group_id
@@ -688,11 +691,17 @@ class CAUBotRequestHandler(SimpleHTTPRequestHandler):
                     return
                 course = res["course"]
                 ckey = course["course_id"].lower()
+                prev_gid = APP_STATE.get("enrolled_groups", {}).get(ckey)
                 _apply_enrolled_group_to_state(course, None)
                 if "enrolled_groups" in APP_STATE:
                     APP_STATE["enrolled_groups"].pop(ckey, None)
-                session_mgr.add_log("SUCCESS", f"Aus Kurs '{course['course_id']}' ausgetragen und aus dem Stundenplan entfernt.")
+                session_mgr.add_log("SUCCESS", f"Aus Kurs '{course['course_id']}' ausgetragen. Starte Chrome für Live-Austragung auf {course.get('platform_host', 'LMS')}...")
                 save_state(APP_STATE)
+
+                def _do_live_unenroll():
+                    session_mgr.execute_live_unenrollment_via_cdp(course, prev_gid)
+                threading.Thread(target=_do_live_unenroll, daemon=True).start()
+
                 self._send_json({
                     "ok": True,
                     "course_id": course["course_id"],

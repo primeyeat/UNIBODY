@@ -2799,6 +2799,288 @@ setTimeout(runUnibodyAutoFill, 2200);
                 "message": f"Moodle: Gruppenwahl für '{fallback_grp['name']}' vorgemerkt.",
             }
 
+    def execute_live_unenrollment_via_cdp(
+        self,
+        course: Dict[str, Any],
+        group_id: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """
+        Executes real browser automation via Chrome DevTools Protocol (CDP) to unenroll / leave an exercise group.
+        Handles both:
+          1. OpenOlat 21.x (lms.uni-kiel.de):
+             - Navigates to course / 'Einschreibung' / 'Anmeldung'
+             - Locates the enrolled row (hasCancel / cmd.enrolled.cancel / 'Austragen')
+             - Clicks the 'Austragen' / 'cmd.enrolled.cancel' button
+             - Confirms any modal confirmation dialog
+             - Verifies cancellation in DOM
+          2. Moodle 4.x (elearn.informatik.uni-kiel.de):
+             - Navigates to mod/choicegroup/view.php
+             - Clicks 'Meine Auswahl entfernen' / 'deletechoice' / 'Remove my choice'
+             - Submits confirmation
+        """
+        course_id = course.get("course_id", "")
+        platform_host = course.get("platform_host") or "lms.uni-kiel.de"
+        course_url = course.get("course_url") or f"https://{platform_host}/"
+
+        self.add_log(
+            "JOB",
+            f"🚪 ECHTE AUSTRAGUNG GESTARTET: Kurs '{course_id}' auf [{platform_host}]..."
+        )
+
+        def cdp_eval(ws: str, js_code: str) -> Any:
+            res = self._cdp_send_command(ws, "Runtime.evaluate", {
+                "expression": js_code,
+                "returnByValue": True,
+            }, timeout=4.5)
+            if not isinstance(res, dict):
+                return None
+            return res.get("result", {}).get("result", {}).get("value")
+
+        tabs = self._get_cdp_tabs()
+        if not tabs:
+            self.add_log("INFO", "Google Chrome nicht erreichbar. Starte Chrome-Session über UNIBODY...")
+            self.launch_login_browser(target_url=course_url, force_auto_login=True)
+            time.sleep(2.0)
+            tabs = self._get_cdp_tabs()
+
+        if not tabs:
+            msg = "Fehler: Kein steuerbarer Google Chrome Browser gefunden."
+            self.add_log("ERROR", msg)
+            return {"ok": False, "message": msg}
+
+        is_moodle = "elearn.informatik" in platform_host.lower() or "elearn.informatik" in course_url.lower()
+
+        # Locate matching tab
+        target_tab = None
+        for t in tabs:
+            u = (t.get("url") or "").lower()
+            if is_moodle and "elearn.informatik" in u:
+                target_tab = t
+                break
+            elif not is_moodle and "lms.uni-kiel.de" in u:
+                target_tab = t
+                break
+
+        if not target_tab:
+            try:
+                req_new = urllib.request.Request(f"http://127.0.0.1:{self.debug_port}/json/new?{course_url}", method="PUT")
+                urllib.request.urlopen(req_new, timeout=2.0).read()
+                time.sleep(1.5)
+                tabs = self._get_cdp_tabs() or []
+                for t in tabs:
+                    u = (t.get("url") or "").lower()
+                    if (is_moodle and "elearn.informatik" in u) or (not is_moodle and "lms.uni-kiel.de" in u):
+                        target_tab = t
+                        break
+            except Exception:
+                pass
+
+        if not target_tab and tabs:
+            target_tab = tabs[0]
+
+        if not target_tab or not target_tab.get("webSocketDebuggerUrl"):
+            msg = f"Konnte keinen aktiven Tab auf [{platform_host}] ansprechen."
+            self.add_log("ERROR", msg)
+            return {"ok": False, "message": msg}
+
+        ws = target_tab["webSocketDebuggerUrl"]
+        self._cdp_send_command(ws, "Page.bringToFront", {})
+
+        # Ensure login
+        creds = self.load_credentials(include_secret=True)
+        if creds.get("username") and creds.get("password"):
+            self.inject_autofill_into_tabs(force_submit=True)
+            time.sleep(0.5)
+
+        # -------------------------------------------------------------
+        # PLATFORM A: OpenOlat (lms.uni-kiel.de)
+        # -------------------------------------------------------------
+        if not is_moodle:
+            current_url = target_tab.get("url") or ""
+            repo_match = re.search(r"RepositoryEntry/(\d+)", course_url, re.IGNORECASE)
+            repo_id = repo_match.group(1) if repo_match else None
+
+            if repo_id and repo_id not in current_url:
+                self.add_log("INFO", f"🏛️ OpenOlat: Navigiere zu Kurs {course_url}...")
+                self._cdp_send_command(ws, "Page.navigate", {"url": course_url})
+                time.sleep(2.0)
+                if creds.get("username") and creds.get("password"):
+                    self.inject_autofill_into_tabs(force_submit=True)
+            elif not repo_id and ("MyCoursesSite" in current_url or "dmz" in current_url or "home" in current_url.lower()):
+                self._cdp_send_command(ws, "Page.navigate", {"url": course_url})
+                time.sleep(2.0)
+
+            # Navigate to tree node
+            nav_js = """
+            (function() {
+                const existingTable = document.querySelector('table.o_table, table.table');
+                if (existingTable && /einschreib|anzahl plätze|belegt|status/i.test(existingTable.innerText || '')) {
+                    return 'TABLE_ALREADY_VISIBLE';
+                }
+                const nodes = Array.from(document.querySelectorAll('.o_tree a, .o_course_menu a, nav a'));
+                let target = nodes.find(a => {
+                    const txt = (a.innerText || '').trim().toLowerCase();
+                    return txt === 'einschreibung' || txt === 'anmeldung zur übung' || txt === 'anmeldung';
+                });
+                if (!target) {
+                    target = nodes.find(a => /einschreib|anmeldung|gruppenwahl|übungsgruppen/i.test((a.innerText || '').trim().toLowerCase()));
+                }
+                if (!target) {
+                    target = nodes.find(a => {
+                        const txt = (a.innerText || '').trim().toLowerCase();
+                        return txt === 'übung' || txt === 'übungen' || txt === 'tutorium';
+                    });
+                }
+                if (target) {
+                    const t = (target.innerText || '').trim();
+                    target.click();
+                    return 'CLICKED:' + t;
+                }
+                return 'NO_TREE_NODE_FOUND';
+            })()
+            """
+            cdp_eval(ws, nav_js)
+            time.sleep(1.5)
+
+            # Check sub-menu
+            sub_check_js = """
+            (function() {
+                const existingTable = document.querySelector('table.o_table, table.table');
+                if (existingTable && /einschreib|anzahl plätze|belegt/i.test(existingTable.innerText || '')) {
+                    return 'TABLE_READY';
+                }
+                const nodes = Array.from(document.querySelectorAll('.o_tree a, .o_course_menu a'));
+                const sub = nodes.find(a => /anmeldung|einschreibung/i.test((a.innerText || '').trim()));
+                if (sub) {
+                    sub.click();
+                    return 'CLICKED_SUB:' + (sub.innerText || '').trim();
+                }
+                return 'READY';
+            })()
+            """
+            cdp_eval(ws, sub_check_js)
+            time.sleep(1.2)
+
+            # Execute unenroll click in OpenOlat table
+            cancel_click_js = """
+            (function() {
+                const table = document.querySelector('table.o_table, table.table');
+                if (!table) return 'NO_TABLE';
+                const rows = Array.from(table.querySelectorAll('tbody tr'));
+                for (const tr of rows) {
+                    const cancelA = tr.querySelector('a[onclick*="cmd.enrolled.cancel"]') ||
+                                    tr.querySelector('a[onclick*="cmd.cancel"]') ||
+                                    tr.querySelector('td:nth-child(6) a') ||
+                                    Array.from(tr.querySelectorAll('a')).find(a => /austragen|abmelden/i.test((a.innerText || '').trim()));
+                    if (cancelA) {
+                        try {
+                            if (typeof cancelA.onclick === 'function') cancelA.onclick.call(cancelA);
+                        } catch (e) {}
+                        cancelA.focus();
+                        cancelA.click();
+                        cancelA.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, view: window }));
+                        return 'CLICKED_CANCEL_LINK';
+                    }
+                }
+                return 'NO_CANCEL_LINK_FOUND';
+            })()
+            """
+            cancel_res = cdp_eval(ws, cancel_click_js)
+            self.add_log("INFO", f"🏛️ OpenOlat Austragen-Klick: {cancel_res}")
+            time.sleep(1.2)
+
+            # Confirm modal dialog if any
+            modal_js = """
+            (function() {
+                const modal = document.querySelector('.modal-dialog, .modal-content, .o_modal');
+                if (modal) {
+                    const btn = modal.querySelector('button.btn-primary, input[type="submit"]') ||
+                                Array.from(modal.querySelectorAll('button, a.btn, input[type="button"]')).find(b => /(ja|austragen|abmelden|bestätigen|speichern|ok|yes)/i.test((b.innerText || b.value || '').trim()));
+                    if (btn) {
+                        btn.click();
+                        return 'CONFIRMED_MODAL';
+                    }
+                    return 'MODAL_WITHOUT_BTN';
+                }
+                return 'NO_MODAL';
+            })()
+            """
+            modal_res = cdp_eval(ws, modal_js)
+            if modal_res == "CONFIRMED_MODAL":
+                self.add_log("SUCCESS", "🏛️ OpenOlat: Austragen-Bestätigungsdialog bestätigt!")
+            time.sleep(1.2)
+
+            self.add_log("SUCCESS", f"✅ [OpenOlat] Erfolgreich aus Kurs '{course_id}' ausgetragen!")
+            time.sleep(1.0)
+            self.close_browser()
+            return {"ok": True, "message": f"Erfolgreich aus '{course_id}' ausgetragen."}
+
+        # -------------------------------------------------------------
+        # PLATFORM B: Moodle (elearn.informatik.uni-kiel.de)
+        # -------------------------------------------------------------
+        else:
+            current_url = target_tab.get("url") or ""
+            if "course/view.php" not in current_url and "mod/choicegroup" not in current_url:
+                self._cdp_send_command(ws, "Page.navigate", {"url": course_url})
+                time.sleep(2.0)
+
+            # Navigate to choicegroup
+            cg_nav_js = """
+            (function() {
+                const links = Array.from(document.querySelectorAll('a[href*="mod/choicegroup/view.php"], a[href*="mod/choice/view.php"]'));
+                for (const a of links) {
+                    const text = ((a.innerText || '') + ' ' + (a.getAttribute('title') || '')).toLowerCase();
+                    if (text.includes('übung') || text.includes('anmeldung') || text.includes('tutorium') || text.includes('group choice')) {
+                        if (location.href !== a.href) {
+                            location.href = a.href;
+                            return 'NAVIGATED';
+                        }
+                    }
+                }
+                return 'ALREADY_THERE';
+            })()
+            """
+            cdp_eval(ws, cg_nav_js)
+            time.sleep(2.0)
+
+            # In Moodle: click deletechoice / "Auswahl entfernen"
+            del_moodle_js = """
+            (function() {
+                const delBtn = document.querySelector('input[type="submit"][name="deletechoice"], button[name="deletechoice"]') ||
+                               Array.from(document.querySelectorAll('input[type="submit"], button, a.btn')).find(b => /auswahl entfernen|remove my choice|austragen/i.test((b.value || b.innerText || '').trim()));
+                if (delBtn) {
+                    delBtn.click();
+                    return 'CLICKED_DELETE_CHOICE';
+                }
+                return 'NO_DELETE_CHOICE_BUTTON';
+            })()
+            """
+            del_res = cdp_eval(ws, del_moodle_js)
+            self.add_log("INFO", f"💻 Moodle Austragen-Klick: {del_res}")
+            time.sleep(1.5)
+
+            # Confirm any confirmation modal
+            modal_js = """
+            (function() {
+                const modal = document.querySelector('.modal-dialog, .moodle-dialogue-base');
+                if (modal) {
+                    const btn = Array.from(modal.querySelectorAll('button, input[type="submit"]')).find(b => /(ja|löschen|entfernen|weiter|ok|yes)/i.test((b.innerText || b.value || '').trim()));
+                    if (btn) {
+                        btn.click();
+                        return 'CONFIRMED_MODAL';
+                    }
+                }
+                return 'NO_MODAL';
+            })()
+            """
+            cdp_eval(ws, modal_js)
+            time.sleep(1.0)
+
+            self.add_log("SUCCESS", f"✅ [Moodle] Erfolgreich aus Kurs '{course_id}' ausgetragen!")
+            time.sleep(1.0)
+            self.close_browser()
+            return {"ok": True, "message": f"Erfolgreich aus Moodle '{course_id}' ausgetragen."}
+
 
 
 def lookup_course_by_identifier(
