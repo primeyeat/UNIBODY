@@ -558,15 +558,11 @@ function renderTimetable() {
     dayCols.push(col);
   }
 
-  // 1. Place Fixed Lectures & Already Enrolled Exercises
+  // 1. Place Fixed Lectures & Enrolled Exercises (with parallel-slot bucketing)
+  const schedBuckets = {};
   appState.schedule.forEach((ev) => {
     const dayIdx = Number(ev.day);
     if (dayIdx < 0 || dayIdx > 4) return;
-
-    const startMins = timeToMinutes(ev.start_time);
-    const endMins = timeToMinutes(ev.end_time);
-    const topPx = ((startMins - START_HOUR * 60) / 60) * PX_PER_HOUR;
-    const heightPx = Math.max(24, ((endMins - startMins) / 60) * PX_PER_HOUR);
 
     // Determine associated course token (from ev.course_id, ev.univis_id, or extracted from title)
     let linkedCourseToken = ev.course_id || ev.univis_id || null;
@@ -584,91 +580,144 @@ function renderTimetable() {
         String(appState.currentCourse.univis_id).includes(linkedCourseToken))
     );
 
-    const el = document.createElement("div");
-    const isEnabled = ev.enabled !== false;
-    el.className = `tt-event ${ev.type || "lecture"} ${!isEnabled ? "disabled-event" : ""} ${isSelectedCourse ? "selected-lecture-block" : ""}`;
-    el.style.top = `${topPx}px`;
-    el.style.height = `${heightPx}px`;
-    if (isSelectedCourse) {
-      el.style.boxShadow = "0 0 0 2.5px #f8fafc, 0 6px 18px rgba(59, 130, 246, 0.55)";
-      el.style.zIndex = "18";
-    }
-    el.title = linkedCourseToken
-      ? `👆 Klick = Diesen Kurs ('${linkedCourseToken}') sofort in Schritt 1 auswählen · Shift+Klick = Pausieren · Rechtsklick = Löschen`
-      : "Shift+Klick zum Pausieren/Aktivieren · Rechtsklick zum Löschen";
+    // If an enrolled exercise belongs to the currently active course, skip it here because
+    // it will be seamlessly rendered and bucketed together with the course's candidate groups in Part 2!
+    if (ev.type === "enrolled_exercise" && isSelectedCourse) return;
 
-    el.innerHTML = `
-      <div class="tt-ev-title">${isSelectedCourse ? "🎯 " : ""}${ev.title}</div>
-      <div class="tt-ev-time">${ev.start_time}–${ev.end_time} ${ev.room ? `· ${ev.room}` : ""}</div>
-    `;
-
-    el.addEventListener("click", async (e) => {
-      e.stopPropagation();
-      // Shift+Click toggles enable/disable; normal Click selects the course in Step 1!
-      if (!e.shiftKey && linkedCourseToken) {
-        const inputEl = document.getElementById("courseQueryInput");
-        inputEl.value = linkedCourseToken;
-        await verifyAndRankCourse(linkedCourseToken);
-        inputEl.style.boxShadow = "0 0 0 3px #8b5cf6";
-        setTimeout(() => {
-          inputEl.style.boxShadow = "";
-        }, 700);
-        return;
-      }
-
-      const res = await apiPost("/api/schedule/toggle", { id: ev.id });
-      if (res.ok) {
-        appState.schedule = res.schedule;
-        if (appState.currentCourse) {
-          await verifyAndRankCourse(appState.currentCourse.course_id);
-        } else {
-          renderTimetable();
-        }
-      }
-    });
-
-    el.addEventListener("contextmenu", async (e) => {
-      e.preventDefault();
-      const res = await apiPost("/api/schedule/delete", { id: ev.id });
-      if (res.ok) {
-        appState.schedule = res.schedule;
-        if (res.enrolled_groups) appState.enrolledGroups = res.enrolled_groups;
-        if (appState.currentCourse) {
-          await verifyAndRankCourse(appState.currentCourse.course_id);
-        } else {
-          renderCatalogChips();
-          renderTimetable();
-        }
-      }
-    });
-
-    dayCols[dayIdx].appendChild(el);
+    const key = `${dayIdx}-${ev.start_time}-${ev.end_time}`;
+    if (!schedBuckets[key]) schedBuckets[key] = [];
+    schedBuckets[key].push({ ev, linkedCourseToken, isSelectedCourse });
   });
 
-  // 2. Place Candidate Tutorial Overlays (All non-conflicting groups + hovered conflicts)
+  Object.values(schedBuckets).forEach((bucket) => {
+    bucket.sort((a, b) => String(a.ev.id).localeCompare(String(b.ev.id)));
+    bucket.forEach(({ ev, linkedCourseToken, isSelectedCourse }, idxInBucket) => {
+      const dayIdx = Number(ev.day);
+      const startMins = timeToMinutes(ev.start_time);
+      const endMins = timeToMinutes(ev.end_time);
+      const topPx = ((startMins - START_HOUR * 60) / 60) * PX_PER_HOUR;
+      const heightPx = Math.max(24, ((endMins - startMins) / 60) * PX_PER_HOUR);
+
+      const el = document.createElement("div");
+      const isEnabled = ev.enabled !== false;
+      el.className = `tt-event ${ev.type || "lecture"} ${!isEnabled ? "disabled-event" : ""} ${isSelectedCourse ? "selected-lecture-block" : ""}`;
+      el.style.top = `${topPx}px`;
+      el.style.height = `${heightPx}px`;
+
+      if (bucket.length > 1) {
+        const gapPct = 1.5;
+        const totalGaps = (bucket.length - 1) * gapPct;
+        const widthPct = (96 - totalGaps) / bucket.length;
+        const leftPct = 2 + idxInBucket * (widthPct + gapPct);
+        el.style.left = `${leftPct}%`;
+        el.style.right = "auto";
+        el.style.width = `${widthPct}%`;
+      } else {
+        el.style.left = "4px";
+        el.style.right = "4px";
+        el.style.width = "auto";
+      }
+
+      if (isSelectedCourse) {
+        el.style.boxShadow = "0 0 0 2.5px #f8fafc, 0 6px 18px rgba(59, 130, 246, 0.55)";
+        el.style.zIndex = "18";
+      }
+      el.title = linkedCourseToken
+        ? `👆 Klick = Diesen Kurs ('${linkedCourseToken}') sofort in Schritt 1 auswählen · Shift+Klick = Pausieren · Rechtsklick = Löschen`
+        : "Shift+Klick zum Pausieren/Aktivieren · Rechtsklick zum Löschen";
+
+      el.innerHTML = `
+        <div class="tt-ev-title">${isSelectedCourse ? "🎯 " : ""}${ev.title}</div>
+        <div class="tt-ev-time">${ev.start_time}–${ev.end_time} ${ev.room ? `· ${ev.room}` : ""}</div>
+      `;
+
+      el.addEventListener("click", async (e) => {
+        e.stopPropagation();
+        if (!e.shiftKey && linkedCourseToken) {
+          const inputEl = document.getElementById("courseQueryInput");
+          inputEl.value = linkedCourseToken;
+          await verifyAndRankCourse(linkedCourseToken);
+          inputEl.style.boxShadow = "0 0 0 3px #8b5cf6";
+          setTimeout(() => {
+            inputEl.style.boxShadow = "";
+          }, 700);
+          return;
+        }
+
+        const res = await apiPost("/api/schedule/toggle", { id: ev.id });
+        if (res.ok) {
+          appState.schedule = res.schedule;
+          if (appState.currentCourse) {
+            await verifyAndRankCourse(appState.currentCourse.course_id);
+          } else {
+            renderTimetable();
+          }
+        }
+      });
+
+      el.addEventListener("contextmenu", async (e) => {
+        e.preventDefault();
+        const res = await apiPost("/api/schedule/delete", { id: ev.id });
+        if (res.ok) {
+          appState.schedule = res.schedule;
+          if (res.enrolled_groups) appState.enrolledGroups = res.enrolled_groups;
+          if (appState.currentCourse) {
+            await verifyAndRankCourse(appState.currentCourse.course_id);
+          } else {
+            renderCatalogChips();
+            renderTimetable();
+          }
+        }
+      });
+
+      dayCols[dayIdx].appendChild(el);
+    });
+  });
+
+  // 2. Place Candidate Tutorial Overlays (All non-conflicting groups + enrolled group + hovered conflicts)
   // Group overlapping candidate slots on the same day/time so side-by-side parallel groups can both be clicked!
   const slotBuckets = {};
   appState.rankedGroups.forEach((g) => {
     const dayIdx = Number(g.day);
     if (dayIdx < 0 || dayIdx > 4) return;
-    // Skip rendering a duplicate candidate overlay for the group that is already rendered as an enrolled_exercise block
-    if (g.is_enrolled || g.group_id === appState.currentEnrolledGroupId) return;
+    const isEnrolled = Boolean(g.is_enrolled || g.group_id === appState.currentEnrolledGroupId);
     const isHovered = appState.highlightedGroupId === g.group_id;
-    if (g.is_conflict && !isHovered) return;
+    if (g.is_conflict && !isHovered && !isEnrolled) return;
 
     const key = `${dayIdx}-${g.start_time}-${g.end_time}`;
     if (!slotBuckets[key]) slotBuckets[key] = [];
     slotBuckets[key].push(g);
   });
 
+  function formatShortGroupName(fullName) {
+    if (!fullName) return "";
+    const mWeek = fullName.match(/\b(w1|w2|Woche\s*[AB]|Gr\.?\s*[AB]|14-tägig\s*Gr\.?\s*[AB])\b/i);
+    let weekLabel = "";
+    if (mWeek) {
+      const raw = mWeek[1].toUpperCase();
+      if (raw === "W1" || raw.includes("GR. A") || raw === "WOCHE A") weekLabel = " [Woche A]";
+      else if (raw === "W2" || raw.includes("GR. B") || raw === "WOCHE B") weekLabel = " [Woche B]";
+      else weekLabel = ` [${raw}]`;
+    }
+    const mGrp = fullName.match(/(?:gruppe|gr\.?|übung)\s*0*(\d+[a-zA-Z]?)/i);
+    const grpNum = mGrp ? `Gr. ${mGrp[1]}` : "";
+    return grpNum ? `${grpNum}${weekLabel}` : fullName;
+  }
+
   Object.values(slotBuckets).forEach((bucket) => {
-    // CRITICAL: Stable sort by group_id so parallel groups NEVER swap horizontal columns under cursor!
-    bucket.sort((a, b) => String(a.group_id || a.name).localeCompare(String(b.group_id || b.name)));
+    // CRITICAL: Stable sort so enrolled group / Woche A is on the left and Woche B is on the right!
+    bucket.sort((a, b) => {
+      const aEnrolled = Boolean(a.is_enrolled || a.group_id === appState.currentEnrolledGroupId);
+      const bEnrolled = Boolean(b.is_enrolled || b.group_id === appState.currentEnrolledGroupId);
+      if (aEnrolled !== bEnrolled) return aEnrolled ? -1 : 1;
+      return String(a.group_id || a.name).localeCompare(String(b.group_id || b.name));
+    });
 
     bucket.forEach((g, idxInBucket) => {
       const dayIdx = Number(g.day);
       const isHovered = appState.highlightedGroupId === g.group_id;
       const isRank1 = g.rank === 1;
+      const isEnrolled = Boolean(g.is_enrolled || g.group_id === appState.currentEnrolledGroupId);
 
       const startMins = timeToMinutes(g.start_time);
       const endMins = timeToMinutes(g.end_time);
@@ -679,6 +728,7 @@ function renderTimetable() {
       const isFull = Boolean(g.is_full || (g.spots_free !== null && g.spots_free !== undefined && Number(g.spots_free) <= 0));
       let variant = "candidate-rank-alt";
       if (g.is_conflict) variant = "candidate-conflict";
+      else if (isEnrolled) variant = "candidate-enrolled";
       else if (isFull) variant = "candidate-full";
       else if (isRank1) variant = "candidate-rank-1";
 
@@ -710,14 +760,6 @@ function renderTimetable() {
         el.style.zIndex = "45";
       }
 
-      el.title = g.is_conflict
-        ? "Zeitkonflikt mit deinem Stundenplan"
-        : isFull
-        ? `Gruppe ist voll belegt (${g.spots_total}/${g.spots_total}). Klick zum Priorisieren als Wunsch #1 (für Sniper bei Nachrücker-Plätzen)!`
-        : isRank1
-        ? `Aktuell als Wunsch #1 (${g.name}) ausgewählt! (Klicke erneut zum Aufheben)`
-        : `Klicke auf diesen Kasten, um '${g.name}' sofort als Wunsch #1 (Grün) für Schritt 3 auszuwählen!`;
-
       const total = Number(g.spots_total) || 40;
       const free = g.spots_free !== undefined && g.spots_free !== null ? Number(g.spots_free) : total;
       const taken = Math.max(0, total - free);
@@ -734,20 +776,44 @@ function renderTimetable() {
         spotsInfo = `🟢 ${total} frei`;
       }
 
-      const pinIcon = g.is_pinned ? "📌 " : (isRank1 ? "🏆 " : "⭐ ");
-      const badge = g.is_conflict
-        ? "❌ KONFLIKT"
-        : isFull
-        ? "🔴 AUSGEBUCHT"
-        : `${pinIcon}Wunsch #${g.rank} (${g.display_score}%)`;
+      let badge = "";
+      if (g.is_conflict) {
+        badge = "❌ KONFLIKT";
+      } else if (isEnrolled) {
+        badge = "✅ BEREITS GEBUCHT";
+      } else if (isFull) {
+        badge = "🔴 AUSGEBUCHT";
+      } else {
+        const pinIcon = g.is_pinned ? "📌 " : (isRank1 ? "🏆 " : "⭐ ");
+        badge = `${pinIcon}Wunsch #${g.rank}`;
+      }
 
-      const subAction = isFull
-        ? "🚫 Ausgebucht"
-        : (isRank1 ? "🏆 Wunsch #1" : "👆 Prio #1");
+      let subAction = "";
+      if (isEnrolled) {
+        subAction = "✅ Deine Gruppe";
+      } else if (isFull) {
+        subAction = "🚫 Ausgebucht";
+      } else if (isRank1) {
+        subAction = "🏆 Wunsch #1";
+      } else {
+        subAction = "👆 Prio #1";
+      }
       const subText = `${spotsInfo} · ${subAction}`;
 
+      el.title = isEnrolled
+        ? `✅ Deine aktuell gebuchte Übungsgruppe: ${g.name}. ${spotsInfo}. Klick zum Beibehalten oder Ändern.`
+        : g.is_conflict
+        ? "Zeitkonflikt mit deinem Stundenplan"
+        : isFull
+        ? `Gruppe ist voll belegt (${total}/${total} Plätze belegt). Klick zum Priorisieren als Wunsch #1 (für Sniper bei Nachrücker-Plätzen)!`
+        : isRank1
+        ? `Aktuell als Wunsch #1 (${g.name}) ausgewählt! (Klicke erneut zum Aufheben)`
+        : `Klicke auf diesen Kasten, um '${g.name}' sofort als Wunsch #1 (Grün) für Schritt 3 auszuwählen!`;
+
+      const displayName = bucket.length > 1 ? formatShortGroupName(g.name) : g.name;
+
       el.innerHTML = `
-        <div class="tt-ev-title">${badge}: ${g.name}</div>
+        <div class="tt-ev-title">${badge}: ${displayName}</div>
         <div class="tt-ev-time">${g.start_time}–${g.end_time} · ${subText}</div>
       `;
 
@@ -767,7 +833,7 @@ function renderTimetable() {
       el.addEventListener("mouseleave", () => {
         appState.highlightedGroupId = null;
         if (!isHovered) {
-          el.style.zIndex = isRank1 ? "24" : "22";
+          el.style.zIndex = isEnrolled ? "25" : (isRank1 ? "24" : "22");
           el.style.transform = "";
         }
       });
