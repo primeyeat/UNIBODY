@@ -48,7 +48,7 @@ Du hast zwei Möglichkeiten (wähle einfach die, die dir leichter fällt):
   1. Drücke gleichzeitig **`Cmd ⌘` + `Leertaste`** (Spotlight-Suche), tippe **`Terminal`** ein und drücke **`Enter`**.
   2. Kopiere diesen Befehl hinein und drücke **`Enter`**:
      ```bash
-     git clone https://github.com/Derfick/UNIBODY.git
+     git clone https://github.com/primeyeat/UNIBODY.git
      ```
 
 #### Schritt 2: UNIBODY starten
