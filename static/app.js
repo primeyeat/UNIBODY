@@ -288,20 +288,54 @@ function renderTimetable() {
     const topPx = ((startMins - START_HOUR * 60) / 60) * PX_PER_HOUR;
     const heightPx = Math.max(24, ((endMins - startMins) / 60) * PX_PER_HOUR);
 
+    // Determine associated course token (from ev.course_id, ev.univis_id, or extracted from title)
+    let linkedCourseToken = ev.course_id || ev.univis_id || null;
+    if (!linkedCourseToken && ev.title) {
+      const mHash = ev.title.match(/#(\d{5,6})/);
+      const mCode = ev.title.match(/\b(infEWInf-01a|infEInf-02a|infEInf-01a|Inf-Math-A|BWL-EinfBWL|Inf-InfRecht)\b/i);
+      if (mCode) linkedCourseToken = mCode[1];
+      else if (mHash) linkedCourseToken = mHash[1];
+    }
+
+    const isSelectedCourse = Boolean(
+      appState.currentCourse &&
+      linkedCourseToken &&
+      (appState.currentCourse.course_id.toLowerCase() === linkedCourseToken.toLowerCase() ||
+        String(appState.currentCourse.univis_id).includes(linkedCourseToken))
+    );
+
     const el = document.createElement("div");
     const isEnabled = ev.enabled !== false;
-    el.className = `tt-event ${ev.type || "lecture"} ${!isEnabled ? "disabled-event" : ""}`;
+    el.className = `tt-event ${ev.type || "lecture"} ${!isEnabled ? "disabled-event" : ""} ${isSelectedCourse ? "selected-lecture-block" : ""}`;
     el.style.top = `${topPx}px`;
     el.style.height = `${heightPx}px`;
-    el.title = "Klicke zum Pausieren/Aktivieren · Rechtsklick zum Löschen";
+    if (isSelectedCourse) {
+      el.style.boxShadow = "0 0 0 2.5px #f8fafc, 0 6px 18px rgba(59, 130, 246, 0.55)";
+      el.style.zIndex = "18";
+    }
+    el.title = linkedCourseToken
+      ? `👆 Klick = Diesen Kurs ('${linkedCourseToken}') sofort in Schritt 1 auswählen · Shift+Klick = Pausieren · Rechtsklick = Löschen`
+      : "Shift+Klick zum Pausieren/Aktivieren · Rechtsklick zum Löschen";
 
     el.innerHTML = `
-      <div class="tt-ev-title">${ev.title}</div>
+      <div class="tt-ev-title">${isSelectedCourse ? "🎯 " : ""}${ev.title}</div>
       <div class="tt-ev-time">${ev.start_time}–${ev.end_time} ${ev.room ? `· ${ev.room}` : ""}</div>
     `;
 
     el.addEventListener("click", async (e) => {
       e.stopPropagation();
+      // Shift+Click toggles enable/disable; normal Click selects the course in Step 1!
+      if (!e.shiftKey && linkedCourseToken) {
+        const inputEl = document.getElementById("courseQueryInput");
+        inputEl.value = linkedCourseToken;
+        await verifyAndRankCourse(linkedCourseToken);
+        inputEl.style.boxShadow = "0 0 0 3px #8b5cf6";
+        setTimeout(() => {
+          inputEl.style.boxShadow = "";
+        }, 700);
+        return;
+      }
+
       const res = await apiPost("/api/schedule/toggle", { id: ev.id });
       if (res.ok) {
         appState.schedule = res.schedule;

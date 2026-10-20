@@ -41,6 +41,8 @@ session_mgr = CAUBrowserSessionManager(profile_dir=CHROME_PROFILE_DIR)
 DEFAULT_SCHEDULE = [
     {
         "id": "lec-einf-1",
+        "course_id": "infEInf-02a",
+        "univis_id": "080058",
         "title": "VL infEInf-02a/01a [#080058]: Einführung in die Informatik",
         "day": 0,
         "day_name": "Montag",
@@ -52,6 +54,8 @@ DEFAULT_SCHEDULE = [
     },
     {
         "id": "lec-bwl-1",
+        "course_id": "BWL-EinfBWL",
+        "univis_id": "030225",
         "title": "VL BWL-EinfBWL [#030225]: Einführung in die BWL",
         "day": 1,
         "day_name": "Dienstag",
@@ -63,6 +67,8 @@ DEFAULT_SCHEDULE = [
     },
     {
         "id": "lec-matha-1",
+        "course_id": "Inf-Math-A",
+        "univis_id": "060107",
         "title": "VL Inf-Math-A [#060107]: Mathematik für die Informatik A",
         "day": 2,
         "day_name": "Mittwoch",
@@ -74,6 +80,8 @@ DEFAULT_SCHEDULE = [
     },
     {
         "id": "lec-ewinf-1",
+        "course_id": "infEWInf-01a",
+        "univis_id": "080038",
         "title": "VL infEWInf-01a [#080038]: Einführung in die Wirtschaftsinformatik",
         "day": 3,
         "day_name": "Donnerstag",
@@ -85,6 +93,8 @@ DEFAULT_SCHEDULE = [
     },
     {
         "id": "lec-matha-2",
+        "course_id": "Inf-Math-A",
+        "univis_id": "060107",
         "title": "VL Inf-Math-A [#060107]: Mathematik für die Informatik A",
         "day": 4,
         "day_name": "Freitag",
@@ -96,6 +106,8 @@ DEFAULT_SCHEDULE = [
     },
     {
         "id": "lec-einf-2",
+        "course_id": "infEInf-02a",
+        "univis_id": "080058",
         "title": "VL infEInf-02a/01a [#080058]: Einführung in die Informatik",
         "day": 4,
         "day_name": "Freitag",
