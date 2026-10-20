@@ -483,20 +483,82 @@ def fetch_live_univis_course(query_str: str, semester: str = "2026w") -> Optiona
                 "waitlist_available": True,
             })
 
-    return {
+    ext_url_m = re.search(r"https?://(?:elearn\.informatik\.uni-kiel\.de|lms\.uni-kiel\.de)[^\s<\"\']+", xml_text, re.IGNORECASE)
+    detected_url = ext_url_m.group(0) if ext_url_m else f"https://univis.uni-kiel.de/prg?search=lectures&number={primary['univis_id']}&sem={semester}"
+
+    live_obj = {
         "course_id": primary["short"] or primary["univis_id"],
         "univis_id": primary["univis_id"],
         "olat_repo_id": primary["internal_id"],
         "title": f"{primary['name']} (Live aus CAU UnivIS #{primary['univis_id']})",
         "lecturer": primary["lecturer"],
         "semester": "WiSe 2026/27 (UnivIS Live-XML)",
-        "platform": "CAU UnivIS Live / OpenOlat",
+        "platform": "CAU UNIBODY Auto-Detect",
         "enrollment_mode": "sniper",
         "enrollment_opens_at": "Sofort / Countdown",
-        "url": f"https://univis.uni-kiel.de/prg?search=lectures&number={primary['univis_id']}&sem={semester}",
+        "url": detected_url,
         "verified_tokens": [q.lower(), primary["univis_id"].lower(), (primary["short"] or "").lower()],
         "groups": groups,
     }
+    return enrich_course_with_unibody(live_obj)
+
+
+def enrich_course_with_unibody(course: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    UNIBODY Auto-Detection Engine:
+    Determines automatically whether a CAU course is hosted on:
+      1. `lms.uni-kiel.de` (CAU Zentrales OpenOlat - e.g. infEWInf-01a, Inf-Math-A, BWL-EinfBWL, Inf-InfRecht)
+      2. `elearn.informatik.uni-kiel.de` (Moodle Institut für Informatik - e.g. infEInf-02a / infEInf-01a, infProg, infADS)
+    and attaches structured UNIBODY routing metadata (`platform_id`, `platform_host`, `platform_badge`).
+    """
+    c = dict(course)
+    cid = (c.get("course_id") or "").lower()
+    url = (c.get("url") or "").lower()
+    plat = (c.get("platform") or "").lower()
+    repo_id = (c.get("olat_repo_id") or "").lower()
+    univis_id = (c.get("univis_id") or "").lower()
+
+    is_elearn_inf = False
+    if "elearn.informatik.uni-kiel.de" in url or "elearn.informatik" in plat or "moodle" in plat or "moodle" in repo_id:
+        is_elearn_inf = True
+    elif any(k in cid for k in ["infeinf", "infinfp", "infprog", "infads", "infrorg", "infti", "infcn", "infse"]):
+        # Note: infEWInf is Wirtschaftsinformatik (Prof. Cordes -> OpenOlat lms.uni-kiel.de)
+        if "infewinf" not in cid:
+            is_elearn_inf = True
+    elif any(u in univis_id for u in ["080058", "080056", "080314"]):
+        is_elearn_inf = True
+
+    if is_elearn_inf:
+        c["platform_id"] = "elearn_inf"
+        c["platform_host"] = "elearn.informatik.uni-kiel.de"
+        c["platform_short"] = "elearn.informatik"
+        c["platform_badge"] = "💻 elearn.informatik.uni-kiel.de (Info-Moodle)"
+        c["platform"] = "Informatik eLearn (elearn.informatik.uni-kiel.de)"
+        if not c.get("url") or "univis.uni-kiel.de" in url or ("lms.uni-kiel.de" in url and "elearn" not in url):
+            c["url"] = (
+                "https://elearn.informatik.uni-kiel.de/course/view.php?id=470"
+                if ("08005" in univis_id or "infeinf" in cid)
+                else "https://elearn.informatik.uni-kiel.de/"
+            )
+    else:
+        c["platform_id"] = "openolat"
+        c["platform_host"] = "lms.uni-kiel.de"
+        c["platform_short"] = "lms.uni-kiel.de"
+        c["platform_badge"] = "🏛️ lms.uni-kiel.de (CAU OpenOlat)"
+        c["platform"] = "CAU OpenOlat (lms.uni-kiel.de)"
+        if not c.get("url") or "univis.uni-kiel.de" in url:
+            c["url"] = (
+                f"https://lms.uni-kiel.de/url/RepositoryEntry/{c.get('olat_repo_id')}"
+                if str(c.get("olat_repo_id", "")).isdigit() and len(str(c.get("olat_repo_id", ""))) > 6
+                else "https://lms.uni-kiel.de/"
+            )
+
+    return c
+
+
+# Enrich all built-in courses with UNIBODY metadata at startup
+for _k, _v in list(BUILTIN_CAU_COURSES.items()):
+    BUILTIN_CAU_COURSES[_k] = enrich_course_with_unibody(_v)
 
 
 KEYCHAIN_SERVICE_NAME = "CAU-LMS-Sniper-Vault"
@@ -504,8 +566,11 @@ KEYCHAIN_SERVICE_NAME = "CAU-LMS-Sniper-Vault"
 
 class CAUBrowserSessionManager:
     """
-    Manages the dedicated Google Chrome browser profile, CAU Account Vault (macOS Keychain + local vault),
-    and automatic Shibboleth SSO / OpenOlat / Moodle Auto-Fill & Auto-Login engine.
+    UNIBODY Dual-Platform Browser Manager:
+    Automatically routes between:
+      1. `lms.uni-kiel.de` (CAU OpenOlat)
+      2. `elearn.informatik.uni-kiel.de` (Informatik Moodle)
+    using the exact same CAU `stu` credentials from macOS Keychain / local vault.
     """
 
     def __init__(self, profile_dir: str):
@@ -518,10 +583,12 @@ class CAUBrowserSessionManager:
         self.session_state = {
             "browser_running": False,
             "logged_in": False,
+            "openolat_logged_in": False,
+            "elearn_inf_logged_in": False,
             "current_url": None,
             "current_title": None,
             "last_checked": None,
-            "user_hint": "Nicht verbunden – Hinterlege deinen CAU Account für 1-Klick Auto-Login.",
+            "user_hint": "UNIBODY bereit – Erkennt automatisch lms.uni-kiel.de & elearn.informatik.uni-kiel.de.",
         }
         self.logs: List[Dict[str, str]] = []
         self._lock = threading.Lock()
@@ -531,9 +598,12 @@ class CAUBrowserSessionManager:
         os.makedirs(self.data_dir, exist_ok=True)
         self._write_chrome_extension()
 
-        self.add_log("SYSTEM", "CAU LMS Sniper, Auto-Login Tresor & Live-UnivIS XML Engine (Semester 2026w) initialisiert.")
+        self.add_log(
+            "SYSTEM",
+            "🫧 CAU UNIBODY Dual-Engine aktiv: Automatisches Routing zwischen lms.uni-kiel.de (OpenOlat) & elearn.informatik.uni-kiel.de (Info-Moodle)."
+        )
 
-        # Start background watcher that auto-fills open Chrome CAU login pages via CDP
+        # Start background watcher that auto-fills open Chrome CAU login pages via CDP on BOTH platforms
         self._watcher_thread = threading.Thread(target=self._autofill_watcher_loop, daemon=True)
         self._watcher_thread.start()
 
@@ -616,7 +686,7 @@ class CAUBrowserSessionManager:
         default_meta = {
             "username": "",
             "has_password": False,
-            "default_platform": "https://lms.uni-kiel.de",
+            "default_platform": "unibody",
             "auto_fill": True,
             "auto_submit": True,
             "use_keychain": True,
@@ -653,7 +723,7 @@ class CAUBrowserSessionManager:
         result = {
             "username": username,
             "has_password": bool(stored_pw),
-            "default_platform": data.get("default_platform") or "https://lms.uni-kiel.de",
+            "default_platform": data.get("default_platform") or "unibody",
             "auto_fill": bool(data.get("auto_fill", True)),
             "auto_submit": bool(data.get("auto_submit", True)),
             "use_keychain": use_keychain,
@@ -668,7 +738,7 @@ class CAUBrowserSessionManager:
         self,
         username: str,
         password: Optional[str],
-        default_platform: str = "https://lms.uni-kiel.de",
+        default_platform: str = "unibody",
         auto_fill: bool = True,
         auto_submit: bool = True,
         use_keychain: bool = True,
@@ -689,7 +759,7 @@ class CAUBrowserSessionManager:
         payload = {
             "username": username,
             "password_b64": base64.b64encode(final_pw.encode("utf-8")).decode("ascii") if final_pw else "",
-            "default_platform": default_platform or "https://lms.uni-kiel.de",
+            "default_platform": default_platform or "unibody",
             "auto_fill": bool(auto_fill),
             "auto_submit": bool(auto_submit),
             "use_keychain": bool(use_keychain),
@@ -712,7 +782,7 @@ class CAUBrowserSessionManager:
         storage_label = "macOS Schlüsselbund (Keychain) + Lokal" if keychain_ok else "Lokalem Tresor (0600)"
         self.add_log(
             "SUCCESS",
-            f"🔐 CAU Login-Daten für '{username}' gespeichert ({storage_label} · Auto-Fill: {'AN' if auto_fill else 'AUS'} · Auto-Login: {'AN' if auto_submit else 'AUS'})."
+            f"🔐 UNIBODY Login-Daten für '{username}' gespeichert ({storage_label} · Synchronisiert für lms.uni-kiel.de & elearn.informatik.uni-kiel.de)."
         )
         return self.load_credentials(include_secret=False)
 
@@ -754,6 +824,10 @@ class CAUBrowserSessionManager:
   const host = (window.location.hostname || '').toLowerCase();
   const url = (window.location.href || '').toLowerCase();
   if (!host.includes('uni-kiel.de') && !host.includes('dfn.de')) return 'NOT_CAU';
+
+  const platformName = host.includes('elearn.informatik')
+    ? 'elearn.informatik.uni-kiel.de'
+    : (host.includes('lms.uni-kiel') ? 'lms.uni-kiel.de' : host);
 
   function setNativeValue(el, val) {{
     if (!el) return false;
@@ -822,7 +896,7 @@ class CAUBrowserSessionManager:
     );
   }}
 
-  // 1. Check for visible username & password fields (CAU Shibboleth IdP, OpenOlat direct, or Moodle direct)
+  // 1. Check for visible username & password fields (CAU Shibboleth IdP, OpenOlat lms.uni-kiel.de, or Moodle elearn.informatik.uni-kiel.de)
   const userSelectors = [
     'input[name="j_username"]',
     'input#username',
@@ -869,7 +943,7 @@ class CAUBrowserSessionManager:
 
     const pageHasErr = hasLoginErrorOnPage();
     if (pageHasErr && !CFG.forceSubmit) {{
-      showAeroBanner('⚠️ CAU Sniper: Felder ausgefüllt (Auto-Submit pausiert wegen Fehlermeldung)', true);
+      showAeroBanner('⚠️ UNIBODY (' + platformName + '): Felder ausgefüllt (Auto-Submit pausiert wegen Fehlermeldung)', true);
       return 'FILLED_PAUSED_ON_ERROR';
     }}
 
@@ -879,7 +953,7 @@ class CAUBrowserSessionManager:
 
     if (CFG.autoSubmit && (!recentlySubmitted || CFG.forceSubmit)) {{
       sessionStorage.setItem('cau_sniper_submit_ts', String(now));
-      showAeroBanner('🫧 CAU Kurs-Sniper: Auto-Login als ' + CFG.username + ' wird ausgeführt...', false);
+      showAeroBanner('🫧 UNIBODY Auto-Login (' + platformName + ') als ' + CFG.username + '...', false);
 
       const submitSelectors = [
         'button[name="_eventId_proceed"]',
@@ -904,13 +978,13 @@ class CAUBrowserSessionManager:
       }}, 220);
       return 'FILLED_AND_SUBMITTED';
     }} else {{
-      showAeroBanner('🫧 CAU Kurs-Sniper: Login für ' + CFG.username + ' automatisch ausgefüllt!', false);
+      showAeroBanner('🫧 UNIBODY (' + platformName + '): Login für ' + CFG.username + ' ausgefüllt!', false);
       return changed ? 'FILLED_ONLY' : 'ALREADY_FILLED';
     }}
   }}
 
-  // 2. If on OpenOlat (lms.uni-kiel.de) or Moodle (elearn) landing page without visible password field:
-  //    Automatically click the "CAU-Login / Shibboleth SSO" button if autoSubmit is active!
+  // 2. If on OpenOlat (lms.uni-kiel.de) or Moodle (elearn.informatik.uni-kiel.de) landing/course page without visible password field:
+  //    Automatically click the "CAU-Login / Shibboleth / Anmelden" link if not authenticated yet!
   if (CFG.autoSubmit) {{
     const lastRedirectTs = parseInt(sessionStorage.getItem('cau_sniper_sso_redirect_ts') || '0', 10);
     if (Date.now() - lastRedirectTs > 5000 || CFG.forceSubmit) {{
@@ -922,13 +996,14 @@ class CAUBrowserSessionManager:
         if (
           href.includes('shibboleth') ||
           href.includes('idp.uni-kiel.de') ||
+          (host.includes('elearn') && href.includes('login/index.php')) ||
           txt.includes('shibboleth') ||
           txt.includes('cau-login') ||
           txt.includes('cau login') ||
           (host.includes('lms.uni-kiel.de') && txt.includes('login') && !url.includes('/auth/'))
         ) {{
           sessionStorage.setItem('cau_sniper_sso_redirect_ts', String(Date.now()));
-          showAeroBanner('🫧 CAU Kurs-Sniper: Weiterleitung zum CAU Single Sign-On...', false);
+          showAeroBanner('🫧 UNIBODY (' + platformName + '): Öffne Login-Maske...', false);
           el.click();
           return 'CLICKED_SSO_REDIRECT';
         }}
@@ -943,15 +1018,15 @@ class CAUBrowserSessionManager:
     def _write_chrome_extension(self):
         """
         Writes a lightweight Manifest V3 Chrome Extension into `data/cau_autofill_ext`
-        so Chrome also has native content-script Auto-Fill on `*.uni-kiel.de`.
+        so Chrome also has native content-script Auto-Fill on both `lms.uni-kiel.de` and `elearn.informatik.uni-kiel.de`.
         """
         try:
             os.makedirs(self.ext_dir, exist_ok=True)
             manifest = {
                 "manifest_version": 3,
-                "name": "CAU Kiel LMS Sniper Auto-Login",
-                "version": "1.0.0",
-                "description": "Automatisches Ausfüllen & Anmelden für lms.uni-kiel.de, elearn.uni-kiel.de und idp.uni-kiel.de",
+                "name": "CAU Kiel UNIBODY Auto-Login (OpenOlat & eLearn Informatik)",
+                "version": "2.0.0",
+                "description": "UNIBODY Auto-Fill & Auto-Login für lms.uni-kiel.de, elearn.informatik.uni-kiel.de und idp.uni-kiel.de",
                 "permissions": ["storage"],
                 "host_permissions": [
                     "https://*.uni-kiel.de/*",
@@ -974,9 +1049,9 @@ class CAUBrowserSessionManager:
             creds = self.load_credentials(include_secret=True)
             js_code = self._build_autofill_js(creds, force_submit=False)
             content_js = f"""
-// CAU Kiel LMS Sniper Auto-Fill Content Script
+// CAU Kiel UNIBODY Auto-Fill Content Script (lms.uni-kiel.de + elearn.informatik.uni-kiel.de)
 setTimeout(() => {{
-  try {{ {js_code} }} catch (e) {{ console.warn('CAU Sniper AutoFill error:', e); }}
+  try {{ {js_code} }} catch (e) {{ console.warn('CAU UNIBODY AutoFill error:', e); }}
 }}, 250);
 """
             with open(os.path.join(self.ext_dir, "content.js"), "w", encoding="utf-8") as f:
@@ -1060,56 +1135,76 @@ setTimeout(() => {{
 
     def inject_autofill_into_tabs(self, force_submit: bool = False, navigate_url: Optional[str] = None) -> str:
         """
-        Evaluates the CAU Auto-Fill & Auto-Login script inside all active uni-kiel.de Chrome tabs via CDP.
+        UNIBODY Multi-Tab Injector:
+        Evaluates the CAU Auto-Fill & Auto-Login script inside ALL active uni-kiel.de Chrome tabs
+        (`lms.uni-kiel.de` AND `elearn.informatik.uni-kiel.de`) via CDP.
+        If `navigate_url` is provided, routes the matching platform tab to `navigate_url` and brings it to front.
         """
         tabs = self._get_cdp_tabs()
         if not tabs:
             return "NO_BROWSER"
 
         creds = self.load_credentials(include_secret=True)
-        target_tab = None
-        for t in tabs:
-            u = (t.get("url") or "").lower()
-            if "uni-kiel.de" in u or "dfn.de" in u:
-                target_tab = t
-                break
-        if not target_tab:
-            target_tab = tabs[0]
-
-        ws_url = target_tab.get("webSocketDebuggerUrl")
-        if not ws_url:
-            return "NO_WS_URL"
 
         if navigate_url:
-            self._cdp_send_command(ws_url, "Page.navigate", {"url": navigate_url})
-            time.sleep(1.1)
+            nav_lower = navigate_url.lower()
+            want_elearn = "elearn.informatik" in nav_lower
+            matched_tab = None
+            for t in tabs:
+                u = (t.get("url") or "").lower()
+                if want_elearn and "elearn.informatik" in u:
+                    matched_tab = t
+                    break
+                elif not want_elearn and "lms.uni-kiel.de" in u:
+                    matched_tab = t
+                    break
+            if not matched_tab:
+                matched_tab = tabs[0]
+            ws_nav = matched_tab.get("webSocketDebuggerUrl")
+            if ws_nav:
+                self._cdp_send_command(ws_nav, "Page.bringToFront", {})
+                if (matched_tab.get("url") or "").rstrip("/") != navigate_url.rstrip("/"):
+                    self._cdp_send_command(ws_nav, "Page.navigate", {"url": navigate_url})
+                    time.sleep(1.0)
 
         if not creds.get("username") or not creds.get("password"):
             return "NO_CREDENTIALS"
 
         js_expr = self._build_autofill_js(creds, force_submit=force_submit)
-        res = self._cdp_send_command(ws_url, "Runtime.evaluate", {"expression": js_expr, "returnByValue": True})
-        val = (
-            res.get("result", {}).get("result", {}).get("value", "EXECUTED")
-            if isinstance(res, dict)
-            else "CDP_SENT"
-        )
-        if val in ("FILLED_AND_SUBMITTED", "FILLED_ONLY", "CLICKED_SSO_REDIRECT"):
-            now = time.time()
-            if now - self._last_autofill_ts > 4.0 or force_submit:
-                self._last_autofill_ts = now
-                if val == "FILLED_AND_SUBMITTED":
-                    self.add_log("SUCCESS", f"⚡ Auto-Login im Browser ausgeführt für '{creds['username']}'!")
-                elif val == "FILLED_ONLY":
-                    self.add_log("INFO", f"🔑 Login-Felder im Browser für '{creds['username']}' automatisch ausgefüllt.")
-                elif val == "CLICKED_SSO_REDIRECT":
-                    self.add_log("INFO", "🌐 Automatische Weiterleitung zum CAU Shibboleth SSO geklickt...")
-        return str(val)
+        last_result = "NONE"
+
+        for t in tabs:
+            u = (t.get("url") or "").lower()
+            if not any(d in u for d in ["uni-kiel.de", "dfn.de"]):
+                continue
+            ws_url = t.get("webSocketDebuggerUrl")
+            if not ws_url:
+                continue
+            res = self._cdp_send_command(ws_url, "Runtime.evaluate", {"expression": js_expr, "returnByValue": True})
+            val = (
+                res.get("result", {}).get("result", {}).get("value", "EXECUTED")
+                if isinstance(res, dict)
+                else "CDP_SENT"
+            )
+            if val in ("FILLED_AND_SUBMITTED", "FILLED_ONLY", "CLICKED_SSO_REDIRECT"):
+                last_result = val
+                plat_label = "elearn.informatik.uni-kiel.de" if "elearn.informatik" in u else ("lms.uni-kiel.de" if "lms.uni-kiel" in u else "idp.uni-kiel.de")
+                now = time.time()
+                if now - self._last_autofill_ts > 3.5 or force_submit:
+                    self._last_autofill_ts = now
+                    if val == "FILLED_AND_SUBMITTED":
+                        self.add_log("SUCCESS", f"⚡ UNIBODY Auto-Login auf [{plat_label}] ausgeführt für '{creds['username']}'!")
+                    elif val == "FILLED_ONLY":
+                        self.add_log("INFO", f"🔑 UNIBODY: Login-Felder auf [{plat_label}] für '{creds['username']}' ausgefüllt.")
+                    elif val == "CLICKED_SSO_REDIRECT":
+                        self.add_log("INFO", f"🌐 UNIBODY: Weiterleitung zum Login auf [{plat_label}] ausgelöst...")
+
+        return str(last_result)
 
     def _autofill_watcher_loop(self):
         """
-        Background daemon thread that monitors the open Chrome window and automatically fills in
-        CAU Shibboleth / OpenOlat / Moodle login forms whenever they appear.
+        Background daemon thread that monitors all open Chrome tabs (`lms.uni-kiel.de` AND `elearn.informatik.uni-kiel.de`)
+        and automatically fills in login forms whenever they appear.
         """
         while True:
             try:
@@ -1139,6 +1234,13 @@ setTimeout(() => {{
         return None
 
     def launch_login_browser(self, target_url: Optional[str] = None, force_auto_login: bool = False) -> Dict[str, Any]:
+        """
+        UNIBODY Browser Launcher:
+        If `target_url` is "unibody" or None (and default_platform is "unibody"), opens BOTH
+        `https://lms.uni-kiel.de` AND `https://elearn.informatik.uni-kiel.de/login/index.php` in two tabs
+        so both CAU platforms are logged in with a single click!
+        If a specific course URL is passed, routes directly to that course's platform.
+        """
         chrome_bin = self.find_chrome_binary()
         if not chrome_bin:
             self.add_log("ERROR", "Google Chrome wurde nicht unter /Applications gefunden.")
@@ -1148,15 +1250,26 @@ setTimeout(() => {{
         self._write_chrome_extension()
 
         creds = self.load_credentials(include_secret=True)
-        if not target_url:
-            target_url = creds.get("default_platform") or "https://lms.uni-kiel.de"
+        pref_plat = target_url or creds.get("default_platform") or "unibody"
+
+        if pref_plat == "unibody":
+            urls_to_open = [
+                "https://lms.uni-kiel.de",
+                "https://elearn.informatik.uni-kiel.de/login/index.php",
+            ]
+        else:
+            urls_to_open = [pref_plat]
 
         tabs = self._get_cdp_tabs()
         if tabs is not None:
-            self.add_log("INFO", f"Browser-Session läuft bereits – führe Auto-Login auf {target_url} aus...")
+            nav_target = None if pref_plat == "unibody" else pref_plat
+            self.add_log(
+                "INFO",
+                f"🫧 UNIBODY Router: Browser läuft bereits – synchronisiere Session auf {nav_target or 'lms.uni-kiel.de & elearn.informatik.uni-kiel.de'}..."
+            )
             self.inject_autofill_into_tabs(
                 force_submit=force_auto_login or bool(creds.get("auto_submit")),
-                navigate_url=target_url if force_auto_login else None,
+                navigate_url=nav_target,
             )
             self.check_status()
             return {"ok": True, "status": self.session_state}
@@ -1170,7 +1283,7 @@ setTimeout(() => {{
             f"--load-extension={self.ext_dir}",
             "--no-first-run",
             "--no-default-browser-check",
-            target_url,
+            *urls_to_open,
         ]
         try:
             self.chrome_process = subprocess.Popen(
@@ -1178,12 +1291,18 @@ setTimeout(() => {{
                 stdout=subprocess.DEVNULL,
                 stderr=subprocess.DEVNULL,
             )
-            self.add_log("SUCCESS", f"Sichtbares Chrome-Fenster gestartet -> {target_url}")
+            self.add_log(
+                "SUCCESS",
+                f"🫧 UNIBODY Chrome-Session gestartet -> {' + '.join(urls_to_open)}"
+            )
             if creds.get("username") and creds.get("password"):
-                self.add_log("INFO", f"🔑 Auto-Login aktiv für Account '{creds['username']}' – Login-Formular wird beim Laden automatisch ausgefüllt.")
+                self.add_log(
+                    "INFO",
+                    f"🔑 UNIBODY Auto-Login aktiv für '{creds['username']}' – Beide Plattformen (OpenOlat & Info-Moodle) werden automatisch eingeloggt."
+                )
             else:
-                self.add_log("INFO", "Bitte im geöffneten Fenster mit deiner CAU stu-Kennung anmelden (oder hinterlege deine Login-Daten im Sniper für Auto-Login).")
-            time.sleep(1.5)
+                self.add_log("INFO", "Bitte im geöffneten Fenster mit deiner CAU stu-Kennung anmelden (oder hinterlege deine Login-Daten im UNIBODY-Tresor).")
+            time.sleep(1.6)
             if creds.get("username") and creds.get("password"):
                 self.inject_autofill_into_tabs(force_submit=force_auto_login or bool(creds.get("auto_submit")))
             self.check_status()
@@ -1209,53 +1328,68 @@ setTimeout(() => {{
             self.session_state.update({
                 "browser_running": False,
                 "logged_in": False,
+                "openolat_logged_in": False,
+                "elearn_inf_logged_in": False,
                 "current_url": None,
                 "current_title": None,
                 "last_checked": now_str,
                 "saved_username": creds_meta.get("username") or "",
                 "has_credentials": bool(creds_meta.get("username") and creds_meta.get("has_password")),
                 "user_hint": (
-                    f"Auto-Login bereit für {creds_meta['username']}"
+                    f"UNIBODY Auto-Login bereit ({creds_meta['username']})"
                     if (creds_meta.get("username") and creds_meta.get("has_password"))
-                    else "Browser ist noch nicht gestartet."
+                    else "UNIBODY bereit (lms.uni-kiel.de & elearn.informatik)"
                 ),
             })
             return self.session_state
 
+        openolat_auth = False
+        elearn_inf_auth = False
         lms_tab = None
+
         for t in tabs:
-            u = t.get("url", "")
-            if "uni-kiel.de" in u:
+            u = (t.get("url") or "").lower()
+            title = (t.get("title") or "").lower()
+            if "uni-kiel.de" in u and not lms_tab:
                 lms_tab = t
-                break
+            is_login_page = any(k in u for k in ["idp.uni-kiel.de", "shibboleth.sso", "login", "wayf"])
+            if "lms.uni-kiel.de" in u and not is_login_page and ("auth/" in u or "olat" in title or "repositoryentry" in u):
+                openolat_auth = True
+            if "elearn.informatik.uni-kiel.de" in u and not is_login_page and ("course" in u or "my" in u or "dashboard" in title or "moodle" in title):
+                elearn_inf_auth = True
+
         if not lms_tab and tabs:
             lms_tab = tabs[0]
 
         url = lms_tab.get("url", "") if lms_tab else ""
         title = lms_tab.get("title", "") if lms_tab else ""
-
-        is_shibboleth_login = any(k in url.lower() for k in ["idp.uni-kiel.de", "shibboleth.sso", "login", "wayf"])
-        is_lms_authenticated = (
-            ("lms.uni-kiel.de" in url.lower() or "elearn.uni-kiel.de" in url.lower() or "elearn.informatik.uni-kiel.de" in url.lower())
-            and not is_shibboleth_login
-            and ("auth/" in url.lower() or "my" in url.lower() or "course" in url.lower() or "olat" in title.lower() or "dashboard" in title.lower())
-        )
+        any_auth = openolat_auth or elearn_inf_auth
 
         self.session_state.update({
             "browser_running": True,
-            "logged_in": is_lms_authenticated,
+            "logged_in": any_auth,
+            "openolat_logged_in": openolat_auth,
+            "elearn_inf_logged_in": elearn_inf_auth,
             "current_url": url,
             "current_title": title,
             "last_checked": now_str,
             "saved_username": creds_meta.get("username") or "",
             "has_credentials": bool(creds_meta.get("username") and creds_meta.get("has_password")),
             "user_hint": (
-                "Verbunden & Authentifiziert auf CAU LMS"
-                if is_lms_authenticated
+                "UNIBODY Verbunden (OpenOlat + Info-Moodle)"
+                if (openolat_auth and elearn_inf_auth)
                 else (
-                    f"Auto-Fill aktiv ({creds_meta['username']}) – Login läuft..."
-                    if (creds_meta.get("username") and creds_meta.get("has_password"))
-                    else "Browser offen – Bitte bei CAU Shibboleth einloggen."
+                    "Verbunden: lms.uni-kiel.de (OpenOlat)"
+                    if openolat_auth
+                    else (
+                        "Verbunden: elearn.informatik.uni-kiel.de"
+                        if elearn_inf_auth
+                        else (
+                            f"UNIBODY Auto-Fill aktiv ({creds_meta['username']})..."
+                            if (creds_meta.get("username") and creds_meta.get("has_password"))
+                            else "Browser offen – Bitte einloggen."
+                        )
+                    )
                 )
             ),
         })
@@ -1268,11 +1402,8 @@ def lookup_course_by_identifier(
     session_mgr: Optional[CAUBrowserSessionManager] = None,
 ) -> Dict[str, Any]:
     """
-    Strictly verifies and looks up a course by its identifier:
-      1. Checks exact verified tokens in BUILTIN_CAU_COURSES + custom_courses
-         (including all lecture AND exercise UnivIS numbers: 080038, 080042, 080058, 080056, 060107, 060098, 030225, 080103).
-      2. If not in the preloaded catalog, queries the official CAU UnivIS XML API live (`univis.uni-kiel.de`)
-         for that exact UnivIS number or code!
+    Strictly verifies and looks up a course by its identifier and enriches it with UNIBODY platform routing:
+      - Automatically detects whether the course is on `lms.uni-kiel.de` (OpenOlat) or `elearn.informatik.uni-kiel.de` (Moodle Informatik).
     """
     raw = query_id.strip()
     if not raw:
@@ -1288,7 +1419,8 @@ def lookup_course_by_identifier(
 
     all_catalog = {**BUILTIN_CAU_COURSES, **custom_courses}
 
-    for key, course in all_catalog.items():
+    for key, raw_course in all_catalog.items():
+        course = enrich_course_with_unibody(raw_course)
         tokens = [t.lower() for t in course.get("verified_tokens", [])]
         tokens.extend([
             str(course.get("course_id", "")).lower(),
@@ -1299,8 +1431,7 @@ def lookup_course_by_identifier(
             if session_mgr:
                 session_mgr.add_log(
                     "VERIFY",
-                    f"Exakte UnivIS/LMS-Kennung '{raw}' verifiziert -> {course['title']} "
-                    f"(UnivIS: {course.get('univis_id')})"
+                    f"🫧 UNIBODY Auto-Detect: '{course['course_id']}' erkannt auf [{course['platform_host']}] -> {course['title']}"
                 )
             return {
                 "ok": True,
@@ -1316,7 +1447,7 @@ def lookup_course_by_identifier(
         if session_mgr:
             session_mgr.add_log(
                 "VERIFY",
-                f"Live aus CAU UnivIS XML geladen: '{raw}' -> {live_course['title']} ({len(live_course['groups'])} Termine)"
+                f"🫧 UNIBODY Live-XML: '{raw}' geladen -> Geroutet auf [{live_course['platform_host']}] ({len(live_course['groups'])} Termine)"
             )
         return {
             "ok": True,

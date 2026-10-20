@@ -171,7 +171,7 @@ function syncPreferencesUI() {
 
 function renderCatalogChips() {
   const container = document.getElementById("catalogChips");
-  container.innerHTML = `<span style="font-size:0.75rem;color:#525c68;font-weight:800;text-transform:uppercase;margin-right:4px;">Verifizierte CAU-Kurse:</span>`;
+  container.innerHTML = `<span style="font-size:0.75rem;color:#0a4d82;font-weight:800;text-transform:uppercase;margin-right:4px;">🫧 UNIBODY Katalog:</span>`;
   appState.catalog.forEach((c) => {
     const btn = document.createElement("button");
     btn.type = "button";
@@ -179,7 +179,9 @@ function renderCatalogChips() {
     if (appState.currentCourse && appState.currentCourse.course_id === c.course_id) {
       btn.classList.add("active");
     }
-    btn.innerHTML = `<strong>${c.course_id}</strong> <span style="opacity:0.8">(${c.univis_id})</span>`;
+    const platIcon = c.platform_id === "elearn_inf" ? "💻 elearn.inf" : "🏛️ lms";
+    btn.title = `UNIBODY routet diesen Kurs automatisch auf ${c.platform_host || "lms.uni-kiel.de"}`;
+    btn.innerHTML = `<strong>${c.course_id}</strong> <span style="opacity:0.85;font-size:0.68rem;">[${platIcon}]</span>`;
     btn.addEventListener("click", () => {
       document.getElementById("courseQueryInput").value = c.course_id;
       verifyAndRankCourse(c.course_id);
@@ -188,7 +190,7 @@ function renderCatalogChips() {
   });
 }
 
-/* COURSE LOOKUP & STRICT ID VERIFICATION */
+/* COURSE LOOKUP & STRICT ID VERIFICATION + UNIBODY ROUTING */
 async function verifyAndRankCourse(queryId) {
   const banner = document.getElementById("verificationBanner");
   const res = await apiPost("/api/course/lookup", { query_id: queryId });
@@ -208,16 +210,40 @@ async function verifyAndRankCourse(queryId) {
   appState.rankedGroups = res.ranked_groups || [];
   document.getElementById("enrollModeSelect").value = res.course.enrollment_mode || "sniper";
 
+  const isElearnInf = res.course.platform_id === "elearn_inf";
+  const unibodyPillStyle = isElearnInf
+    ? "background:linear-gradient(180deg,#5eead4 0%,#0d9488 50%,#0f766e 100%);color:#ffffff;border:1px solid #115e59;"
+    : "background:linear-gradient(180deg,#62d4ff 0%,#0088e8 50%,#0062b8 100%);color:#ffffff;border:1px solid #004b8f;";
+
   banner.className = "verification-banner verified";
   banner.innerHTML = `
-    <div>
-      ✅ <strong>Exakte Kurs-ID verifiziert:</strong> ${res.course.title}<br/>
+    <div style="flex:1;">
+      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:4px;">
+        <span>✅ <strong>Exakte Kurs-ID verifiziert:</strong> ${res.course.title}</span>
+        <span class="step-pill" style="${unibodyPillStyle}">
+          🫧 UNIBODY &rarr; ${res.course.platform_host || "lms.uni-kiel.de"}
+        </span>
+      </div>
       <span style="font-size:0.77rem;opacity:0.95;">
-        Modulcode: <code>${res.course.course_id}</code> · UnivIS-Nr.: <code>${res.course.univis_id}</code> · OpenOlat/LMS: <code>${res.course.olat_repo_id}</code> · Dozent/in: ${res.course.lecturer}
+        Modulcode: <code>${res.course.course_id}</code> · UnivIS-Nr.: <code>${res.course.univis_id}</code> · Ziel-System: <strong>${res.course.platform_badge || res.course.platform}</strong> · Dozent/in: ${res.course.lecturer}
       </span>
     </div>
-    <span class="step-pill">ID SICHER</span>
+    <button type="button" id="btnRouteCourseBrowser" class="btn btn-xs btn-primary" title="Öffnet diesen Kurs automatisch auf der richtigen Plattform (${res.course.platform_host}) und loggt dich ein">
+      🚀 Auf ${res.course.platform_short || res.course.platform_host} öffnen
+    </button>
   `;
+
+  const routeBtn = document.getElementById("btnRouteCourseBrowser");
+  if (routeBtn) {
+    routeBtn.addEventListener("click", async () => {
+      const r = await apiPost("/api/browser/launch", {
+        url: res.course.url,
+        force_auto_login: true,
+      });
+      if (r.status) updateBrowserBadge(r.status);
+      await pollTelemetry();
+    });
+  }
 
   renderCatalogChips();
   renderRankedGroups();
@@ -573,10 +599,10 @@ function bindUIEvents() {
     });
   });
 
-  // Launch CAU Shibboleth SSO Chrome window (with Auto-Login if credentials saved)
+  // Launch CAU UNIBODY Chrome window (opens both lms.uni-kiel.de & elearn.informatik.uni-kiel.de or routes to selected course)
   document.getElementById("btnLaunchBrowser").addEventListener("click", async () => {
-    const plat = document.getElementById("credPlatform")?.value || "https://lms.uni-kiel.de";
-    const targetUrl = appState.currentCourse ? appState.currentCourse.url : plat;
+    const plat = document.getElementById("credPlatform")?.value || "unibody";
+    const targetUrl = plat === "unibody" ? "unibody" : (appState.currentCourse ? appState.currentCourse.url : plat);
     const res = await apiPost("/api/browser/launch", {
       url: targetUrl,
       force_auto_login: true,

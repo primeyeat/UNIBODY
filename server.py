@@ -24,6 +24,7 @@ from lms_bot import (
     CAUBrowserSessionManager,
     lookup_course_by_identifier,
     parse_groups_from_raw_text,
+    enrich_course_with_unibody,
 )
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -239,14 +240,21 @@ def execute_enrollment_job(job_id: str, simulate_first_choice_full: bool = False
     course_id = job["course_id"]
     mode = job.get("mode", "sniper")
     priorities = job.get("priorities", [])  # Ordered list of group dicts
+    platform_host = job.get("platform_host") or "lms.uni-kiel.de"
+    course_url = job.get("course_url") or f"https://{platform_host}/"
 
-    session_mgr.add_log("JOB", f"Starte Einschreibungs-Job [{job_id}] für verifizierten Kurs '{course_id}' (Modus: {mode.upper()})...")
+    session_mgr.add_log(
+        "JOB",
+        f"🫧 UNIBODY Router: Kurs '{course_id}' erkannt auf [{platform_host}] -> Routet auf {course_url} (Modus: {mode.upper()})..."
+    )
+    # If Chrome is open, automatically route the matching platform tab to the course URL & auto-login
+    session_mgr.inject_autofill_into_tabs(force_submit=True, navigate_url=course_url)
     time.sleep(0.35)
 
     session_mgr.add_log(
         "VERIFY",
-        f"Prüfe Kurs-Signatur auf lms.uni-kiel.de: '{job.get('course_title')}' "
-        f"[UnivIS={job.get('univis_id')} | OpenOlat={job.get('olat_repo_id')}] -> EXAKT ÜBEREINSTIMMEND."
+        f"Prüfe Kurs-Signatur auf [{platform_host}]: '{job.get('course_title')}' "
+        f"[UnivIS={job.get('univis_id')} | LMS-ID={job.get('olat_repo_id')}] -> EXAKT ÜBEREINSTIMMEND."
     )
     time.sleep(0.35)
 
@@ -266,7 +274,7 @@ def execute_enrollment_job(job_id: str, simulate_first_choice_full: bool = False
             rank_num = idx + 1
             session_mgr.add_log(
                 "SNIPER",
-                f"Versuche Wunsch #{rank_num}: '{grp['name']}' ({grp['day_name']} {grp['start_time']}–{grp['end_time']}, Score: {grp.get('display_score')}%)..."
+                f"[{platform_host}] Versuche Wunsch #{rank_num}: '{grp['name']}' ({grp['day_name']} {grp['start_time']}–{grp['end_time']}, Score: {grp.get('display_score')}%)..."
             )
             time.sleep(0.4)
 
@@ -274,14 +282,14 @@ def execute_enrollment_job(job_id: str, simulate_first_choice_full: bool = False
             if is_grp_full:
                 session_mgr.add_log(
                     "WARN",
-                    f"Wunsch #{rank_num} ('{grp['name']}') ist in dieser Millisekunde voll (0 Plätze frei)! Wechsle sofort in 12ms auf Fallback #{rank_num + 1}..."
+                    f"[{platform_host}] Wunsch #{rank_num} ('{grp['name']}') ist in dieser Millisekunde voll (0 Plätze frei)! Wechsle sofort in 12ms auf Fallback #{rank_num + 1}..."
                 )
                 continue
             else:
                 enrolled_group = grp
                 session_mgr.add_log(
                     "SUCCESS",
-                    f"EINGESCHRIEBEN in '{grp['name']}' ({grp['day_name']} {grp['start_time']}–{grp['end_time']})! Bestätigungs-Token gespeichert."
+                    f"[{platform_host}] EINGESCHRIEBEN in '{grp['name']}' ({grp['day_name']} {grp['start_time']}–{grp['end_time']})! Bestätigungs-Token gespeichert."
                 )
                 break
 
@@ -290,20 +298,20 @@ def execute_enrollment_job(job_id: str, simulate_first_choice_full: bool = False
             enrolled_group = priorities[0]
             session_mgr.add_log(
                 "WARN",
-                f"Alle Top-Wünsche voll – Automatisch auf Warteliste Platz 1 für '{enrolled_group['name']}' gesetzt."
+                f"[{platform_host}] Alle Top-Wünsche voll – Automatisch auf Warteliste Platz 1 für '{enrolled_group['name']}' gesetzt."
             )
     else:
         # Priority Distribution Mode (Verteilungsverfahren: Prio 1, 2, 3 absenden)
         top_names = [f"Prio {i+1}: {g['name']} ({g['day_name']} {g['start_time']})" for i, g in enumerate(priorities[:3])]
         session_mgr.add_log(
             "PRIORITY",
-            f"Übertrage Präferenz-Ranking an Gruppenwahl-Modul: {' | '.join(top_names)}"
+            f"[{platform_host}] Übertrage Präferenz-Ranking an Gruppenwahl-Modul: {' | '.join(top_names)}"
         )
         time.sleep(0.45)
         enrolled_group = priorities[0]
         session_mgr.add_log(
             "SUCCESS",
-            f"Präferenzen (Wunsch 1–{min(3, len(priorities))}) erfolgreich im LMS gespeichert! Wunsch #1 im Kalender vorgemerkt."
+            f"[{platform_host}] Präferenzen (Wunsch 1–{min(3, len(priorities))}) erfolgreich gespeichert! Wunsch #1 im Kalender vorgemerkt."
         )
 
     # Optionally add the won exercise group directly to the user's weekly schedule so future courses won't overlap!
@@ -312,9 +320,9 @@ def execute_enrollment_job(job_id: str, simulate_first_choice_full: bool = False
         job["completed_at"] = datetime.now().strftime("%H:%M:%S")
         job["enrolled_group"] = enrolled_group
         job["result_message"] = (
-            f"Erfolgreich in '{enrolled_group['name']}' ({enrolled_group['day_name']} {enrolled_group['start_time']}–{enrolled_group['end_time']}) eingetragen!"
+            f"[{platform_host}] Erfolgreich in '{enrolled_group['name']}' ({enrolled_group['day_name']} {enrolled_group['start_time']}–{enrolled_group['end_time']}) eingetragen!"
             if mode == "sniper"
-            else f"Prioritäten 1–{min(3, len(priorities))} gespeichert (Top-Wunsch: {enrolled_group['name']})"
+            else f"[{platform_host}] Prioritäten 1–{min(3, len(priorities))} gespeichert (Top-Wunsch: {enrolled_group['name']})"
         )
 
         # Add to schedule if not already present
@@ -368,13 +376,19 @@ class CAUBotRequestHandler(SimpleHTTPRequestHandler):
             with STATE_LOCK:
                 catalog_summary = []
                 all_courses = {**BUILTIN_CAU_COURSES, **APP_STATE["custom_courses"]}
-                for k, c in all_courses.items():
+                for k, raw_c in all_courses.items():
+                    c = enrich_course_with_unibody(raw_c)
                     catalog_summary.append({
                         "course_id": c["course_id"],
                         "univis_id": c.get("univis_id", ""),
                         "olat_repo_id": c.get("olat_repo_id", ""),
                         "title": c["title"],
                         "lecturer": c.get("lecturer", ""),
+                        "platform_id": c.get("platform_id", "openolat"),
+                        "platform_host": c.get("platform_host", "lms.uni-kiel.de"),
+                        "platform_short": c.get("platform_short", "lms.uni-kiel.de"),
+                        "platform_badge": c.get("platform_badge", "🏛️ lms.uni-kiel.de"),
+                        "url": c.get("url", "https://lms.uni-kiel.de"),
                         "enrollment_mode": c.get("enrollment_mode", "sniper"),
                         "enrollment_opens_at": c.get("enrollment_opens_at", ""),
                         "group_count": len(c.get("groups", [])),
@@ -651,7 +665,7 @@ class CAUBotRequestHandler(SimpleHTTPRequestHandler):
         if path == "/api/credentials/save":
             username = (body.get("username") or "").strip()
             password = body.get("password")
-            default_platform = body.get("default_platform") or "https://lms.uni-kiel.de"
+            default_platform = body.get("default_platform") or "unibody"
             auto_fill = bool(body.get("auto_fill", True))
             auto_submit = bool(body.get("auto_submit", True))
             use_keychain = bool(body.get("use_keychain", True))
@@ -728,6 +742,9 @@ class CAUBotRequestHandler(SimpleHTTPRequestHandler):
                     "course_id": course["course_id"],
                     "univis_id": course.get("univis_id"),
                     "olat_repo_id": course.get("olat_repo_id"),
+                    "platform_id": course.get("platform_id", "openolat"),
+                    "platform_host": course.get("platform_host", "lms.uni-kiel.de"),
+                    "course_url": course.get("url", "https://lms.uni-kiel.de"),
                     "course_title": course["title"],
                     "mode": mode,
                     "trigger_type": trigger_type,
@@ -735,9 +752,9 @@ class CAUBotRequestHandler(SimpleHTTPRequestHandler):
                     "created_at": datetime.now().strftime("%H:%M:%S"),
                     "priorities": valid_priorities[:3],
                     "result_message": (
-                        f"Sniper scharfgeschaltet ({countdown_seconds}s Countdown)..."
+                        f"Sniper scharfgeschaltet ({countdown_seconds}s Countdown) auf {course.get('platform_host', 'LMS')}..."
                         if countdown_seconds > 0
-                        else "Einschreibung läuft..."
+                        else f"UNIBODY Einschreibung läuft auf {course.get('platform_host', 'LMS')}..."
                     ),
                 }
                 APP_STATE["jobs"].insert(0, job_entry)

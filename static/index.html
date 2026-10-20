@@ -13,7 +13,7 @@
       <div class="cau-crest">CAU</div>
       <div>
         <h1>CAU Kiel · LMS Kurs-Sniper &amp; Optimizer</h1>
-        <p class="subtitle">Exakte Kurs-ID-Verifikation · Stundenplan-Kollisionsschutz · Sekundengenaue Übungsgruppen-Wahl auf <code>lms.uni-kiel.de</code></p>
+        <p class="subtitle">🫧 <strong>UNIBODY Dual-Engine</strong> · Routet automatisch zwischen <code>lms.uni-kiel.de</code> (OpenOlat) &amp; <code>elearn.informatik.uni-kiel.de</code> (Info-Moodle)</p>
       </div>
     </div>
 
@@ -21,15 +21,15 @@
       <button id="btnToggleDarkMode" class="btn btn-outline" title="Zwischen Frutiger Aero Daylight und Deep Ocean Aurora Dark Mode wechseln">
         🌙 Dark Mode
       </button>
-      <button id="btnToggleAccountPanel" class="btn btn-outline" title="CAU Login-Daten (stu-Kennung & Passwort) für OpenOlat / eLearn speichern & Auto-Login verwalten">
+      <button id="btnToggleAccountPanel" class="btn btn-outline" title="CAU Login-Daten (stu-Kennung & Passwort) für OpenOlat & Informatik-eLearn speichern">
         🔑 CAU Account hinterlegen
       </button>
       <div id="ssoBadge" class="sso-badge disconnected">
         <span class="dot"></span>
-        <span id="ssoStatusText">Shibboleth SSO: Bereit</span>
+        <span id="ssoStatusText">UNIBODY: Bereit</span>
       </div>
-      <button id="btnLaunchBrowser" class="btn btn-outline" title="Öffnet das Google Chrome Fenster und füllt deine CAU Login-Daten automatisch aus">
-        🌐 CAU Login-Browser starten (SSO)
+      <button id="btnLaunchBrowser" class="btn btn-outline" title="Startet die UNIBODY Chrome-Session für lms.uni-kiel.de & elearn.informatik.uni-kiel.de mit Auto-Login">
+        🌐 UNIBODY Browser starten
       </button>
     </div>
   </header>
@@ -42,8 +42,8 @@
       <div class="card account-vault-card" id="accountVaultCard">
         <div class="card-header">
           <div>
-            <span class="step-pill" id="vaultStatusPill">AUTO-LOGIN TRESOR</span>
-            <h2>🔐 CAU Account &amp; Auto-Fill (OpenOlat / eLearn / Shibboleth)</h2>
+            <span class="step-pill" id="vaultStatusPill">🫧 UNIBODY TRESOR</span>
+            <h2>🔐 CAU Account &amp; UNIBODY Auto-Login (OpenOlat + Informatik eLearn)</h2>
           </div>
           <div style="display:flex;gap:6px;align-items:center;">
             <span id="vaultSavedBadge" class="vault-badge unsaved">Noch kein Account gespeichert</span>
@@ -55,7 +55,7 @@
 
         <form id="formCredentials" class="vault-form-body">
           <p class="helper-text">
-            Speichere deine <strong>CAU-Kennung (z.&nbsp;B. <code>stu123456</code>)</strong> und dein Passwort sicher im <strong>macOS Schlüsselbund (Keychain)</strong>. Sobald sich <code>lms.uni-kiel.de</code> (OpenOlat), <code>elearn.uni-kiel.de</code> (Moodle) oder <code>idp.uni-kiel.de</code> (Shibboleth) öffnet, füllt der Sniper deine Daten vollautomatisch aus und loggt dich ein!
+            Einmal eingeben, überall eingeloggt: Unsere <strong>UNIBODY-Engine</strong> nutzt deine gespeicherte <strong>CAU-Kennung (<code>stu...</code>)</strong> gleichzeitig für <strong>1. <code>lms.uni-kiel.de</code> (OpenOlat)</strong> und <strong>2. <code>elearn.informatik.uni-kiel.de</code> (Informatik-Moodle für <code>infEInf-02a</code>)</strong> und entscheidet bei jedem Kurs automatisch, welche der beiden Seiten angesteuert werden muss!
           </p>
 
           <div class="vault-grid">
@@ -86,11 +86,11 @@
             </div>
 
             <div class="form-group">
-              <label for="credPlatform">Standard-Plattform beim Start</label>
+              <label for="credPlatform">UNIBODY Plattform-Modus</label>
               <select id="credPlatform">
-                <option value="https://lms.uni-kiel.de">OpenOlat CAU (lms.uni-kiel.de)</option>
-                <option value="https://elearn.uni-kiel.de">Moodle CAU (elearn.uni-kiel.de)</option>
-                <option value="https://elearn.informatik.uni-kiel.de">Moodle Informatik (elearn.informatik.uni-kiel.de)</option>
+                <option value="unibody">🫧 UNIBODY Auto-Router (Beide Seiten automatisch!)</option>
+                <option value="https://lms.uni-kiel.de">Nur 1. Seite: OpenOlat (lms.uni-kiel.de)</option>
+                <option value="https://elearn.informatik.uni-kiel.de">Nur 2. Seite: Info-Moodle (elearn.informatik.uni-kiel.de)</option>
               </select>
             </div>
           </div>
@@ -98,7 +98,7 @@
           <div class="vault-toggles-row">
             <label class="checkbox-inline">
               <input type="checkbox" id="credAutoFill" checked />
-              <span>✨ Login-Felder im Browser automatisch ausfüllen (Auto-Fill)</span>
+              <span>✨ Auf beiden Plattformen automatisch ausfüllen (Auto-Fill)</span>
             </label>
             <label class="checkbox-inline">
               <input type="checkbox" id="credAutoSubmit" checked />
@@ -112,10 +112,10 @@
 
           <div class="vault-actions-row">
             <button type="submit" id="btnSaveCreds" class="btn btn-primary">
-              💾 Login-Daten speichern
+              💾 UNIBODY Login-Daten speichern
             </button>
             <button type="button" id="btnSaveAndAutoLogin" class="btn btn-accent">
-              🚀 Speichern &amp; sofort Auto-Login im Browser starten
+              🚀 Speichern &amp; beide Plattformen im Browser einloggen
             </button>
             <button type="button" id="btnClearCreds" class="btn btn-xs btn-ghost" style="margin-left:auto;">
               🗑️ Gespeicherte Daten löschen
