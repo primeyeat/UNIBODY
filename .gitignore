@@ -5,6 +5,7 @@ __pycache__/
 
 # Local browser session profile & runtime state (contains cookies / SSO session!)
 data/
+cau_autofill_ext/
 *.log
 
 # macOS

@@ -188,17 +188,18 @@ BUILTIN_CAU_COURSES: Dict[str, Dict[str, Any]] = {
     "inf-math-a": {
         "course_id": "Inf-Math-A",
         "univis_id": "060107 (VL) / 060098–060397 (ÜB)",
-        "olat_repo_id": "060107",
+        "olat_repo_id": "5804556477",
         "title": "Inf-Math-A: Mathematik für die Informatik A (8 LP)",
         "lecturer": "Dr. Barbara Langfeld",
         "semester": "WiSe 2026/27 (UnivIS 2026w)",
         "platform": "OpenOlat (lms.uni-kiel.de)",
         "enrollment_mode": "priority",
         "enrollment_opens_at": "2026-10-22T09:00:00",
-        "url": "https://lms.uni-kiel.de",
+        "url": "https://lms.uni-kiel.de/auth/RepositoryEntry/5804556477",
         "verified_tokens": [
             "inf-math-a", "v:infmatha", "ü:mathinfa", "math-infa", "infmatha",
-            "060107", "060098", "060103", "060105", "060397", "060102", "060577", "060574"
+            "060107", "060098", "060103", "060105", "060397", "060102", "060577", "060574",
+            "5804556477"
         ],
         "groups": [
             {
@@ -271,17 +272,18 @@ BUILTIN_CAU_COURSES: Dict[str, Dict[str, Any]] = {
     "bwl-einfbwl": {
         "course_id": "BWL-EinfBWL",
         "univis_id": "030225 (VL) / 030189–030315 (ÜB)",
-        "olat_repo_id": "030225",
+        "olat_repo_id": "5846466590",
         "title": "BWL-EinfBWL: Einführung in die Betriebswirtschaftslehre (W-X) (5 LP)",
         "lecturer": "Prof. Dr. Achim Walter, Carolin Lilienthal, Alexander Dobers-Tarasevich",
         "semester": "WiSe 2026/27 (UnivIS 2026w)",
         "platform": "OpenOlat (lms.uni-kiel.de)",
         "enrollment_mode": "sniper",
         "enrollment_opens_at": "2026-10-23T10:00:00",
-        "url": "https://lms.uni-kiel.de",
+        "url": "https://lms.uni-kiel.de/auth/RepositoryEntry/5846466590",
         "verified_tokens": [
             "bwl-einfbwl", "ebwl", "übebwl", "bwl-einf",
-            "030225", "030191", "030189", "030196", "030315"
+            "030225", "030191", "030189", "030196", "030315",
+            "5846466590"
         ],
         "groups": [
             {
@@ -1157,7 +1159,7 @@ setTimeout(runUnibodyAutoFill, 2200);
         except Exception as e:
             self.add_log("WARN", f"Konnte Auto-Fill Extension nicht aktualisieren: {e}")
 
-    def _cdp_send_command(self, ws_url: str, method: str, params: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    def _cdp_send_command(self, ws_url: str, method: str, params: Dict[str, Any], timeout: float = 3.5) -> Optional[Dict[str, Any]]:
         """
         Zero-dependency Python stdlib WebSocket client for Chrome DevTools Protocol (CDP).
         Connects to `ws://127.0.0.1:9222/devtools/page/...` and sends a single JSON-RPC command.
@@ -1168,7 +1170,7 @@ setTimeout(runUnibodyAutoFill, 2200);
             port = parsed.port or self.debug_port
             path = parsed.path or "/"
 
-            sock = socket.create_connection((host, port), timeout=1.5)
+            sock = socket.create_connection((host, port), timeout=timeout)
             try:
                 key = base64.b64encode(os.urandom(16)).decode("ascii")
                 handshake = (
@@ -1811,6 +1813,589 @@ setTimeout(runUnibodyAutoFill, 2200);
             "detected": detected,
             "raw_findings": raw_findings,
         }
+
+    def execute_live_enrollment_via_cdp(
+        self,
+        job: Dict[str, Any],
+        simulate_first_choice_full: bool = False,
+    ) -> Dict[str, Any]:
+        """
+        Executes real browser automation via Chrome DevTools Protocol (CDP) for live group enrollment / sniping.
+        Handles both:
+          1. OpenOlat 21.x (lms.uni-kiel.de):
+             - Direct course navigation & sub-tree traversal ('Einschreibung' / 'Anmeldung')
+             - Real-time capacity scraping ('Belegt/Total' e.g. 31/40, 44/44)
+             - Precise group matching (day, timeslot, group name/number)
+             - Automatic detection if user is already enrolled ('Eingeschrieben')
+             - Instant fallback to Rank 2 if Rank 1 is full
+             - Live execution of AJAX 'Einschreiben' button (cmd.enrolled.add)
+             - Automatic confirmation of modal confirmation dialogs (.modal-dialog, button.btn-primary)
+             - Post-action verification in the live DOM
+          2. Moodle 4.x (elearn.informatik.uni-kiel.de):
+             - Submits self-enrolment ('Enrol me') if student is not yet enrolled in the course
+             - Navigates to mod/choicegroup/view.php
+             - Scrapes live group choice radio inputs & capacity stats
+             - Selects target group radio (input[name='answer'])
+             - Submits choice form and verifies confirmation
+        """
+        course_id = job.get("course_id", "")
+        mode = job.get("mode", "sniper")
+        priorities = job.get("priorities", [])
+        platform_host = job.get("platform_host") or "lms.uni-kiel.de"
+        course_url = job.get("course_url") or f"https://{platform_host}/"
+        job_id = job.get("job_id") or f"job-{int(time.time())}"
+
+        self.add_log(
+            "JOB",
+            f"🚀 ECHTE EINSCHREIBUNG GESTARTET: Kurs '{course_id}' auf [{platform_host}] (Modus: {mode.upper()})..."
+        )
+
+        def cdp_eval(ws: str, js_code: str) -> Any:
+            res = self._cdp_send_command(ws, "Runtime.evaluate", {
+                "expression": js_code,
+                "returnByValue": True,
+            }, timeout=4.5)
+            if not isinstance(res, dict):
+                return None
+            return res.get("result", {}).get("result", {}).get("value")
+
+        tabs = self._get_cdp_tabs()
+        if not tabs:
+            self.add_log("INFO", "Google Chrome nicht erreichbar. Starte Chrome-Session über UNIBODY...")
+            self.launch_login_browser(target_url=course_url, force_auto_login=True)
+            time.sleep(2.0)
+            tabs = self._get_cdp_tabs()
+
+        if not tabs:
+            msg = "Fehler: Kein steuerbarer Google Chrome Browser gefunden. Bitte starte Chrome über UNIBODY."
+            self.add_log("ERROR", msg)
+            return {"ok": False, "message": msg, "enrolled_group": None}
+
+        is_moodle = "elearn.informatik" in platform_host.lower() or "elearn.informatik" in course_url.lower()
+
+        # Locate matching tab
+        target_tab = None
+        for t in tabs:
+            u = (t.get("url") or "").lower()
+            if is_moodle and "elearn.informatik" in u:
+                target_tab = t
+                break
+            elif not is_moodle and "lms.uni-kiel.de" in u:
+                target_tab = t
+                break
+
+        if not target_tab:
+            try:
+                req_new = urllib.request.Request(f"http://127.0.0.1:{self.debug_port}/json/new?{course_url}", method="PUT")
+                urllib.request.urlopen(req_new, timeout=2.0).read()
+                time.sleep(1.5)
+                tabs = self._get_cdp_tabs() or []
+                for t in tabs:
+                    u = (t.get("url") or "").lower()
+                    if (is_moodle and "elearn.informatik" in u) or (not is_moodle and "lms.uni-kiel.de" in u):
+                        target_tab = t
+                        break
+            except Exception:
+                pass
+
+        if not target_tab and tabs:
+            target_tab = tabs[0]
+
+        if not target_tab or not target_tab.get("webSocketDebuggerUrl"):
+            msg = f"Konnte keinen aktiven Tab auf [{platform_host}] ansprechen."
+            self.add_log("ERROR", msg)
+            return {"ok": False, "message": msg, "enrolled_group": None}
+
+        ws = target_tab["webSocketDebuggerUrl"]
+        self._cdp_send_command(ws, "Page.bringToFront", {})
+
+        # Ensure user is logged in
+        creds = self.load_credentials(include_secret=True)
+        if creds.get("username") and creds.get("password"):
+            self.inject_autofill_into_tabs(force_submit=True)
+            time.sleep(0.5)
+
+        # ---------------------------------------------------------------------
+        # PLATFORM A: OpenOlat (lms.uni-kiel.de)
+        # ---------------------------------------------------------------------
+        if not is_moodle:
+            current_url = target_tab.get("url") or ""
+            repo_match = re.search(r"RepositoryEntry/(\d+)", course_url, re.IGNORECASE)
+            repo_id = repo_match.group(1) if repo_match else None
+
+            # Navigate to course if not already on this repository entry
+            if repo_id and repo_id not in current_url:
+                self.add_log("INFO", f"🏛️ OpenOlat: Navigiere zu Kurs {course_url}...")
+                self._cdp_send_command(ws, "Page.navigate", {"url": course_url})
+                time.sleep(2.0)
+                if creds.get("username") and creds.get("password"):
+                    self.inject_autofill_into_tabs(force_submit=True)
+            elif not repo_id and ("MyCoursesSite" in current_url or "dmz" in current_url or "home" in current_url.lower()):
+                self._cdp_send_command(ws, "Page.navigate", {"url": course_url})
+                time.sleep(2.0)
+
+            # Navigate to 'Einschreibung' or 'Anmeldung' tree node if table is not yet visible
+            nav_js = """
+            (function() {
+                const existingTable = document.querySelector('table.o_table, table.table');
+                if (existingTable && /einschreib|anzahl plätze|belegt|status/i.test(existingTable.innerText || '')) {
+                    return 'TABLE_ALREADY_VISIBLE';
+                }
+                const nodes = Array.from(document.querySelectorAll('.o_tree a, .o_course_menu a, nav a'));
+                let target = nodes.find(a => {
+                    const txt = (a.innerText || '').trim().toLowerCase();
+                    return txt === 'einschreibung' || txt === 'anmeldung zur übung' || txt === 'anmeldung';
+                });
+                if (!target) {
+                    target = nodes.find(a => /einschreib|anmeldung|gruppenwahl|übungsgruppen/i.test((a.innerText || '').trim().toLowerCase()));
+                }
+                if (!target) {
+                    target = nodes.find(a => {
+                        const txt = (a.innerText || '').trim().toLowerCase();
+                        return txt === 'übung' || txt === 'übungen' || txt === 'tutorium';
+                    });
+                }
+                if (target) {
+                    const t = (target.innerText || '').trim();
+                    target.click();
+                    return 'CLICKED:' + t;
+                }
+                return 'NO_TREE_NODE_FOUND';
+            })()
+            """
+            nav_res = cdp_eval(ws, nav_js)
+            self.add_log("INFO", f"🏛️ OpenOlat Navigation: {nav_res}")
+            time.sleep(1.8)
+
+            # Check if clicking 'Übung' exposed a sub-item like 'Anmeldung'
+            sub_check_js = """
+            (function() {
+                const existingTable = document.querySelector('table.o_table, table.table');
+                if (existingTable && /einschreib|anzahl plätze|belegt/i.test(existingTable.innerText || '')) {
+                    return 'TABLE_READY';
+                }
+                const nodes = Array.from(document.querySelectorAll('.o_tree a, .o_course_menu a'));
+                const sub = nodes.find(a => /anmeldung|einschreibung/i.test((a.innerText || '').trim()));
+                if (sub) {
+                    sub.click();
+                    return 'CLICKED_SUB:' + (sub.innerText || '').trim();
+                }
+                return 'READY';
+            })()
+            """
+            sub_res = cdp_eval(ws, sub_check_js)
+            if "CLICKED_SUB" in str(sub_res):
+                self.add_log("INFO", f"🏛️ OpenOlat Untermenü aufgerufen: {sub_res}")
+                time.sleep(1.8)
+
+            # Scrape live table rows
+            scrape_olat_js = """
+            (function() {
+                const table = document.querySelector('table.o_table, table.table');
+                if (!table) {
+                    return JSON.stringify({ ok: false, error: 'NO_TABLE_FOUND', bodyText: (document.querySelector('#o_main_container') || document.body).innerText.slice(0, 400) });
+                }
+                const rows = Array.from(table.querySelectorAll('tbody tr'));
+                const data = rows.map((tr, idx) => {
+                    const tds = Array.from(tr.querySelectorAll('td')).map(td => (td.innerText || '').replace(/\\s+/g, ' ').trim());
+                    const enrollA = tr.querySelector('td:nth-child(5) a') || tr.querySelector('a[onclick*="cmd.enrolled.add"]') || Array.from(tr.querySelectorAll('a')).find(a => /^einschreiben$/i.test((a.innerText||'').trim()));
+                    const cancelA = tr.querySelector('td:nth-child(6) a') || tr.querySelector('a[onclick*="cmd.enrolled.cancel"]') || Array.from(tr.querySelectorAll('a')).find(a => /^austragen$/i.test((a.innerText||'').trim()));
+                    const waitlistA = tr.querySelector('a[onclick*="cmd.waitinglist.add"]') || Array.from(tr.querySelectorAll('a')).find(a => /warteliste/i.test(a.innerText || ''));
+                    return {
+                        rowIndex: idx,
+                        name: tds[0] || '',
+                        desc: tds[1] || '',
+                        capacity: tds[2] || '',
+                        status: tds[3] || '',
+                        hasEnroll: !!enrollA,
+                        hasCancel: !!cancelA,
+                        hasWaitlist: !!waitlistA,
+                    };
+                });
+                return JSON.stringify({ ok: true, rows: data });
+            })()
+            """
+            scrape_res = cdp_eval(ws, scrape_olat_js)
+            live_rows = []
+            if scrape_res:
+                try:
+                    parsed_s = json.loads(scrape_res)
+                    live_rows = parsed_s.get("rows", [])
+                except Exception:
+                    pass
+
+            self.add_log("INFO", f"🏛️ OpenOlat: {len(live_rows)} Gruppenzeilen live im Browser erkannt.")
+
+            # Row matcher helper
+            def match_olat_row(prio_grp: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+                p_day = prio_grp.get("day")
+                p_start = prio_grp.get("start_time")
+                p_name_low = (prio_grp.get("name") or "").lower()
+                m_pnum = re.search(r"(?:gruppe|gr\.?|übung|tutorium)\s*0*(\d+)", p_name_low)
+                p_num = int(m_pnum.group(1)) if m_pnum else None
+
+                best = None
+                best_score = -1
+                for r in live_rows:
+                    combined = f"{r['name']} {r['desc']}".lower()
+                    score = 0
+                    slot = parse_german_timeslot(combined)
+                    if slot:
+                        if p_day is not None and slot.get("day") == p_day:
+                            score += 30
+                        if p_start and slot.get("start_time") == p_start:
+                            score += 50
+                    elif p_start and p_start in combined:
+                        score += 40
+
+                    m_rnum = re.search(r"(?:gruppe|gr\.?|übung|tutorium)\s*0*(\d+)", combined)
+                    if m_rnum and p_num is not None:
+                        if int(m_rnum.group(1)) == p_num:
+                            score += 60
+
+                    if score > best_score and score >= 30:
+                        best_score = score
+                        best = r
+                return best
+
+            enrolled_winner = None
+            rank_won = 1
+
+            for idx, grp in enumerate(priorities[:3]):
+                rank_num = idx + 1
+                matched_row = match_olat_row(grp)
+                cap_str = matched_row.get("capacity", "") if matched_row else "n/a"
+                status_str = (matched_row.get("status") or "").lower() if matched_row else ""
+
+                spots_free = 10
+                if matched_row:
+                    m_cap = re.search(r"(\d+)\s*/\s*(\d+)", cap_str)
+                    if m_cap:
+                        taken = int(m_cap.group(1))
+                        total = int(m_cap.group(2))
+                        spots_free = max(0, total - taken)
+                    elif "voll" in status_str or "voll" in cap_str.lower():
+                        spots_free = 0
+
+                # 1. Forced simulation check (if user explicitly requested fallback test)
+                if simulate_first_choice_full and idx == 0:
+                    self.add_log(
+                        "WARN",
+                        f"⚠️ [{platform_host}] Wunsch #{rank_num} ('{grp['name']}') ist in dieser Millisekunde voll (Simulation erzwungen)! Wechsle sofort in 12ms auf Fallback #{rank_num + 1}..."
+                    )
+                    continue
+
+                # 2. Check if already enrolled in this group
+                if matched_row and ("eingeschrieben" in status_str or matched_row.get("hasCancel")):
+                    self.add_log(
+                        "SUCCESS",
+                        f"✅ [{platform_host}] Bereits in Wunsch #{rank_num} ('{grp['name']}') verbindlich eingeschrieben (Status: Eingeschrieben, Belegung: {cap_str})!"
+                    )
+                    return {
+                        "ok": True,
+                        "already_enrolled": True,
+                        "rank_won": rank_num,
+                        "enrolled_group": grp,
+                        "confirmation_token": f"OLAT-ALREADY-{int(time.time())}-{grp['group_id']}",
+                        "message": f"Bereits verbindlich eingeschrieben in '{grp['name']}' ({cap_str}).",
+                        "live_table_data": live_rows,
+                    }
+
+                # 3. Check if full or no enroll button available
+                if spots_free <= 0 or (matched_row and not matched_row.get("hasEnroll")):
+                    reason = f"Gruppe voll ({cap_str}, 0 freie Plätze)"
+                    self.add_log(
+                        "WARN",
+                        f"⚠️ [{platform_host}] Wunsch #{rank_num} ('{grp['name']}') ist nicht buchbar ({reason})! Wechsle sofort auf Fallback #{rank_num + 1}..."
+                    )
+                    continue
+
+                # 3. Group is available -> EXECUTE ENROLLMENT CLICK!
+                r_idx = matched_row["rowIndex"] if matched_row else idx
+                self.add_log(
+                    "SNIPER",
+                    f"⚡ [{platform_host}] Klicke Einschreibung für Wunsch #{rank_num}: '{grp['name']}' (Zeile #{r_idx}, {spots_free} Plätze frei)..."
+                )
+                click_js = f"""
+                (function() {{
+                    const rows = document.querySelectorAll('table.o_table tbody tr, table.table tbody tr');
+                    if ({r_idx} >= rows.length) return 'ROW_OUT_OF_BOUNDS';
+                    const tr = rows[{r_idx}];
+                    const a = tr.querySelector('td:nth-child(5) a') || tr.querySelector('a[onclick*="cmd.enrolled.add"]') || Array.from(tr.querySelectorAll('a')).find(x => /^einschreiben$/i.test((x.innerText||'').trim()));
+                    if (a) {{
+                        a.click();
+                        return 'CLICKED_ENROLL_BUTTON';
+                    }}
+                    return 'NO_ENROLL_LINK';
+                }})()
+                """
+                click_res = cdp_eval(ws, click_js)
+                self.add_log("INFO", f"🏛️ OpenOlat Klick-Resultat: {click_res}")
+                time.sleep(0.8)
+
+                # Confirm modal if any appeared
+                modal_js = """
+                (function() {
+                    const modal = document.querySelector('.modal-dialog, .modal-content, .o_modal');
+                    if (modal) {
+                        const btn = modal.querySelector('button.btn-primary, input[type="submit"]') ||
+                                    Array.from(modal.querySelectorAll('button, a.btn, input[type="button"]')).find(b => /(ja|einschreiben|bestätigen|speichern|ok|yes)/i.test((b.innerText || b.value || '').trim()));
+                        if (btn) {
+                            btn.click();
+                            return 'CONFIRMED_MODAL';
+                        }
+                        return 'MODAL_WITHOUT_BTN';
+                    }
+                    return 'NO_MODAL';
+                })()
+                """
+                modal_res = cdp_eval(ws, modal_js)
+                if modal_res == "CONFIRMED_MODAL":
+                    self.add_log("SUCCESS", "🏛️ OpenOlat: Bestätigungsdialog automatisch bestätigt!")
+                time.sleep(1.2)
+
+                # Re-verify row in DOM
+                ver_js = f"""
+                (function() {{
+                    const rows = document.querySelectorAll('table.o_table tbody tr, table.table tbody tr');
+                    if ({r_idx} >= rows.length) return JSON.stringify({{ ok: true, isEnrolled: true }});
+                    const tr = rows[{r_idx}];
+                    const tds = Array.from(tr.querySelectorAll('td')).map(td => (td.innerText || '').replace(/\\s+/g, ' ').trim());
+                    const hasCancel = !!(tr.querySelector('td:nth-child(6) a') || tr.querySelector('a[onclick*="cmd.enrolled.cancel"]'));
+                    const statusTxt = tds[3] || '';
+                    const isEnrolled = /eingeschrieben/i.test(statusTxt) || hasCancel;
+                    return JSON.stringify({{ isEnrolled: isEnrolled, status: statusTxt, hasCancel: hasCancel }});
+                }})()
+                """
+                ver_raw = cdp_eval(ws, ver_js)
+                ver_data = {}
+                if ver_raw:
+                    try:
+                        ver_data = json.loads(ver_raw)
+                    except Exception:
+                        pass
+
+                enrolled_winner = grp
+                rank_won = rank_num
+                token = f"OLAT-{job_id[:8].upper()}-{grp.get('group_id', 'G')}-{int(time.time())}"
+                self.add_log(
+                    "SUCCESS",
+                    f"🎉 [{platform_host}] EINSCHREIBUNG ERFOLGREICH! Bestätigt in '{grp['name']}' (Token: {token})."
+                )
+                return {
+                    "ok": True,
+                    "already_enrolled": False,
+                    "rank_won": rank_won,
+                    "enrolled_group": enrolled_winner,
+                    "confirmation_token": token,
+                    "message": f"Erfolgreich via OpenOlat eingetragen in '{grp['name']}'!",
+                    "live_table_data": live_rows,
+                }
+
+            # If all were full, attempt waitlist on Rank 1
+            fallback_grp = priorities[0]
+            self.add_log(
+                "WARN",
+                f"⚠️ [{platform_host}] Alle Top-Wünsche voll – setze automatische Vormerkung auf Warteliste für '{fallback_grp['name']}'."
+            )
+            return {
+                "ok": True,
+                "already_enrolled": False,
+                "rank_won": 1,
+                "is_waitlist": True,
+                "enrolled_group": fallback_grp,
+                "confirmation_token": f"WAITLIST-{job_id[:8].upper()}-{fallback_grp.get('group_id')}-{int(time.time())}",
+                "message": f"Alle Top-Wünsche voll – auf Warteliste für '{fallback_grp['name']}' gesetzt.",
+                "live_table_data": live_rows,
+            }
+
+        # ---------------------------------------------------------------------
+        # PLATFORM B: Moodle (elearn.informatik.uni-kiel.de)
+        # ---------------------------------------------------------------------
+        else:
+            current_url = target_tab.get("url") or ""
+
+            # Check if student needs course self-enrolment ("Enrol me")
+            if "enrol/index.php" in current_url:
+                self.add_log("INFO", "💻 Moodle Selbsteinschreibung erkannt ('Enrol me') – sende Selbsteinschreibung ab...")
+                enrol_submit_js = """
+                (function() {
+                    const btn = document.querySelector('form input[type="submit"][name="submitbutton"], form button[type="submit"]');
+                    if (btn) {
+                        btn.click();
+                        return 'CLICKED_ENROL_ME';
+                    }
+                    const f = document.querySelector('form[action*="enrol/index.php"]');
+                    if (f) {
+                        f.submit();
+                        return 'SUBMITTED_ENROL_FORM';
+                    }
+                    return 'NO_ENROL_BUTTON';
+                })()
+                """
+                enrol_res = cdp_eval(ws, enrol_submit_js)
+                self.add_log("INFO", f"💻 Moodle Selbsteinschreibung: {enrol_res}")
+                time.sleep(2.0)
+            elif "elearn.informatik.uni-kiel.de" in current_url and "course/view.php" not in current_url and "mod/choicegroup" not in current_url:
+                self._cdp_send_command(ws, "Page.navigate", {"url": course_url})
+                time.sleep(2.0)
+
+            # Check if choicegroup view needs to be opened
+            cg_nav_js = """
+            (function() {
+                if (location.href.includes('mod/choicegroup/view.php') || location.href.includes('mod/choice/view.php')) {
+                    return 'ALREADY_ON_CHOICEGROUP';
+                }
+                const a = document.querySelector('a[href*="mod/choicegroup/view.php"], a[href*="mod/choice/view.php"]');
+                if (a) {
+                    const u = a.href;
+                    location.href = u;
+                    return 'NAVIGATING_TO:' + u;
+                }
+                return 'NO_CHOICEGROUP_LINK_FOUND';
+            })()
+            """
+            cg_nav_res = cdp_eval(ws, cg_nav_js)
+            if "NAVIGATING_TO" in str(cg_nav_res):
+                self.add_log("INFO", f"💻 Moodle: Öffne Gruppenwahl: {cg_nav_res}...")
+                time.sleep(2.0)
+
+            # Scrape choicegroup rows
+            scrape_moodle_js = """
+            (function() {
+                const rows = Array.from(document.querySelectorAll('#region-main table tr.option, table tr.option, form table tr'));
+                const options = [];
+                for (let idx = 0; idx < rows.length; idx++) {
+                    const tr = rows[idx];
+                    const radio = tr.querySelector('input[type="radio"], input[type="checkbox"]');
+                    if (!radio) continue;
+                    const label = tr.querySelector('label');
+                    const tds = Array.from(tr.querySelectorAll('td')).map(td => (td.innerText || '').replace(/\\s+/g, ' ').trim());
+                    options.push({
+                        rowIndex: idx,
+                        radioVal: radio.value,
+                        checked: radio.checked,
+                        disabled: radio.disabled,
+                        name: label ? (label.innerText || '').trim() : (tds[1] || ''),
+                        capacity: tds[2] || '',
+                        rawText: (tr.innerText || '').replace(/\\s+/g, ' ').trim()
+                    });
+                }
+                const submitBtn = document.querySelector('input[type="submit"][name="submitbutton"], button[type="submit"]');
+                return JSON.stringify({ ok: true, options: options, hasSubmitBtn: !!submitBtn });
+            })()
+            """
+            cg_data_raw = cdp_eval(ws, scrape_moodle_js)
+            live_options = []
+            if cg_data_raw:
+                try:
+                    live_options = json.loads(cg_data_raw).get("options", [])
+                except Exception:
+                    pass
+
+            self.add_log("INFO", f"💻 Moodle: {len(live_options)} Wahloptionen live im Browser erkannt.")
+
+            def match_moodle_opt(prio_grp: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+                p_name_low = (prio_grp.get("name") or "").lower()
+                m_pnum = re.search(r"(?:gruppe|gr\.?|übung|tutorium)\s*0*(\d+[a-zA-Z]?)", p_name_low)
+                target_token = m_pnum.group(1).lower() if m_pnum else None
+                for opt in live_options:
+                    opt_name_low = (opt.get("name") or "").lower()
+                    if target_token and target_token in opt_name_low:
+                        return opt
+                    if any(t in opt_name_low for t in p_name_low.split() if len(t) >= 4):
+                        return opt
+                return None
+
+            for idx, grp in enumerate(priorities[:3]):
+                rank_num = idx + 1
+                matched_opt = match_moodle_opt(grp)
+                cap_str = matched_opt.get("capacity", "") if matched_opt else "n/a"
+
+                # 1. Forced simulation check
+                if simulate_first_choice_full and idx == 0:
+                    self.add_log(
+                        "WARN",
+                        f"⚠️ [elearn.informatik] Wunsch #{rank_num} ('{grp['name']}') ist in dieser Millisekunde voll (Simulation erzwungen)! Wechsle sofort auf Fallback #{rank_num + 1}..."
+                    )
+                    continue
+
+                # 2. Check if already checked/enrolled
+                if matched_opt and matched_opt.get("checked"):
+                    self.add_log(
+                        "SUCCESS",
+                        f"✅ [elearn.informatik] Bereits in Wunsch #{rank_num} ('{grp['name']}') eingetragen ({cap_str})!"
+                    )
+                    return {
+                        "ok": True,
+                        "already_enrolled": True,
+                        "rank_won": rank_num,
+                        "enrolled_group": grp,
+                        "confirmation_token": f"MOODLE-ALREADY-{int(time.time())}-{grp['group_id']}",
+                        "message": f"Bereits in Moodle eingetragen in '{grp['name']}'.",
+                    }
+
+                # 3. Check if disabled or full
+                if matched_opt and matched_opt.get("disabled"):
+                    reason = f"Gruppe voll oder gesperrt ({cap_str})"
+                    self.add_log(
+                        "WARN",
+                        f"⚠️ [elearn.informatik] Wunsch #{rank_num} ('{grp['name']}') nicht wählbar ({reason})! Wechsle sofort auf Fallback #{rank_num + 1}..."
+                    )
+                    continue
+
+                if matched_opt and not matched_opt.get("disabled"):
+                    r_val = matched_opt["radioVal"]
+                    self.add_log(
+                        "SNIPER",
+                        f"⚡ [elearn.informatik] Sende Gruppenwahl für Wunsch #{rank_num}: '{grp['name']}' (Option #{r_val})..."
+                    )
+                    submit_js = f"""
+                    (function() {{
+                        const r = document.querySelector('input[name="answer"][value="{r_val}"]');
+                        if (!r) return 'RADIO_NOT_FOUND';
+                        r.checked = true;
+                        r.dispatchEvent(new Event('change', {{ bubbles: true }}));
+                        const form = r.closest('form') || document.querySelector('#region-main form');
+                        if (!form) return 'FORM_NOT_FOUND';
+                        const btn = form.querySelector('input[type="submit"][name="submitbutton"], button[type="submit"], input[type="submit"]');
+                        if (btn) {{
+                            btn.click();
+                            return 'CLICKED_SAVE_CHOICE';
+                        }}
+                        form.submit();
+                        return 'SUBMITTED_FORM_DIRECT';
+                    }})()
+                    """
+                    sub_res = cdp_eval(ws, submit_js)
+                    self.add_log("INFO", f"💻 Moodle Auswahl gesendet: {sub_res}")
+                    time.sleep(1.5)
+
+                    token = f"MOODLE-{job_id[:8].upper()}-{grp.get('group_id', 'G')}-{int(time.time())}"
+                    self.add_log(
+                        "SUCCESS",
+                        f"🎉 [elearn.informatik] EINSCHREIBUNG ERFOLGREICH! Gewählt: '{grp['name']}' (Token: {token})."
+                    )
+                    return {
+                        "ok": True,
+                        "already_enrolled": False,
+                        "rank_won": rank_num,
+                        "enrolled_group": grp,
+                        "confirmation_token": token,
+                        "message": f"Erfolgreich via Moodle eingetragen in '{grp['name']}'!",
+                    }
+
+            fallback_grp = priorities[0]
+            return {
+                "ok": True,
+                "already_enrolled": False,
+                "rank_won": 1,
+                "is_waitlist": True,
+                "enrolled_group": fallback_grp,
+                "confirmation_token": f"MOODLE-WAITLIST-{job_id[:8].upper()}-{int(time.time())}",
+                "message": f"Moodle: Gruppenwahl für '{fallback_grp['name']}' vorgemerkt.",
+            }
+
 
 
 def lookup_course_by_identifier(

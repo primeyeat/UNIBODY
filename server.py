@@ -273,8 +273,9 @@ def _apply_enrolled_group_to_state(course: Dict[str, Any], group_id: Optional[st
 
 def execute_enrollment_job(job_id: str, simulate_first_choice_full: bool = False):
     """
-    Executes an enrollment job (either Sniper first-come-first-served or Priority allocation)
-    with strict ID verification and automatic fallback to Rank 2 if Rank 1 is full.
+    Executes a real enrollment job (either Sniper first-come-first-served or Priority allocation)
+    via Chrome DevTools Protocol automation with live DOM interaction, real-time capacity checks,
+    and automatic fallback to Rank 2 if Rank 1 is full.
     """
     with STATE_LOCK:
         job = next((j for j in APP_STATE["jobs"] if j["job_id"] == job_id), None)
@@ -289,21 +290,6 @@ def execute_enrollment_job(job_id: str, simulate_first_choice_full: bool = False
     platform_host = job.get("platform_host") or "lms.uni-kiel.de"
     course_url = job.get("course_url") or f"https://{platform_host}/"
 
-    session_mgr.add_log(
-        "JOB",
-        f"🫧 UNIBODY Router: Kurs '{course_id}' erkannt auf [{platform_host}] -> Routet auf {course_url} (Modus: {mode.upper()})..."
-    )
-    # If Chrome is open, automatically route the matching platform tab to the course URL & auto-login
-    session_mgr.inject_autofill_into_tabs(force_submit=True, navigate_url=course_url)
-    time.sleep(0.35)
-
-    session_mgr.add_log(
-        "VERIFY",
-        f"Prüfe Kurs-Signatur auf [{platform_host}]: '{job.get('course_title')}' "
-        f"[UnivIS={job.get('univis_id')} | LMS-ID={job.get('olat_repo_id')}] -> EXAKT ÜBEREINSTIMMEND."
-    )
-    time.sleep(0.35)
-
     if not priorities:
         session_mgr.add_log("ERROR", f"Job [{job_id}] abgebrochen: Keine konfliktfreien Übungsgruppen in der Prioritätenliste.")
         with STATE_LOCK:
@@ -312,88 +298,54 @@ def execute_enrollment_job(job_id: str, simulate_first_choice_full: bool = False
             save_state(APP_STATE)
         return
 
-    enrolled_group = None
+    # Execute real CDP browser automation
+    live_res = session_mgr.execute_live_enrollment_via_cdp(
+        job,
+        simulate_first_choice_full=simulate_first_choice_full,
+    )
 
-    if mode == "sniper":
-        # First-Come-First-Served Sniper with automatic Fallback
-        for idx, grp in enumerate(priorities[:3]):
-            rank_num = idx + 1
-            session_mgr.add_log(
-                "SNIPER",
-                f"[{platform_host}] Versuche Wunsch #{rank_num}: '{grp['name']}' ({grp['day_name']} {grp['start_time']}–{grp['end_time']}, Score: {grp.get('display_score')}%)..."
-            )
-            time.sleep(0.4)
-
-            is_grp_full = (idx == 0 and simulate_first_choice_full) or (grp.get("spots_free", 1) <= 0)
-            if is_grp_full:
-                session_mgr.add_log(
-                    "WARN",
-                    f"[{platform_host}] Wunsch #{rank_num} ('{grp['name']}') ist in dieser Millisekunde voll (0 Plätze frei)! Wechsle sofort in 12ms auf Fallback #{rank_num + 1}..."
-                )
-                continue
-            else:
-                enrolled_group = grp
-                session_mgr.add_log(
-                    "SUCCESS",
-                    f"[{platform_host}] EINGESCHRIEBEN in '{grp['name']}' ({grp['day_name']} {grp['start_time']}–{grp['end_time']})! Bestätigungs-Token gespeichert."
-                )
-                break
-
-        if not enrolled_group:
-            # Put on waitlist of #1
-            enrolled_group = priorities[0]
-            session_mgr.add_log(
-                "WARN",
-                f"[{platform_host}] Alle Top-Wünsche voll – Automatisch auf Warteliste Platz 1 für '{enrolled_group['name']}' gesetzt."
-            )
-    else:
-        # Priority Distribution Mode (Verteilungsverfahren: Prio 1, 2, 3 absenden)
-        top_names = [f"Prio {i+1}: {g['name']} ({g['day_name']} {g['start_time']})" for i, g in enumerate(priorities[:3])]
-        session_mgr.add_log(
-            "PRIORITY",
-            f"[{platform_host}] Übertrage Präferenz-Ranking an Gruppenwahl-Modul: {' | '.join(top_names)}"
-        )
-        time.sleep(0.45)
-        enrolled_group = priorities[0]
-        session_mgr.add_log(
-            "SUCCESS",
-            f"[{platform_host}] Präferenzen (Wunsch 1–{min(3, len(priorities))}) erfolgreich gespeichert! Wunsch #1 im Kalender vorgemerkt."
-        )
-
-    # Optionally add the won exercise group directly to the user's weekly schedule so future courses won't overlap!
     with STATE_LOCK:
-        job["status"] = "completed"
-        job["completed_at"] = datetime.now().strftime("%H:%M:%S")
-        job["enrolled_group"] = enrolled_group
-        job["result_message"] = (
-            f"[{platform_host}] Erfolgreich in '{enrolled_group['name']}' ({enrolled_group['day_name']} {enrolled_group['start_time']}–{enrolled_group['end_time']}) eingetragen!"
-            if mode == "sniper"
-            else f"[{platform_host}] Prioritäten 1–{min(3, len(priorities))} gespeichert (Top-Wunsch: {enrolled_group['name']})"
-        )
+        if live_res.get("ok"):
+            enrolled_group = live_res.get("enrolled_group") or priorities[0]
+            job["status"] = "completed"
+            job["completed_at"] = datetime.now().strftime("%H:%M:%S")
+            job["enrolled_group"] = enrolled_group
+            job["rank_won"] = live_res.get("rank_won", 1)
+            job["confirmation_token"] = live_res.get("confirmation_token")
+            job["is_waitlist"] = live_res.get("is_waitlist", False)
+            job["result_message"] = live_res.get("message") or (
+                f"[{platform_host}] Erfolgreich in '{enrolled_group['name']}' eingetragen!"
+            )
 
-        if "enrolled_groups" not in APP_STATE:
-            APP_STATE["enrolled_groups"] = {}
-        APP_STATE["enrolled_groups"][course_id.lower()] = enrolled_group.get("group_id")
+            # Block won exercise group in the user's weekly schedule so future courses won't overlap!
+            if "enrolled_groups" not in APP_STATE:
+                APP_STATE["enrolled_groups"] = {}
+            APP_STATE["enrolled_groups"][course_id.lower()] = enrolled_group.get("group_id")
 
-        sched_entry_id = f"enrolled-{course_id.lower()}"
-        APP_STATE["schedule"] = [
-            e for e in APP_STATE["schedule"]
-            if str(e.get("id", "")).lower() != sched_entry_id
-            and not (e.get("type") == "enrolled_exercise" and str(e.get("course_id", "")).lower() == course_id.lower())
-        ]
-        APP_STATE["schedule"].append({
-            "id": f"enrolled-{course_id}",
-            "course_id": course_id,
-            "group_id": enrolled_group.get("group_id"),
-            "title": f"✅ {course_id}: {enrolled_group['name']}",
-            "day": enrolled_group["day"],
-            "day_name": enrolled_group["day_name"],
-            "start_time": enrolled_group["start_time"],
-            "end_time": enrolled_group["end_time"],
-            "room": enrolled_group.get("room", "LMS"),
-            "type": "enrolled_exercise",
-            "enabled": True,
-        })
+            sched_entry_id = f"enrolled-{course_id.lower()}"
+            APP_STATE["schedule"] = [
+                e for e in APP_STATE["schedule"]
+                if str(e.get("id", "")).lower() != sched_entry_id
+                and not (e.get("type") == "enrolled_exercise" and str(e.get("course_id", "")).lower() == course_id.lower())
+            ]
+            APP_STATE["schedule"].append({
+                "id": f"enrolled-{course_id}",
+                "course_id": course_id,
+                "group_id": enrolled_group.get("group_id"),
+                "title": f"✅ {course_id}: {enrolled_group['name']}",
+                "day": enrolled_group["day"],
+                "day_name": enrolled_group["day_name"],
+                "start_time": enrolled_group["start_time"],
+                "end_time": enrolled_group["end_time"],
+                "room": enrolled_group.get("room", "LMS"),
+                "type": "enrolled_exercise",
+                "enabled": True,
+            })
+        else:
+            job["status"] = "failed"
+            job["completed_at"] = datetime.now().strftime("%H:%M:%S")
+            job["result_message"] = live_res.get("message") or "Einschreibung fehlgeschlagen."
+
         save_state(APP_STATE)
 
 
