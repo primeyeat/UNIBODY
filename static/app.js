@@ -718,6 +718,22 @@ function renderTimetable() {
         ? `Aktuell als Wunsch #1 (${g.name}) ausgewählt! (Klicke erneut zum Aufheben)`
         : `Klicke auf diesen Kasten, um '${g.name}' sofort als Wunsch #1 (Grün) für Schritt 3 auszuwählen!`;
 
+      const total = Number(g.spots_total) || 40;
+      const free = g.spots_free !== undefined && g.spots_free !== null ? Number(g.spots_free) : total;
+      const taken = Math.max(0, total - free);
+      const isLocked = Boolean(g.is_locked);
+
+      let spotsInfo = "";
+      if (isFull) {
+        spotsInfo = `🔴 Ausgebucht (${total}/${total})`;
+      } else if (isLocked) {
+        spotsInfo = `🔒 Gesperrt (${total} Pl.)`;
+      } else if (taken > 0) {
+        spotsInfo = `🟢 ${free} frei (${taken}/${total})`;
+      } else {
+        spotsInfo = `🟢 ${total} frei`;
+      }
+
       const pinIcon = g.is_pinned ? "📌 " : (isRank1 ? "🏆 " : "⭐ ");
       const badge = g.is_conflict
         ? "❌ KONFLIKT"
@@ -725,9 +741,10 @@ function renderTimetable() {
         ? "🔴 AUSGEBUCHT"
         : `${pinIcon}Wunsch #${g.rank} (${g.display_score}%)`;
 
-      const subText = isFull
-        ? "🚫 Ausgebucht (0 Plätze)"
-        : (isRank1 ? "🏆 Ausgewählt (Wunsch #1)" : "👆 Klick = Prio #1");
+      const subAction = isFull
+        ? "🚫 Ausgebucht"
+        : (isRank1 ? "🏆 Wunsch #1" : "👆 Prio #1");
+      const subText = `${spotsInfo} · ${subAction}`;
 
       el.innerHTML = `
         <div class="tt-ev-title">${badge}: ${g.name}</div>

@@ -85,7 +85,7 @@ BUILTIN_CAU_COURSES: Dict[str, Dict[str, Any]] = {
         "semester": "WiSe 2026/27 (UnivIS 2026w)",
         "platform": "CAU Informatik Moodle (id=470) / OpenOlat",
         "enrollment_mode": "sniper",
-        "enrollment_opens_at": "2026-10-23T10:00:00",
+        "enrollment_opens_at": "2026-10-23T14:00:00",
         "url": "https://elearn.informatik.uni-kiel.de/course/view.php?id=470",
         "verified_tokens": [
             "infeinf-02a", "infeinf-01a", "infeinf", "infInfp-01a",
@@ -278,7 +278,7 @@ BUILTIN_CAU_COURSES: Dict[str, Dict[str, Any]] = {
         "semester": "WiSe 2026/27 (UnivIS 2026w)",
         "platform": "OpenOlat (lms.uni-kiel.de)",
         "enrollment_mode": "sniper",
-        "enrollment_opens_at": "2026-10-23T10:00:00",
+        "enrollment_opens_at": "2026-10-20T16:00:00",
         "url": "https://lms.uni-kiel.de/auth/RepositoryEntry/5846466590",
         "verified_tokens": [
             "bwl-einfbwl", "ebwl", "übebwl", "bwl-einf",
@@ -288,54 +288,107 @@ BUILTIN_CAU_COURSES: Dict[str, Dict[str, Any]] = {
         "groups": [
             {
                 "group_id": "030191",
-                "name": "ÜbEBWL [UnivIS #030191] (Do 10:15 - 11:45 · LMS2 - R.Ü2/K · 14-tägig)",
+                "name": "EBWL Übung Gruppe 1 [UnivIS #030191] (Do 10:15 - 11:45 · LMS2 - R.Ü2/K · w1)",
                 "day": 3,
                 "day_name": "Donnerstag",
                 "start_time": "10:15",
                 "end_time": "11:45",
                 "room": "LMS2 - R.Ü2/K",
-                "tutor": "UnivIS Kennung 030191 (w2 Do 10:15-11:45)",
-                "spots_free": 35,
-                "spots_total": 35,
+                "tutor": "UnivIS Kennung 030191 (14-tägig Woche A)",
+                "spots_free": 28,
+                "spots_total": 44,
                 "waitlist_available": True,
             },
             {
                 "group_id": "030189",
-                "name": "ÜbEBWL [UnivIS #030189] (Do 12:15 - 13:45 · LMS2 - R.Ü2/K · 14-tägig)",
+                "name": "EBWL Übung Gruppe 2 [UnivIS #030189] (Do 12:15 - 13:45 · LMS2 - R.Ü2/K · w1)",
                 "day": 3,
                 "day_name": "Donnerstag",
                 "start_time": "12:15",
                 "end_time": "13:45",
                 "room": "LMS2 - R.Ü2/K",
-                "tutor": "UnivIS Kennung 030189 (w2 Do 12:15-13:45)",
-                "spots_free": 35,
-                "spots_total": 35,
-                "waitlist_available": True,
+                "tutor": "UnivIS Kennung 030189 (14-tägig Woche A)",
+                "spots_free": 0,
+                "spots_total": 44,
+                "is_full": True,
+                "waitlist_available": False,
             },
             {
                 "group_id": "030196",
-                "name": "ÜbEBWL [UnivIS #030196] (Fr 12:15 - 13:45 · LMS2 - R.Ü2/K · 14-tägig Gr. A)",
+                "name": "EBWL Übung Gruppe 3 [UnivIS #030196] (Fr 10:15 - 11:45 · LMS2 - R.Ü2/K · w1)",
                 "day": 4,
                 "day_name": "Freitag",
-                "start_time": "12:15",
-                "end_time": "13:45",
+                "start_time": "10:15",
+                "end_time": "11:45",
                 "room": "LMS2 - R.Ü2/K",
-                "tutor": "UnivIS Kennung 030196 (w2 Fr 12:15-13:45)",
-                "spots_free": 35,
-                "spots_total": 35,
+                "tutor": "UnivIS Kennung 030196 (14-tägig Woche A)",
+                "spots_free": 32,
+                "spots_total": 44,
                 "waitlist_available": True,
             },
             {
                 "group_id": "030315",
-                "name": "ÜbEBWL [UnivIS #030315] (Fr 12:15 - 13:45 · LMS2 - R.Ü2/K · 14-tägig Gr. B)",
+                "name": "EBWL Übung Gruppe 4 [UnivIS #030315] (Fr 12:15 - 13:45 · LMS2 - R.Ü2/K · w1)",
                 "day": 4,
                 "day_name": "Freitag",
                 "start_time": "12:15",
                 "end_time": "13:45",
                 "room": "LMS2 - R.Ü2/K",
-                "tutor": "UnivIS Kennung 030315 (w2 Fr 12:15-13:45)",
-                "spots_free": 35,
-                "spots_total": 35,
+                "tutor": "UnivIS Kennung 030315 (14-tägig Woche A)",
+                "spots_free": 40,
+                "spots_total": 44,
+                "waitlist_available": True,
+            },
+            {
+                "group_id": "030191-g5",
+                "name": "EBWL Übung Gruppe 5 [UnivIS #030191] (Do 10:15 - 11:45 · LMS2 - R.Ü2/K · w2)",
+                "day": 3,
+                "day_name": "Donnerstag",
+                "start_time": "10:15",
+                "end_time": "11:45",
+                "room": "LMS2 - R.Ü2/K",
+                "tutor": "UnivIS Kennung 030191 (14-tägig Woche B)",
+                "spots_free": 44,
+                "spots_total": 44,
+                "waitlist_available": True,
+            },
+            {
+                "group_id": "030189-g6",
+                "name": "EBWL Übung Gruppe 6 [UnivIS #030189] (Do 12:15 - 13:45 · LMS2 - R.Ü2/K · w2)",
+                "day": 3,
+                "day_name": "Donnerstag",
+                "start_time": "12:15",
+                "end_time": "13:45",
+                "room": "LMS2 - R.Ü2/K",
+                "tutor": "UnivIS Kennung 030189 (14-tägig Woche B)",
+                "spots_free": 1,
+                "spots_total": 44,
+                "waitlist_available": True,
+            },
+            {
+                "group_id": "030196-g7",
+                "name": "EBWL Übung Gruppe 7 [UnivIS #030196] (Fr 10:15 - 11:45 · LMS2 - R.Ü2/K · w2)",
+                "day": 4,
+                "day_name": "Freitag",
+                "start_time": "10:15",
+                "end_time": "11:45",
+                "room": "LMS2 - R.Ü2/K",
+                "tutor": "UnivIS Kennung 030196 (14-tägig Woche B)",
+                "spots_free": 42,
+                "spots_total": 44,
+                "waitlist_available": True,
+            },
+            {
+                "group_id": "030315-g8",
+                "name": "EBWL Übung Gruppe 8 [UnivIS #030315] (Fr 12:15 - 13:45 · LMS2 - R.Ü2/K · w2)",
+                "day": 4,
+                "day_name": "Freitag",
+                "start_time": "12:15",
+                "end_time": "13:45",
+                "room": "LMS2 - R.Ü2/K",
+                "tutor": "UnivIS Kennung 030315 (14-tägig Woche B)",
+                "spots_free": 41,
+                "spots_total": 44,
                 "waitlist_available": True,
             },
         ],
@@ -1408,6 +1461,7 @@ setTimeout(runUnibodyAutoFill, 2200);
                 cmd,
                 stdout=subprocess.DEVNULL,
                 stderr=subprocess.DEVNULL,
+                start_new_session=True,
             )
             self.add_log(
                 "SUCCESS",
@@ -1777,24 +1831,48 @@ setTimeout(runUnibodyAutoFill, 2200);
                     course_url = f"https://lms.uni-kiel.de/auth/RepositoryEntry/{repo_id}"
                     self.add_log("INFO", f"🏛️ UNIBODY Live-Sync: Lese Echtzeit-Belegung für '{c['course_id']}' ({repo_id})...")
                     self._cdp_send_command(ws_olat, "Page.navigate", {"url": course_url})
-                    time.sleep(1.4)
+                    time.sleep(1.8)
 
+                    # Robust navigation in OpenOlat tree: handles both direct Einschreibung and nested Übung -> Anmeldung
                     click_tree_js = """
                     (() => {
-                        const span = Array.from(document.querySelectorAll("span.o_tree_item")).find(s => /(?:einschreib|anmeld)/i.test((s.innerText || '').trim()));
-                        if (span && span.closest("a")) { span.closest("a").click(); return true; }
-                        return false;
+                        // Dismiss any modal/dialog that might be overlaying the screen
+                        const closeBtn = document.querySelector('.modal-header .close, button.close, .o_modal_close');
+                        if (closeBtn) closeBtn.click();
+
+                        const allLinks = Array.from(document.querySelectorAll('a, span.o_tree_item, .o_tree_link'));
+                        
+                        // Expand Übung tree section if present
+                        const ubOpener = allLinks.find(el => /(?:unterelemente von übung|übung)/i.test(el.getAttribute('title') || el.innerText || ''));
+                        if (ubOpener && ubOpener.closest('a')) {
+                            const a = ubOpener.closest('a');
+                            let code = (a.getAttribute('onclick') || '').replace(/return\\s+false\\s*;?/g, '');
+                            try { (new Function(code)).call(a); } catch(e) {}
+                        }
+
+                        // Target Anmeldung or Einschreibung
+                        const target = allLinks.find(el => /(?:anmeldung\\s*zur\\s*übung|anmeldung|einschreibung)/i.test((el.innerText || '').trim()));
+                        if (target && target.closest('a')) {
+                            const a = target.closest('a');
+                            let code = (a.getAttribute('onclick') || '').replace(/return\\s+false\\s*;?/g, '');
+                            if (code) {
+                                try { (new Function(code)).call(a); return 'CLICKED_ONCLICK'; } catch(e) {}
+                            }
+                            a.click();
+                            return 'CLICKED_DIRECT';
+                        }
+                        return 'NOT_FOUND';
                     })()
                     """
                     self._cdp_send_command(ws_olat, "Runtime.evaluate", {"expression": click_tree_js, "returnByValue": True})
-                    time.sleep(1.8)
+                    time.sleep(2.0)
 
                     scrape_table_js = """
                     (() => {
                         const table = document.querySelector('table.o_table, table.table');
                         if (!table) return [];
                         return Array.from(table.querySelectorAll('tbody tr')).map(tr => {
-                            const tds = Array.from(tr.querySelectorAll('td')).map(td => (td.innerText || '').replace(/\\s+/g, ' ').trim());
+                            const tds = Array.from(tr.querySelectorAll('td, th')).map(td => (td.innerText || '').replace(/\\s+/g, ' ').trim());
                             return {
                                 name: tds[0] || '',
                                 desc: tds[1] || '',
@@ -1815,21 +1893,30 @@ setTimeout(runUnibodyAutoFill, 2200);
                                 total = int(m_cap.group(2))
                                 free = max(0, total - taken)
                                 is_full = (free <= 0) or ("voll" in (r.get("status") or "").lower())
+                                is_enrolled_row = "eingeschrieben" in (r.get("status") or "").lower() and "nicht" not in (r.get("status") or "").lower()
+
                                 for grp in raw_c.get("groups", []):
                                     slot = parse_german_timeslot(f"{r['name']} {r['desc']}")
                                     m_gnum = re.search(r"(?:gruppe|gr\.?|übung)\s*0*(\d+)", r['name'].lower())
                                     matched = False
-                                    if slot and grp.get("day") == slot["day"] and grp.get("start_time") == slot["start_time"]:
-                                        matched = True
-                                    elif m_gnum:
+                                    if m_gnum:
                                         g_num = m_gnum.group(1)
-                                        if re.search(rf"\b0*{g_num}\b", grp.get("name", "").lower()):
+                                        m_target_num = re.search(r"(?:gruppe|gr\.?|übung)\s*0*(\d+)", grp.get("name", "").lower())
+                                        if m_target_num and m_target_num.group(1) == g_num:
                                             matched = True
+                                        elif re.search(rf"\b0*{g_num}\b", grp.get("name", "").lower()):
+                                            matched = True
+                                    elif slot and grp.get("day") == slot["day"] and grp.get("start_time") == slot["start_time"]:
+                                        matched = True
+
                                     if matched:
                                         grp["spots_free"] = free
                                         grp["spots_total"] = total
                                         grp["is_full"] = is_full
                                         grp["waitlist_available"] = False if is_full else grp.get("waitlist_available", True)
+                                        if is_enrolled_row:
+                                            grp["is_enrolled"] = True
+                                            match_course_and_group(c.get("title") or c["course_id"], r["name"], r["desc"], course_url)
                                         matched_count += 1
                         if matched_count > 0:
                             self.add_log("INFO", f"📊 OpenOlat: {matched_count} Übungsgruppen von '{c['course_id']}' mit Echtzeit-Kapazitäten synchronisiert.")
@@ -1870,13 +1957,20 @@ setTimeout(runUnibodyAutoFill, 2200);
                 except Exception:
                     moodle_courses = []
 
+            # Ensure infEInf-02a (id=470) is always checked
+            if not any("id=470" in mc.get("url", "") for mc in moodle_courses):
+                moodle_courses.append({
+                    "title": "infEInf-02a / infEInf-01a: Einführung in die Informatik",
+                    "url": "https://elearn.informatik.uni-kiel.de/course/view.php?id=470"
+                })
+
             for mc in moodle_courses[:5]:
                 c_url = mc.get("url")
                 c_title = mc.get("title") or ""
                 if not c_url or "fachschaft" in c_title.lower():
                     continue
                 self._cdp_send_command(ws_moodle, "Page.navigate", {"url": c_url})
-                time.sleep(1.2)
+                time.sleep(1.3)
                 extract_cg_js = """
                 (function() {
                   const links = Array.from(document.querySelectorAll('a[href*="mod/choicegroup/view.php"], a[href*="mod/choice/view.php"]'));
@@ -1892,31 +1986,76 @@ setTimeout(runUnibodyAutoFill, 2200);
                     except Exception:
                         cg_links = []
 
-                for cg in cg_links[:2]:
+                for cg in cg_links:
                     cg_url = cg.get("url")
-                    if not cg_url:
+                    cg_title = cg.get("title") or ""
+                    if not cg_url or "übung" not in cg_title.lower():
                         continue
                     self._cdp_send_command(ws_moodle, "Page.navigate", {"url": cg_url})
-                    time.sleep(1.1)
-                    check_selected_js = """
+                    time.sleep(1.3)
+
+                    check_cg_details_js = """
                     (function() {
-                      const checked = document.querySelector('form input[type="radio"]:checked, form input[type="checkbox"]:checked');
-                      if (checked) {
-                        const row = checked.closest('tr, .fitem, li, div');
-                        return JSON.stringify({ chosen: row ? row.innerText.replace(/\\s+/g, ' ').trim() : checked.value });
-                      }
-                      const bodyTxt = document.querySelector('#region-main, main')?.innerText || '';
-                      const m = bodyTxt.match(/(?:Ihre Auswahl|Your choice|Mitglied in)[:\\s]+([^\\n]+)/i);
-                      return JSON.stringify({ chosen: m ? m[1].trim() : '' });
+                        const bodyTxt = (document.querySelector('#region-main, main')?.innerText || '').replace(/\\s+/g, ' ');
+                        const isLocked = bodyTxt.includes('not available until') || bodyTxt.includes('gesperrt') || bodyTxt.includes('noch nicht geöffnet') || bodyTxt.includes('Verfügbar ab');
+                        const mOpen = bodyTxt.match(/Opens?:\\s*([^\\n\\.]+)/i) || bodyTxt.match(/available until\\s*([^\\n\\.]+)/i);
+                        const openDate = mOpen ? mOpen[1].trim() : '';
+
+                        const checked = document.querySelector('form input[type="radio"]:checked, form input[type="checkbox"]:checked');
+                        let chosen = '';
+                        if (checked) {
+                            const row = checked.closest('tr, .fitem, li, div');
+                            chosen = row ? row.innerText.replace(/\\s+/g, ' ').trim() : checked.value;
+                        } else {
+                            const m = bodyTxt.match(/(?:Ihre Auswahl|Your choice|Mitglied in)[:\\s]+([^\\n]+)/i);
+                            chosen = m ? m[1].trim() : '';
+                        }
+
+                        const rows = Array.from(document.querySelectorAll('#region-main table tr.option, table tr.option, form table tr'));
+                        const options = rows.map(tr => {
+                            const tds = Array.from(tr.querySelectorAll('td')).map(td => (td.innerText || '').replace(/\\s+/g, ' ').trim());
+                            const input = tr.querySelector('input');
+                            return {
+                                name: (tds[1] || tr.innerText || '').replace(/\\s+/g, ' ').trim(),
+                                capacity: tds[2] || '',
+                                checked: input ? input.checked : false,
+                                disabled: input ? input.disabled : false
+                            };
+                        });
+
+                        return JSON.stringify({ isLocked, openDate, chosen, options });
                     })();
                     """
-                    res_sel = self._cdp_send_command(ws_moodle, "Runtime.evaluate", {"expression": check_selected_js, "returnByValue": True})
-                    val_sel = res_sel.get("result", {}).get("result", {}).get("value") if isinstance(res_sel, dict) else None
-                    if val_sel:
+                    res_cg_det = self._cdp_send_command(ws_moodle, "Runtime.evaluate", {"expression": check_cg_details_js, "returnByValue": True})
+                    val_cg_det = res_cg_det.get("result", {}).get("result", {}).get("value") if isinstance(res_cg_det, dict) else None
+                    if val_cg_det:
                         try:
-                            chosen_txt = json.loads(val_sel).get("chosen") or ""
-                            if chosen_txt:
-                                match_course_and_group(c_title, chosen_txt, chosen_txt, cg_url)
+                            cg_info = json.loads(val_cg_det)
+                            moodle_course = next((raw_c for ckey, raw_c in all_courses.items() if "infeinf" in ckey or "moodle" in str(raw_c.get("platform", "")).lower()), None)
+                            if moodle_course:
+                                if cg_info.get("isLocked"):
+                                    open_d = cg_info.get("openDate") or "23. Oktober 2026, 14:00 Uhr"
+                                    self.add_log("INFO", f"⏳ [elearn.informatik] Übungsgruppen noch nicht freigeschaltet: Gesperrt bis {open_d} (Dozenten-Freischaltung ausstehend).")
+                                    for g in moodle_course.get("groups", []):
+                                        g["is_locked"] = True
+                                        g["enrollment_opens_at"] = "2026-10-23T14:00:00"
+                                elif cg_info.get("options"):
+                                    for opt in cg_info["options"]:
+                                        m_cap = re.search(r"(\d+)\s*/\s*(\d+)", opt.get("capacity", ""))
+                                        if m_cap:
+                                            taken = int(m_cap.group(1))
+                                            total = int(m_cap.group(2))
+                                            free = max(0, total - taken)
+                                            is_full = (free <= 0) or opt.get("disabled", False)
+                                            for g in moodle_course.get("groups", []):
+                                                m_num = re.search(r"(?:gruppe|gr\.?|übung)\s*0*(\d+)", opt.get("name", "").lower())
+                                                if m_num and re.search(rf"\b0*{m_num.group(1)}\b", g.get("name", "").lower()):
+                                                    g["spots_free"] = free
+                                                    g["spots_total"] = total
+                                                    g["is_full"] = is_full
+
+                            if cg_info.get("chosen"):
+                                match_course_and_group(c_title, cg_info["chosen"], cg_info["chosen"], cg_url)
                         except Exception:
                             pass
 
