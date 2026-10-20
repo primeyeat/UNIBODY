@@ -353,9 +353,14 @@ async function pinGroupAsRank1(groupId) {
 }
 
 function formatCapacityTag(g, course) {
-  const total = Number(g.spots_total) || 28;
+  const total = Number(g.spots_total) || 40;
   const free = g.spots_free !== undefined && g.spots_free !== null ? Number(g.spots_free) : total;
   const taken = Math.max(0, total - free);
+
+  // Check if group is full or ausgebucht
+  if (g.is_full || free <= 0) {
+    return `<span class="spots-pill spots-full" title="Gruppe ist voll belegt (${total}/${total}) · Keine freien Plätze">🔴 Ausgebucht (${total}/${total})</span>`;
+  }
 
   // Check if course or group registration has not opened yet
   const openDateStr = g.enrollment_opens_at || (course ? course.enrollment_opens_at : null);
@@ -375,10 +380,6 @@ function formatCapacityTag(g, course) {
 
   if (isOpenFuture && taken === 0) {
     return `<span class="spots-pill spots-locked" title="Einschreibung öffnet am ${openDateStr} · Alle ${total} Plätze verfügbar">🔒 Start: ${dateLabel} (${total} Plätze)</span>`;
-  }
-
-  if (free <= 0) {
-    return `<span class="spots-pill spots-full" title="Alle ${total} Plätze belegt · Warteliste aktiv">🔴 Voll (${total}/${total}) · Warteliste</span>`;
   }
 
   if (taken > 0) {
@@ -675,8 +676,10 @@ function renderTimetable() {
       const heightPx = Math.max(28, ((endMins - startMins) / 60) * PX_PER_HOUR);
 
       const el = document.createElement("div");
+      const isFull = Boolean(g.is_full || (g.spots_free !== null && g.spots_free !== undefined && Number(g.spots_free) <= 0));
       let variant = "candidate-rank-alt";
       if (g.is_conflict) variant = "candidate-conflict";
+      else if (isFull) variant = "candidate-full";
       else if (isRank1) variant = "candidate-rank-1";
 
       el.className = `tt-event candidate-overlay ${variant}`;
@@ -709,6 +712,8 @@ function renderTimetable() {
 
       el.title = g.is_conflict
         ? "Zeitkonflikt mit deinem Stundenplan"
+        : isFull
+        ? `Gruppe ist voll belegt (${g.spots_total}/${g.spots_total}). Klick zum Priorisieren als Wunsch #1 (für Sniper bei Nachrücker-Plätzen)!`
         : isRank1
         ? `Aktuell als Wunsch #1 (${g.name}) ausgewählt! (Klicke erneut zum Aufheben)`
         : `Klicke auf diesen Kasten, um '${g.name}' sofort als Wunsch #1 (Grün) für Schritt 3 auszuwählen!`;
@@ -716,10 +721,17 @@ function renderTimetable() {
       const pinIcon = g.is_pinned ? "📌 " : (isRank1 ? "🏆 " : "⭐ ");
       const badge = g.is_conflict
         ? "❌ KONFLIKT"
+        : isFull
+        ? "🔴 AUSGEBUCHT"
         : `${pinIcon}Wunsch #${g.rank} (${g.display_score}%)`;
+
+      const subText = isFull
+        ? "🚫 Ausgebucht (0 Plätze)"
+        : (isRank1 ? "🏆 Ausgewählt (Wunsch #1)" : "👆 Klick = Prio #1");
+
       el.innerHTML = `
         <div class="tt-ev-title">${badge}: ${g.name}</div>
-        <div class="tt-ev-time">${g.start_time}–${g.end_time} · 👆 Klick = Prio #1</div>
+        <div class="tt-ev-time">${g.start_time}–${g.end_time} · ${subText}</div>
       `;
 
       if (!g.is_conflict) {

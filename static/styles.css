@@ -985,6 +985,24 @@ code {
   cursor: not-allowed;
 }
 
+.tt-event.candidate-full {
+  background: linear-gradient(
+    180deg,
+    rgba(241, 245, 249, 0.88) 0%,
+    rgba(226, 232, 240, 0.75) 100%
+  );
+  border: 1.5px dashed #94a3b8;
+  color: #475569;
+  z-index: 21;
+  cursor: pointer;
+}
+
+.tt-event.candidate-full:hover {
+  border-color: #ef4444;
+  color: #991b1b;
+  z-index: 45 !important;
+}
+
 .tt-ev-title {
   font-weight: 800;
   line-height: 1.2;
