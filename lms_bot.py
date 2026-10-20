@@ -1998,8 +1998,8 @@ setTimeout(runUnibodyAutoFill, 2200);
                 const rows = Array.from(table.querySelectorAll('tbody tr'));
                 const data = rows.map((tr, idx) => {
                     const tds = Array.from(tr.querySelectorAll('td')).map(td => (td.innerText || '').replace(/\\s+/g, ' ').trim());
-                    const enrollA = tr.querySelector('td:nth-child(5) a') || tr.querySelector('a[onclick*="cmd.enrolled.add"]') || Array.from(tr.querySelectorAll('a')).find(a => /^einschreiben$/i.test((a.innerText||'').trim()));
-                    const cancelA = tr.querySelector('td:nth-child(6) a') || tr.querySelector('a[onclick*="cmd.enrolled.cancel"]') || Array.from(tr.querySelectorAll('a')).find(a => /^austragen$/i.test((a.innerText||'').trim()));
+                    const enrollA = tr.querySelector('td:nth-child(5) a') || tr.querySelector('a[onclick*="cmd.enroll"]') || tr.querySelector('a[onclick*="cmd.enrolled.add"]') || Array.from(tr.querySelectorAll('a')).find(a => /einschreiben/i.test((a.innerText||'').trim()));
+                    const cancelA = tr.querySelector('td:nth-child(6) a') || tr.querySelector('a[onclick*="cmd.enrolled.cancel"]') || tr.querySelector('a[onclick*="cmd.cancel"]') || Array.from(tr.querySelectorAll('a')).find(a => /austragen/i.test((a.innerText||'').trim()));
                     const waitlistA = tr.querySelector('a[onclick*="cmd.waitinglist.add"]') || Array.from(tr.querySelectorAll('a')).find(a => /warteliste/i.test(a.innerText || ''));
                     return {
                         rowIndex: idx,
@@ -2085,11 +2085,23 @@ setTimeout(runUnibodyAutoFill, 2200);
                     )
                     continue
 
-                # 2. Check if already enrolled in this group
-                if matched_row and ("eingeschrieben" in status_str or matched_row.get("hasCancel")):
+                # 2. Check if already enrolled in this group (MUST NOT match 'Nicht eingeschrieben'!)
+                is_already_enrolled = bool(
+                    matched_row
+                    and (
+                        matched_row.get("hasCancel")
+                        or (
+                            "eingeschrieben" in status_str
+                            and "nicht" not in status_str
+                            and "kein" not in status_str
+                            and not matched_row.get("hasEnroll")
+                        )
+                    )
+                )
+                if is_already_enrolled:
                     self.add_log(
                         "SUCCESS",
-                        f"✅ [{platform_host}] Bereits in Wunsch #{rank_num} ('{grp['name']}') verbindlich eingeschrieben (Status: Eingeschrieben, Belegung: {cap_str})!"
+                        f"✅ [{platform_host}] Bereits in Wunsch #{rank_num} ('{grp['name']}') verbindlich eingeschrieben (Status: {matched_row.get('status')}, Belegung: {cap_str})!"
                     )
                     return {
                         "ok": True,
@@ -2110,7 +2122,7 @@ setTimeout(runUnibodyAutoFill, 2200);
                     )
                     continue
 
-                # 3. Group is available -> EXECUTE ENROLLMENT CLICK!
+                # 4. Group is available -> EXECUTE ENROLLMENT CLICK!
                 r_idx = matched_row["rowIndex"] if matched_row else idx
                 self.add_log(
                     "SNIPER",
@@ -2121,17 +2133,32 @@ setTimeout(runUnibodyAutoFill, 2200);
                     const rows = document.querySelectorAll('table.o_table tbody tr, table.table tbody tr');
                     if ({r_idx} >= rows.length) return 'ROW_OUT_OF_BOUNDS';
                     const tr = rows[{r_idx}];
-                    const a = tr.querySelector('td:nth-child(5) a') || tr.querySelector('a[onclick*="cmd.enrolled.add"]') || Array.from(tr.querySelectorAll('a')).find(x => /^einschreiben$/i.test((x.innerText||'').trim()));
-                    if (a) {{
+                    const a = tr.querySelector('td:nth-child(5) a') ||
+                              tr.querySelector('a[onclick*="cmd.enroll"]') ||
+                              tr.querySelector('a[onclick*="cmd.enrolled.add"]') ||
+                              Array.from(tr.querySelectorAll('a')).find(x => /einschreiben/i.test((x.innerText || '').trim()));
+                    if (!a) return 'NO_ENROLL_LINK';
+
+                    // 1. Direct call of onclick function if present
+                    try {{
+                        if (typeof a.onclick === 'function') {{
+                            a.onclick.call(a);
+                        }}
+                    }} catch (e) {{}}
+
+                    // 2. Dispatch native mouse and click events
+                    try {{
+                        a.focus();
                         a.click();
-                        return 'CLICKED_ENROLL_BUTTON';
-                    }}
-                    return 'NO_ENROLL_LINK';
+                        a.dispatchEvent(new MouseEvent('click', {{ bubbles: true, cancelable: true, view: window }}));
+                    }} catch (e) {{}}
+
+                    return 'CLICKED_ENROLL_BUTTON';
                 }})()
                 """
                 click_res = cdp_eval(ws, click_js)
                 self.add_log("INFO", f"🏛️ OpenOlat Klick-Resultat: {click_res}")
-                time.sleep(0.8)
+                time.sleep(1.0)
 
                 # Confirm modal if any appeared
                 modal_js = """
@@ -2154,16 +2181,15 @@ setTimeout(runUnibodyAutoFill, 2200);
                     self.add_log("SUCCESS", "🏛️ OpenOlat: Bestätigungsdialog automatisch bestätigt!")
                 time.sleep(1.2)
 
-                # Re-verify row in DOM
                 ver_js = f"""
                 (function() {{
                     const rows = document.querySelectorAll('table.o_table tbody tr, table.table tbody tr');
                     if ({r_idx} >= rows.length) return JSON.stringify({{ ok: true, isEnrolled: true }});
                     const tr = rows[{r_idx}];
                     const tds = Array.from(tr.querySelectorAll('td')).map(td => (td.innerText || '').replace(/\\s+/g, ' ').trim());
-                    const hasCancel = !!(tr.querySelector('td:nth-child(6) a') || tr.querySelector('a[onclick*="cmd.enrolled.cancel"]'));
+                    const hasCancel = !!(tr.querySelector('td:nth-child(6) a') || tr.querySelector('a[onclick*="cmd.cancel"]') || tr.querySelector('a[onclick*="cmd.enrolled.cancel"]'));
                     const statusTxt = tds[3] || '';
-                    const isEnrolled = /eingeschrieben/i.test(statusTxt) || hasCancel;
+                    const isEnrolled = hasCancel || (/eingeschrieben/i.test(statusTxt) && !/nicht|kein/i.test(statusTxt));
                     return JSON.stringify({{ isEnrolled: isEnrolled, status: statusTxt, hasCancel: hasCancel }});
                 }})()
                 """
