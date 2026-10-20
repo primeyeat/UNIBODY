@@ -896,11 +896,88 @@ class CAUBrowserSessionManager:
     );
   }}
 
-  // 1. Check for visible username & password fields (CAU Shibboleth IdP, OpenOlat lms.uni-kiel.de, or Moodle elearn.informatik.uni-kiel.de)
+  // 1. Special Handler for OpenOlat 21+ Two-Step FlexiForm AJAX Login (`lms.uni-kiel.de/dmz/`)
+  //    Step 1: `#o_fiooolat_login_name` is visible, while `#o_cooolat_login_pass` is still empty.
+  //    Step 2: `#o_fiooolat_login_pass` is dynamically injected via `o_XHRSubmit('ofo_oolat_login')`.
+  const olatForm = document.getElementById('ofo_oolat_login');
+  const olatNameInput = document.getElementById('o_fiooolat_login_name');
+  const olatPassInput = document.getElementById('o_fiooolat_login_pass');
+  const olatBtn = document.getElementById('o_fiooolat_login_button');
+
+  function triggerOlatFlexiSubmit() {{
+    const du = document.getElementById('ofo_oolat_login_dispatchuri');
+    const ev = document.getElementById('ofo_oolat_login_eventval');
+    if (du) du.value = 'o_fiooolat_login_button';
+    if (ev) ev.value = '2';
+    if (window.o_info) window.o_info.preventOnchange = true;
+    if (typeof window.o_XHRSubmit === 'function') {{
+      window.o_XHRSubmit('ofo_oolat_login');
+      return true;
+    }} else if (olatBtn) {{
+      olatBtn.click();
+      return true;
+    }}
+    return false;
+  }}
+
+  if (olatForm && (olatNameInput || olatPassInput)) {{
+    const pageHasErr = hasLoginErrorOnPage();
+    // Ignore the "Bitte geben Sie einen Anmeldenamen ein" error if the field was empty
+    const errEl = document.getElementById('o_fiooolat_login_name_error');
+    const isEmptyNameErr = errEl && (errEl.innerText || '').includes('Anmeldenamen ein');
+
+    if (pageHasErr && !isEmptyNameErr && !CFG.forceSubmit) {{
+      showAeroBanner('⚠️ UNIBODY (lms.uni-kiel.de): Auto-Submit pausiert wegen Fehlermeldung', true);
+      return 'FILLED_PAUSED_ON_ERROR';
+    }}
+
+    // Step 1: Username field is visible, password field is not yet rendered
+    if (olatNameInput && olatNameInput.offsetParent !== null && (!olatPassInput || olatPassInput.offsetParent === null)) {{
+      if (window.o_info) window.o_info.preventOnchange = true;
+      setNativeValue(olatNameInput, CFG.username);
+      const lastStep1Ts = parseInt(sessionStorage.getItem('cau_sniper_olat_step1_ts') || '0', 10);
+      const now = Date.now();
+      if (CFG.autoSubmit && (now - lastStep1Ts > 3500 || CFG.forceSubmit)) {{
+        sessionStorage.setItem('cau_sniper_olat_step1_ts', String(now));
+        showAeroBanner('🫧 UNIBODY (lms.uni-kiel.de): Schritt 1/2 – Sende Kennung ' + CFG.username + '...', false);
+        setTimeout(() => {{
+          triggerOlatFlexiSubmit();
+        }}, 120);
+        return 'FILLED_AND_SUBMITTED';
+      }}
+      showAeroBanner('🫧 UNIBODY (lms.uni-kiel.de): Kennung ' + CFG.username + ' eingetragen', false);
+      return 'FILLED_ONLY';
+    }}
+
+    // Step 2: Password field is now visible in DOM
+    if (olatPassInput && olatPassInput.offsetParent !== null) {{
+      if (window.o_info) window.o_info.preventOnchange = true;
+      if (olatNameInput && olatNameInput.offsetParent !== null && olatNameInput.value !== CFG.username) {{
+        setNativeValue(olatNameInput, CFG.username);
+      }}
+      setNativeValue(olatPassInput, CFG.password);
+      const lastStep2Ts = parseInt(sessionStorage.getItem('cau_sniper_olat_step2_ts') || '0', 10);
+      const now = Date.now();
+      if (CFG.autoSubmit && (now - lastStep2Ts > 4500 || CFG.forceSubmit)) {{
+        sessionStorage.setItem('cau_sniper_olat_step2_ts', String(now));
+        showAeroBanner('🫧 UNIBODY Auto-Login (lms.uni-kiel.de): Schritt 2/2 – Melde ' + CFG.username + ' an...', false);
+        setTimeout(() => {{
+          triggerOlatFlexiSubmit();
+        }}, 150);
+        return 'FILLED_AND_SUBMITTED';
+      }}
+      showAeroBanner('🫧 UNIBODY (lms.uni-kiel.de): Passwort ausgefüllt!', false);
+      return 'FILLED_ONLY';
+    }}
+  }}
+
+  // 2. Check for standard username & password fields (CAU Shibboleth IdP or Moodle elearn.informatik.uni-kiel.de)
   const userSelectors = [
     'input[name="j_username"]',
     'input#username',
     'input[name="username"]',
+    'input[name*="fiooolat_login_name"]',
+    'input[id*="fiooolat_login_name"]',
     'input[name*="fiooldap_login_name"]',
     'input[id*="fiooldap_login_name"]',
     'input[name="userid"]',
@@ -910,6 +987,8 @@ class CAUBrowserSessionManager:
     'input[name="j_password"]',
     'input#password',
     'input[name="password"]',
+    'input[name*="fiooolat_login_pass"]',
+    'input[id*="fiooolat_login_pass"]',
     'input[name*="fiooldap_login_pass"]',
     'input[id*="fiooldap_login_pass"]',
     'input[type="password"]'
@@ -959,6 +1038,7 @@ class CAUBrowserSessionManager:
         'button[name="_eventId_proceed"]',
         'input[name="_eventId_proceed"]',
         'button#loginbtn',
+        'button#o_fiooolat_login_button',
         'button[type="submit"]',
         'input[type="submit"]',
         'button.o_button_login'
@@ -983,9 +1063,15 @@ class CAUBrowserSessionManager:
     }}
   }}
 
-  // 2. If on OpenOlat (lms.uni-kiel.de) or Moodle (elearn.informatik.uni-kiel.de) landing/course page without visible password field:
+  // 3. If OpenOlat accidentally landed on the static `/msg/json/en/info.html` page, redirect straight back to `/dmz/`
+  if (host.includes('lms.uni-kiel.de') && url.includes('/msg/json/')) {{
+    window.location.replace('https://lms.uni-kiel.de/dmz/');
+    return 'CLICKED_SSO_REDIRECT';
+  }}
+
+  // 4. If on Moodle (elearn.informatik.uni-kiel.de) or CAU SSO page without visible login fields:
   //    Automatically click the "CAU-Login / Shibboleth / Anmelden" link if not authenticated yet!
-  if (CFG.autoSubmit) {{
+  if (CFG.autoSubmit && !olatForm) {{
     const lastRedirectTs = parseInt(sessionStorage.getItem('cau_sniper_sso_redirect_ts') || '0', 10);
     if (Date.now() - lastRedirectTs > 5000 || CFG.forceSubmit) {{
       const ssoLinks = Array.from(document.querySelectorAll('a, button'));
@@ -993,14 +1079,14 @@ class CAUBrowserSessionManager:
         if (el.offsetParent === null) continue;
         const href = (el.getAttribute('href') || '').toLowerCase();
         const txt = (el.innerText || el.value || '').toLowerCase();
+        if (href.includes('/msg/json/')) continue;
         if (
           href.includes('shibboleth') ||
           href.includes('idp.uni-kiel.de') ||
           (host.includes('elearn') && href.includes('login/index.php')) ||
           txt.includes('shibboleth') ||
           txt.includes('cau-login') ||
-          txt.includes('cau login') ||
-          (host.includes('lms.uni-kiel.de') && txt.includes('login') && !url.includes('/auth/'))
+          txt.includes('cau login')
         ) {{
           sessionStorage.setItem('cau_sniper_sso_redirect_ts', String(Date.now()));
           showAeroBanner('🫧 UNIBODY (' + platformName + '): Öffne Login-Maske...', false);
@@ -1050,9 +1136,12 @@ class CAUBrowserSessionManager:
             js_code = self._build_autofill_js(creds, force_submit=False)
             content_js = f"""
 // CAU Kiel UNIBODY Auto-Fill Content Script (lms.uni-kiel.de + elearn.informatik.uni-kiel.de)
-setTimeout(() => {{
+function runUnibodyAutoFill() {{
   try {{ {js_code} }} catch (e) {{ console.warn('CAU UNIBODY AutoFill error:', e); }}
-}}, 250);
+}}
+setTimeout(runUnibodyAutoFill, 250);
+setTimeout(runUnibodyAutoFill, 1150);
+setTimeout(runUnibodyAutoFill, 2200);
 """
             with open(os.path.join(self.ext_dir, "content.js"), "w", encoding="utf-8") as f:
                 f.write(content_js)
@@ -1352,8 +1441,8 @@ setTimeout(() => {{
             title = (t.get("title") or "").lower()
             if "uni-kiel.de" in u and not lms_tab:
                 lms_tab = t
-            is_login_page = any(k in u for k in ["idp.uni-kiel.de", "shibboleth.sso", "login", "wayf"])
-            if "lms.uni-kiel.de" in u and not is_login_page and ("auth/" in u or "olat" in title or "repositoryentry" in u):
+            is_login_page = any(k in u for k in ["idp.uni-kiel.de", "shibboleth.sso", "login", "wayf", "/dmz/", "/msg/json/"])
+            if "lms.uni-kiel.de" in u and not is_login_page and ("/auth/" in u or "repositoryentry" in u):
                 openolat_auth = True
             if "elearn.informatik.uni-kiel.de" in u and not is_login_page and ("course" in u or "my" in u or "dashboard" in title or "moodle" in title):
                 elearn_inf_auth = True
