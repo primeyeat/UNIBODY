@@ -10,6 +10,8 @@
 
 <p align="center">
   <img src="https://img.shields.io/badge/Python-3.9+-3776AB?style=flat-square&logo=python&logoColor=white" alt="Python 3.9+" />
+  <img src="https://img.shields.io/badge/iOS-27.0+-000000?style=flat-square&logo=apple&logoColor=white" alt="iOS 27.0+" />
+  <img src="https://img.shields.io/badge/SwiftUI-6.0-F05138?style=flat-square&logo=swift&logoColor=white" alt="SwiftUI 6.0" />
   <img src="https://img.shields.io/badge/Design-Frutiger%20Aero%20Glass-00a8ff?style=flat-square" alt="Frutiger Aero" />
   <img src="https://img.shields.io/badge/Plattformen-OpenOlat%20%7C%20Moodle-10b981?style=flat-square" alt="OpenOlat & Moodle" />
   <img src="https://img.shields.io/badge/Zero--Dependency-Stdlib%20Only-blueviolet?style=flat-square" alt="Zero Dependencies" />
@@ -141,6 +143,31 @@ UnivIS exportiert oft überladene Kalenderdateien mit unbereinigten Doppelungen.
 - Klicke im Wochenplan auf **`🧹 UnivIS .ics Import & Bereiniger`**.
 - Lade deine `.ics`-Datei hoch.
 - UNIBODY filtert verdächtige oder doppelte Einträge automatisch heraus und übernimmt nur deine echten Vorlesungen in den Stundenplan.
+
+---
+
+## 📱 Native iOS 27 App (SwiftUI & Frutiger Aero)
+
+Für das mobile Erlebnis auf iPhone und iPad existiert eine native iOS 27 App unter [`ios/UNIBODY/UNIBODY.xcodeproj`](file:///Users/zer0/.gemini/antigravity/scratch/cau-lms-bot/ios/UNIBODY/UNIBODY.xcodeproj):
+
+- 🫧 **Frutiger Aero Liquid Glass Design:** Native SwiftUI-Komponenten mit `.ultraThinMaterial`, dynamischen Lichtreflexionen, animierten Aurora-Backdrops und taktilem iOS-Feedback.
+- 📅 **Interaktiver Wochenplan:** Tages-Umschaltung (Mo–Fr), automatische Berücksichtigung alternierender Wochen (Woche A & Woche B) und Terminkollisionsprüfung.
+- ⚡ **Dual-Platform Kurs-Katalog:** Detaillierte Ansicht für alle CAU-Module (`lms.uni-kiel.de` & `elearn.informatik.uni-kiel.de`) mit Echtzeit-Platzanzeige (`spots_free / spots_total`) und 1-Tap-Einschreibung.
+- 🎯 **Mobile Sniper-Dashboard:** Sekundengenauer Countdown und konfigurierbare Prioritätenliste mit Fallback-Automatik.
+- 📅 **UnivIS .ics Import:** Direktes Einlesen von UnivIS-Kalenderdaten via iCalendar-Parser.
+
+### iOS App bauen & starten:
+
+```bash
+# Projekt in Xcode öffnen
+open ios/UNIBODY/UNIBODY.xcodeproj
+
+# Oder direkt per CLI für den iOS Simulator bauen:
+xcodebuild -project ios/UNIBODY/UNIBODY.xcodeproj \
+           -target UNIBODY \
+           -sdk iphonesimulator \
+           clean build CODE_SIGNING_ALLOWED=NO
+```
 
 ---
 
