@@ -23,6 +23,7 @@ from lms_bot import (
     BUILTIN_CAU_COURSES,
     CAUBrowserSessionManager,
     lookup_course_by_identifier,
+    parse_groups_from_raw_text,
 )
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -557,6 +558,35 @@ class CAUBotRequestHandler(SimpleHTTPRequestHandler):
 
             session_mgr.add_log("SUCCESS", f"Eigener CAU-Kurs '{new_course['title']}' (ID: {cid}) mit {len(parsed_groups)} Übungsgruppen gespeichert.")
             self._send_json({"ok": True, "course": new_course})
+            return
+
+        if path == "/api/course/update-groups":
+            course_id = (body.get("course_id") or "").strip()
+            raw_text = body.get("raw_text") or ""
+            with STATE_LOCK:
+                res = lookup_course_by_identifier(course_id, APP_STATE["custom_courses"], session_mgr)
+                if not res.get("ok"):
+                    self._send_json(res)
+                    return
+
+                course = dict(res["course"])
+                new_groups = parse_groups_from_raw_text(raw_text, course["course_id"])
+                if not new_groups:
+                    self._send_json({
+                        "ok": False,
+                        "error": "Keine gültigen Zeitangaben (z. B. 'Di 16:15 - 17:45' oder 'Mi 14-16') im Text erkannt."
+                    })
+                    return
+
+                course["groups"] = new_groups
+                APP_STATE["custom_courses"][course["course_id"].lower()] = course
+                save_state(APP_STATE)
+
+            session_mgr.add_log(
+                "SUCCESS",
+                f"Übungsgruppen für '{course['course_id']}' live aktualisiert ({len(new_groups)} Gruppen übernommen)."
+            )
+            self._send_json({"ok": True, "course": course})
             return
 
         if path == "/api/browser/launch":
