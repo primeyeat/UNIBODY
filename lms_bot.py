@@ -1351,6 +1351,18 @@ setTimeout(runUnibodyAutoFill, 2200);
 
         tabs = self._get_cdp_tabs()
         if tabs is not None:
+            # Ensure requested platform tabs exist if Chrome is already running (e.g. if all windows were closed on macOS)
+            existing_urls = " ".join((t.get("url") or "").lower() for t in tabs)
+            for u_open in urls_to_open:
+                host_check = "elearn.informatik" if "elearn.informatik" in u_open else ("lms.uni-kiel.de" if "lms.uni-kiel.de" in u_open else u_open)
+                if host_check not in existing_urls:
+                    try:
+                        req_new = urllib.request.Request(f"http://127.0.0.1:{self.debug_port}/json/new?{u_open}", method="PUT")
+                        urllib.request.urlopen(req_new, timeout=1.5).read()
+                        time.sleep(0.8)
+                    except Exception:
+                        pass
+
             nav_target = None if pref_plat == "unibody" else pref_plat
             self.add_log(
                 "INFO",
@@ -1360,6 +1372,12 @@ setTimeout(runUnibodyAutoFill, 2200);
                 force_submit=force_auto_login or bool(creds.get("auto_submit")),
                 navigate_url=nav_target,
             )
+            if creds.get("username") and creds.get("password"):
+                time.sleep(1.3)
+                self.inject_autofill_into_tabs(
+                    force_submit=force_auto_login or bool(creds.get("auto_submit")),
+                    navigate_url=None,
+                )
             self.check_status()
             return {"ok": True, "status": self.session_state}
 
@@ -1393,6 +1411,8 @@ setTimeout(runUnibodyAutoFill, 2200);
                 self.add_log("INFO", "Bitte im geöffneten Fenster mit deiner CAU stu-Kennung anmelden (oder hinterlege deine Login-Daten im UNIBODY-Tresor).")
             time.sleep(1.6)
             if creds.get("username") and creds.get("password"):
+                self.inject_autofill_into_tabs(force_submit=force_auto_login or bool(creds.get("auto_submit")))
+                time.sleep(1.3)
                 self.inject_autofill_into_tabs(force_submit=force_auto_login or bool(creds.get("auto_submit")))
             self.check_status()
             return {"ok": True, "status": self.session_state}
