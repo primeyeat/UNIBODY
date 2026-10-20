@@ -9,12 +9,6 @@ public struct ScheduleView: View {
     private let dayNames = ["Montag", "Dienstag", "Mittwoch", "Donnerstag", "Freitag"]
     private let dayShort = ["Mo", "Di", "Mi", "Do", "Fr"]
     
-    private var eventsForDay: [ScheduleEvent] {
-        appState.schedule
-            .filter { $0.day == selectedDay }
-            .sorted { $0.startMinutes < $1.startMinutes }
-    }
-    
     public var body: some View {
         NavigationStack {
             ZStack {
@@ -50,7 +44,7 @@ public struct ScheduleView: View {
                     HStack(spacing: 8) {
                         ForEach(0..<5) { idx in
                             Button {
-                                withAnimation(.spring(response: 0.35, dampingFraction: 0.7)) {
+                                withAnimation(.spring(response: 0.35, dampingFraction: 0.75)) {
                                     selectedDay = idx
                                 }
                             } label: {
@@ -85,71 +79,19 @@ public struct ScheduleView: View {
                     .padding(.horizontal)
                     .padding(.vertical, 10)
                     
-                    // Selected Day Title & Event Count
-                    HStack {
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(dayNames[selectedDay])
-                                .font(.system(.title2, design: .rounded).weight(.bold))
-                                .foregroundColor(.white)
-                            Text("\(eventsForDay.count) Termine eingetragen")
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                        }
-                        Spacer()
-                        
-                        Button {
-                            showICSImportSheet = true
-                        } label: {
-                            Label("UnivIS ICS", systemImage: "calendar.badge.plus")
-                                .font(.caption.weight(.semibold))
-                                .padding(.horizontal, 10)
-                                .padding(.vertical, 6)
-                                .background(Capsule().fill(AeroTheme.skyBlue.opacity(0.2)))
-                                .foregroundColor(AeroTheme.skyBlue)
+                    // Swipeable Page TabView between Days
+                    TabView(selection: $selectedDay) {
+                        ForEach(0..<5, id: \.self) { day in
+                            DaySchedulePageView(day: day, showICSImportSheet: $showICSImportSheet)
+                                .tag(day)
                         }
                     }
-                    .padding(.horizontal)
-                    .padding(.top, 6)
-                    .padding(.bottom, 12)
-                    
-                    // Events List
-                    if eventsForDay.isEmpty {
-                        Spacer()
-                        VStack(spacing: 12) {
-                            Image(systemName: "calendar.badge.clock")
-                                .font(.system(size: 48))
-                                .foregroundColor(AeroTheme.skyBlue.opacity(0.6))
-                            Text("Keine Termine am \(dayNames[selectedDay])")
-                                .font(.headline)
-                                .foregroundColor(.white)
-                            Text("Importiere deinen UnivIS-Plan oder wähle Übungsgruppen aus dem Katalog.")
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                                .multilineTextAlignment(.center)
-                                .padding(.horizontal, 32)
-                        }
-                        Spacer()
-                    } else {
-                        ScrollView {
-                            LazyVStack(spacing: 12) {
-                                ForEach(eventsForDay) { ev in
-                                    ScheduleEventCard(
-                                        event: ev,
-                                        onToggle: {
-                                            appState.toggleEvent(id: ev.id)
-                                        },
-                                        onDelete: {
-                                            appState.deleteEvent(id: ev.id)
-                                        }
-                                    )
-                                }
-                            }
-                            .padding(.horizontal)
-                            .padding(.bottom, 24)
-                        }
-                        .refreshable {
-                            await appState.syncWithLocalServer()
-                        }
+                    .tabViewStyle(.page(indexDisplayMode: .never))
+                    .animation(.spring(response: 0.35, dampingFraction: 0.75), value: selectedDay)
+                    .onChange(of: selectedDay) { _ in
+                        #if canImport(UIKit)
+                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                        #endif
                     }
                 }
             }
@@ -184,6 +126,92 @@ public struct ScheduleView: View {
             }
             .sheet(isPresented: $showAddEventSheet) {
                 AddEventSheet(selectedDay: selectedDay)
+            }
+        }
+    }
+}
+
+// MARK: - Day Page View for Swipe Navigation
+private struct DaySchedulePageView: View {
+    let day: Int
+    @Binding var showICSImportSheet: Bool
+    @EnvironmentObject var appState: AppState
+    
+    private let dayNames = ["Montag", "Dienstag", "Mittwoch", "Donnerstag", "Freitag"]
+    
+    private var eventsForDay: [ScheduleEvent] {
+        appState.schedule
+            .filter { $0.day == day }
+            .sorted { $0.startMinutes < $1.startMinutes }
+    }
+    
+    var body: some View {
+        VStack(spacing: 0) {
+            // Selected Day Title & Event Count
+            HStack {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(dayNames[day])
+                        .font(.system(.title2, design: .rounded).weight(.bold))
+                        .foregroundColor(.white)
+                    Text("\(eventsForDay.count) Termine eingetragen")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+                Spacer()
+                
+                Button {
+                    showICSImportSheet = true
+                } label: {
+                    Label("UnivIS ICS", systemImage: "calendar.badge.plus")
+                        .font(.caption.weight(.semibold))
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 6)
+                        .background(Capsule().fill(AeroTheme.skyBlue.opacity(0.2)))
+                        .foregroundColor(AeroTheme.skyBlue)
+                }
+            }
+            .padding(.horizontal)
+            .padding(.top, 6)
+            .padding(.bottom, 12)
+            
+            // Events List
+            if eventsForDay.isEmpty {
+                Spacer()
+                VStack(spacing: 12) {
+                    Image(systemName: "calendar.badge.clock")
+                        .font(.system(size: 48))
+                        .foregroundColor(AeroTheme.skyBlue.opacity(0.6))
+                    Text("Keine Termine am \(dayNames[day])")
+                        .font(.headline)
+                        .foregroundColor(.white)
+                    Text("Importiere deinen UnivIS-Plan oder wähle Übungsgruppen aus dem Katalog.")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal, 32)
+                }
+                Spacer()
+            } else {
+                ScrollView {
+                    LazyVStack(spacing: 12) {
+                        ForEach(eventsForDay) { ev in
+                            ScheduleEventCard(
+                                event: ev,
+                                onToggle: {
+                                    appState.toggleEvent(id: ev.id)
+                                },
+                                onDelete: {
+                                    appState.deleteEvent(id: ev.id)
+                                }
+                            )
+                        }
+                    }
+                    .padding(.horizontal)
+                    .padding(.bottom, 24)
+                }
+                .refreshable {
+                    await appState.syncWithLocalServer()
+                }
             }
         }
     }
