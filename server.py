@@ -370,8 +370,7 @@ class CAUBotRequestHandler(SimpleHTTPRequestHandler):
         super().__init__(*args, directory=STATIC_DIR, **kwargs)
 
     def log_message(self, format, *args):
-        # Quiet standard access logs
-        pass
+        print(f"[HTTP] {format % args}", flush=True)
 
     def _send_json(self, data: Any, status: int = 200):
         raw = json.dumps(data, ensure_ascii=False).encode("utf-8")
