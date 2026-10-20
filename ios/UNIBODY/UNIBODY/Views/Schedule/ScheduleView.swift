@@ -144,12 +144,28 @@ public struct ScheduleView: View {
                             .padding(.horizontal)
                             .padding(.bottom, 24)
                         }
+                        .refreshable {
+                            await appState.syncWithLocalServer()
+                        }
                     }
                 }
             }
             .navigationTitle("Wochenplan")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button {
+                        Task { await appState.syncWithLocalServer() }
+                    } label: {
+                        if appState.isSyncing {
+                            ProgressView()
+                                .tint(AeroTheme.skyBlue)
+                        } else {
+                            Image(systemName: "arrow.triangle.2.circlepath")
+                                .foregroundColor(AeroTheme.skyBlue)
+                        }
+                    }
+                }
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button {
                         showAddEventSheet = true

@@ -25,9 +25,16 @@ public class AppState: ObservableObject {
     private let kAutoFillKey = "unibody_cau_autofill"
     private let kAutoSubmitKey = "unibody_cau_autosubmit"
     
+    @Published public var lastSyncDate: Date? = nil
+    
     public init() {
         loadCredentialsFromStorage()
         loadInitialData()
+        
+        // Auto-sync on startup
+        Task {
+            await syncWithLocalServer()
+        }
     }
     
     public func loadCredentialsFromStorage() {
@@ -369,19 +376,42 @@ public class AppState: ObservableObject {
         jobs.insert(job, at: 0)
     }
     
-    public func syncWithLocalServer() async {
+    public func syncWithLocalServer(customURL: String? = nil) async {
         isSyncing = true
         defer { isSyncing = false }
         
-        guard let url = URL(string: "\(serverURL)/api/state") else { return }
+        let target = customURL ?? serverURL
+        guard let activeHost = await SyncService.shared.discoverActiveServer(preferredURL: target) else {
+            syncMessage = "⚠️ UNIBODY Server nicht erreichbar (\(target)). Lokaler Offline-Modus aktiv."
+            return
+        }
+        
+        self.serverURL = activeHost
+        
         do {
-            let (data, _) = try await URLSession.shared.data(from: url)
-            if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-               let ok = json["ok"] as? Bool, ok {
-                syncMessage = "Erfolgreich mit UNIBODY-Core synchronisiert!"
+            let result = try await SyncService.shared.fetchServerState(serverURL: activeHost)
+            
+            // 1. Update Enrolled Groups Map
+            self.enrolledGroups = result.enrolled
+            
+            // 2. Update Schedule with server events (including ✅ enrolled exercises)
+            if !result.schedule.isEmpty {
+                self.schedule = result.schedule
             }
+            
+            // 3. Mark enrolled groups in the course catalog
+            for i in 0..<courses.count {
+                let cid = courses[i].courseId.lowercased()
+                if let enrolledGid = result.enrolled[cid] {
+                    courses[i].enrolledGroupId = enrolledGid
+                }
+            }
+            
+            self.lastSyncDate = Date()
+            let count = result.enrolled.count
+            syncMessage = "✅ Synchronisiert (\(count) gebuchte Übung\(count == 1 ? "" : "en") aktiv) · Server: \(activeHost)"
         } catch {
-            syncMessage = "Offline-Modus aktiv (Lokales UNIBODY-Backend nicht erreichbar)."
+            syncMessage = "Fehler beim Verarbeiten der Serverdaten: \(error.localizedDescription)"
         }
     }
 }

@@ -26,7 +26,8 @@
 		000020000000000000000011 /* UnivISImportView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000010000000000000000011 /* UnivISImportView.swift */; };
 		000020000000000000000012 /* AppState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000010000000000000000012 /* AppState.swift */; };
 		000020000000000000000013 /* OptimizerEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000010000000000000000013 /* OptimizerEngine.swift */; };
-		000020000000000000000014 /* UnivISParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000010000000000000000014 /* UnivISParser.swift */; };
+		000020000000000000000014 /* SyncService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000010000000000000000014 /* SyncService.swift */; };
+		000020000000000000000015 /* UnivISParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000010000000000000000015 /* UnivISParser.swift */; };
 		0000200000000000000003E7 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 0000100000000000000003E7 /* Assets.xcassets */; };
 /* End PBXBuildFile section */
 
@@ -51,7 +52,8 @@
 		000010000000000000000011 /* UnivISImportView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Views/Sync/UnivISImportView.swift"; sourceTree = "<group>"; };
 		000010000000000000000012 /* AppState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Services/AppState.swift"; sourceTree = "<group>"; };
 		000010000000000000000013 /* OptimizerEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Services/OptimizerEngine.swift"; sourceTree = "<group>"; };
-		000010000000000000000014 /* UnivISParser.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Services/UnivISParser.swift"; sourceTree = "<group>"; };
+		000010000000000000000014 /* SyncService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Services/SyncService.swift"; sourceTree = "<group>"; };
+		000010000000000000000015 /* UnivISParser.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Services/UnivISParser.swift"; sourceTree = "<group>"; };
 		0000100000000000000003E7 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		0000100000000000000003E6 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -97,7 +99,8 @@
 				000010000000000000000011 /* UnivISImportView.swift */,
 				000010000000000000000012 /* AppState.swift */,
 				000010000000000000000013 /* OptimizerEngine.swift */,
-				000010000000000000000014 /* UnivISParser.swift */,
+				000010000000000000000014 /* SyncService.swift */,
+				000010000000000000000015 /* UnivISParser.swift */,
 				0000100000000000000003E7 /* Assets.xcassets */,
 				0000100000000000000003E6 /* Info.plist */,
 			);
@@ -199,7 +202,8 @@
 				000020000000000000000011 /* UnivISImportView.swift in Sources */,
 				000020000000000000000012 /* AppState.swift in Sources */,
 				000020000000000000000013 /* OptimizerEngine.swift in Sources */,
-				000020000000000000000014 /* UnivISParser.swift in Sources */,
+				000020000000000000000014 /* SyncService.swift in Sources */,
+				000020000000000000000015 /* UnivISParser.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
