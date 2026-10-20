@@ -343,14 +343,19 @@ def execute_enrollment_job(job_id: str, simulate_first_choice_full: bool = False
             })
 
         else:
-            job["status"] = "failed"
+            is_locked = bool(live_res.get("is_locked", False) or live_res.get("status") == "locked")
+            job["status"] = "locked" if is_locked else "failed"
+            job["is_locked"] = is_locked
+            job["open_date"] = live_res.get("open_date")
             job["completed_at"] = datetime.now().strftime("%H:%M:%S")
-            job["result_message"] = live_res.get("message") or "Einschreibung fehlgeschlagen."
+            job["result_message"] = live_res.get("message") or (
+                "Anmeldung noch nicht freigeschaltet." if is_locked else "Einschreibung fehlgeschlagen."
+            )
 
         save_state(APP_STATE)
 
-    # Automatically close Google Chrome as requested once the enrollment order is fulfilled (outside of lock)
-    if live_res.get("ok"):
+    # Automatically close Google Chrome as requested once the enrollment order is fulfilled or locked (outside of lock)
+    if live_res.get("ok") or live_res.get("is_locked") or live_res.get("status") == "locked":
         time.sleep(1.0)
         session_mgr.close_browser()
         with STATE_LOCK:

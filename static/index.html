@@ -534,6 +534,58 @@
     </div>
   </div>
 
+  <!-- MODAL 6: ENROLLMENT LOCKED / NOT YET OPEN NOTIFICATION POPUP -->
+  <div id="modalEnrollmentLocked" class="modal-backdrop hidden">
+    <div class="modal modal-locked-notification">
+      <div class="modal-header locked-header">
+        <div class="locked-header-badge">
+          <span class="lock-icon">⏳</span>
+          <div>
+            <h3>Anmeldung noch nicht freigeschaltet</h3>
+            <p class="subtitle-modal">Übungsgruppen von den Dozenten noch nicht eröffnet</p>
+          </div>
+        </div>
+        <button class="btn-close" data-close="modalEnrollmentLocked">&times;</button>
+      </div>
+      <div class="modal-body locked-body">
+        <div class="locked-card">
+          <div class="locked-badge-pill" id="lockedPlatformPill">⚡ Moodle (elearn.informatik.uni-kiel.de)</div>
+          <h4 class="locked-course-title" id="lockedCourseTitle">infEInf-02a: Einführung in die Informatik</h4>
+
+          <div class="locked-status-banner">
+            <span class="lock-indicator-pill">🔒 GESPERRT</span>
+            <div id="lockedDateNotice" class="locked-date-text">
+              Freischaltung erst am: <strong>Freitag, 23. Oktober 2026, 14:00 Uhr</strong>
+            </div>
+          </div>
+
+          <div class="locked-explanation">
+            <p>
+              UNIBODY hat den Reiter <strong>„Übungsgruppen“</strong> aufgerufen und live geprüft: Die Dozenten haben das Wahl-Formular für dieses Modul noch nicht aktiviert.
+            </p>
+            <p>
+              Sobald die Dozenten die Gruppen freischalten, ist UNIBODY sofort einsatzbereit und trägt dich in Millisekunden in deine Wunschgruppe ein!
+            </p>
+          </div>
+
+          <div class="chrome-closed-notice">
+            <span class="pulse-indicator amber"></span>
+            <div>
+              <strong>Google Chrome wurde sicher beendet.</strong>
+              <p>Auftragsprüfung abgeschlossen – Browser-Tabs wurden geschlossen und Ressourcen freigegeben.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-ghost" data-close="modalEnrollmentLocked">Schließen</button>
+        <button type="button" class="btn btn-secondary" id="btnLockedArmCountdown" data-close="modalEnrollmentLocked">
+          ⏱️ Zur Kurs-Auswahl
+        </button>
+      </div>
+    </div>
+  </div>
+
   <script src="/app.js"></script>
 </body>
 </html>

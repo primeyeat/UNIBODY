@@ -2322,31 +2322,140 @@ setTimeout(runUnibodyAutoFill, 2200);
                 enrol_res = cdp_eval(ws, enrol_submit_js)
                 self.add_log("INFO", f"💻 Moodle Selbsteinschreibung: {enrol_res}")
                 time.sleep(2.0)
-            elif "elearn.informatik.uni-kiel.de" in current_url and "course/view.php" not in current_url and "mod/choicegroup" not in current_url:
-                self._cdp_send_command(ws, "Page.navigate", {"url": course_url})
-                time.sleep(2.0)
+            elif "elearn.informatik.uni-kiel.de" in current_url:
+                check_wrong_choice_js = """
+                (function() {
+                    const txt = ((document.querySelector('#region-main, main')?.innerText || '') + ' ' + document.title).toLowerCase();
+                    return txt.includes('auswahl eures moduls') || txt.includes('abgabegruppe') || txt.includes('kleingruppen für abgaben');
+                })()
+                """
+                is_wrong_choice = bool(cdp_eval(ws, check_wrong_choice_js))
+                if is_wrong_choice or ("course/view.php" not in current_url and "mod/choicegroup" not in current_url):
+                    self._cdp_send_command(ws, "Page.navigate", {"url": course_url})
+                    time.sleep(2.0)
 
-            # Check if choicegroup view needs to be opened
+            # Check and navigate specifically to Übungsgruppen choicegroup
             cg_nav_js = """
             (function() {
-                if (location.href.includes('mod/choicegroup/view.php') || location.href.includes('mod/choice/view.php')) {
-                    return 'ALREADY_ON_CHOICEGROUP';
+                const isAlreadyCg = location.href.includes('mod/choicegroup/view.php') || location.href.includes('mod/choice/view.php');
+                const curText = ((document.querySelector('#region-main, main')?.innerText || '') + ' ' + document.title).toLowerCase();
+                const isOnWrongChoice = isAlreadyCg && (curText.includes('auswahl eures moduls') || curText.includes('kleingruppen für abgaben') || curText.includes('abgabe'));
+
+                const links = Array.from(document.querySelectorAll('a[href*="mod/choicegroup/view.php"], a[href*="mod/choice/view.php"]'));
+                function scoreLink(a) {
+                    const text = ((a.innerText || '') + ' ' + (a.getAttribute('title') || '')).toLowerCase();
+                    const parentText = (a.closest('.activityitem, .activity, li.section, .content, .mod-indent-outer')?.innerText || '').toLowerCase();
+                    const combined = text + ' ' + parentText;
+                    if (combined.includes('auswahl eures moduls') || combined.includes('modulwahl') || combined.includes('modul')) return -999;
+                    if (combined.includes('kleingruppe für abgabe') || combined.includes('kleingruppen für abgaben') || combined.includes('abgabegruppe')) return -999;
+                    if (combined.includes('klausur') || combined.includes('prüfung')) return -500;
+                    let s = 0;
+                    if (combined.includes('übungsgruppe') || combined.includes('übungsgruppen')) s += 100;
+                    if (combined.includes('anmeldung zu den übungsgruppen') || combined.includes('anmeldung zur übung')) s += 120;
+                    if (combined.includes('tutorium') || combined.includes('tutorien')) s += 80;
+                    if (combined.includes('group choice') && (combined.includes('übung') || combined.includes('tutorial'))) s += 90;
+                    if (text.includes('übung') && !text.includes('abgabe')) s += 50;
+                    return s;
                 }
-                const a = document.querySelector('a[href*="mod/choicegroup/view.php"], a[href*="mod/choice/view.php"]');
-                if (a) {
-                    const u = a.href;
-                    location.href = u;
-                    return 'NAVIGATING_TO:' + u;
+
+                let bestLink = null;
+                let maxScore = 0;
+                for (const a of links) {
+                    const s = scoreLink(a);
+                    if (s > maxScore) {
+                        maxScore = s;
+                        bestLink = a;
+                    }
                 }
-                return 'NO_CHOICEGROUP_LINK_FOUND';
+
+                if (bestLink && maxScore > 0) {
+                    const targetUrl = bestLink.href;
+                    if (!isAlreadyCg || isOnWrongChoice || location.href !== targetUrl) {
+                        location.href = targetUrl;
+                        return JSON.stringify({ action: 'NAVIGATE', url: targetUrl, title: (bestLink.innerText || '').trim(), score: maxScore });
+                    }
+                    return JSON.stringify({ action: 'ALREADY_ON_CORRECT_CHOICEGROUP', url: location.href, score: maxScore });
+                }
+
+                // Fallback: check section links e.g. "Organisation + Übungsbetrieb"
+                const secLinks = Array.from(document.querySelectorAll('a[href*="course/section.php"]')).filter(a => {
+                    const t = (a.innerText || '').toLowerCase();
+                    return t.includes('übung') || t.includes('organisation');
+                });
+                if (secLinks.length > 0 && !isAlreadyCg) {
+                    const targetUrl = secLinks[0].href;
+                    location.href = targetUrl;
+                    return JSON.stringify({ action: 'NAVIGATE_SECTION', url: targetUrl, title: (secLinks[0].innerText || '').trim() });
+                }
+
+                return JSON.stringify({ action: isAlreadyCg ? 'ON_CHOICEGROUP' : 'NO_LINK_FOUND', url: location.href });
             })()
             """
-            cg_nav_res = cdp_eval(ws, cg_nav_js)
-            if "NAVIGATING_TO" in str(cg_nav_res):
-                self.add_log("INFO", f"💻 Moodle: Öffne Gruppenwahl: {cg_nav_res}...")
-                time.sleep(2.0)
+            cg_nav_raw = cdp_eval(ws, cg_nav_js)
+            nav_data = json.loads(cg_nav_raw) if cg_nav_raw else {}
+            if nav_data.get("action") == "NAVIGATE":
+                self.add_log("INFO", f"💻 Moodle: Öffne Ziel-Aktivität '{nav_data.get('title')}' ({nav_data.get('url')})...")
+                time.sleep(2.5)
+            elif nav_data.get("action") == "NAVIGATE_SECTION":
+                self.add_log("INFO", f"💻 Moodle: Wechsle in Kursabschnitt '{nav_data.get('title')}'...")
+                time.sleep(2.2)
+                # Re-evaluate inside the section
+                cg_nav_raw2 = cdp_eval(ws, cg_nav_js)
+                nav_data2 = json.loads(cg_nav_raw2) if cg_nav_raw2 else {}
+                if nav_data2.get("action") == "NAVIGATE":
+                    self.add_log("INFO", f"💻 Moodle: Öffne Ziel-Aktivität '{nav_data2.get('title')}'...")
+                    time.sleep(2.5)
 
-            # Scrape choicegroup rows
+            # Check if this exercise group choice is LOCKED / NOT YET OPEN
+            check_locked_js = """
+            (function() {
+                const mainEl = document.querySelector('#region-main, main, body');
+                const text = (mainEl ? mainEl.innerText : '').replace(/\\s+/g, ' ');
+                const isNotAvailable = /not available until|nicht verfügbar|noch nicht geöffnet|gesperrt bis|opens:/i.test(text);
+                const hasSubmitBtn = !!document.querySelector('input[type="submit"][name="submitbutton"], button[type="submit"], input[value*="speichern" i]');
+                const rows = Array.from(document.querySelectorAll('#region-main table tr.option, table tr.option, form table tr')).filter(tr => !!tr.querySelector('input[type="radio"], input[type="checkbox"]'));
+
+                let lockDate = '';
+                const mOpen = text.match(/(?:Opens|Öffnet|not available until|nicht verfügbar bis zum|gesperrt bis zum|verfügbar ab)[:\\s]+([^.,\\n\\r]+(?:202\\d|PM|AM|Uhr)[^.,\\n\\r]*)/i);
+                if (mOpen) {
+                    lockDate = mOpen[1].trim();
+                } else {
+                    const mAlt = text.match(/(?:Friday|Saturday|Sunday|Monday|Tuesday|Wednesday|Thursday|Freitag|Samstag|Sonntag|Montag|Dienstag|Mittwoch|Donnerstag)[\\s,]+(\\d{1,2}\\.?\\s+(?:October|Oktober|November|Dezember|December)\\s+202\\d[^\\n.,]*)/i);
+                    if (mAlt) lockDate = mAlt[0].trim();
+                }
+
+                const isLocked = (!hasSubmitBtn && rows.length === 0 && (isNotAvailable || !!lockDate)) ||
+                                 (text.includes('Sorry, this activity is not available') || text.includes('Diese Abstimmung ist noch nicht geöffnet'));
+
+                return JSON.stringify({
+                    isLocked: isLocked,
+                    lockDate: lockDate || 'Freitag, 23. Oktober 2026, 14:00 Uhr',
+                    hasSubmitBtn: hasSubmitBtn,
+                    rowCount: rows.length,
+                    title: document.title,
+                    url: location.href
+                });
+            })()
+            """
+            locked_raw = cdp_eval(ws, check_locked_js)
+            lock_info = json.loads(locked_raw) if locked_raw else {}
+            if lock_info.get("isLocked"):
+                lock_date = lock_info.get("lockDate") or "Freitag, 23. Oktober 2026, 14:00 Uhr"
+                self.add_log(
+                    "WARN",
+                    f"⏳ [elearn.informatik] Übungsgruppen-Anmeldung noch nicht freigeschaltet: Gesperrt bis {lock_date} (Dozenten-Freischaltung ausstehend)."
+                )
+                self.close_browser()
+                return {
+                    "ok": False,
+                    "status": "locked",
+                    "is_locked": True,
+                    "open_date": lock_date,
+                    "platform_host": platform_host,
+                    "message": f"Anmeldung von den Dozenten noch nicht freigeschaltet (Gesperrt bis: {lock_date}).",
+                }
+
+            # Scrape choicegroup rows (when registration IS unlocked)
             scrape_moodle_js = """
             (function() {
                 const rows = Array.from(document.querySelectorAll('#region-main table tr.option, table tr.option, form table tr'));
@@ -2387,9 +2496,13 @@ setTimeout(runUnibodyAutoFill, 2200);
                 target_token = m_pnum.group(1).lower() if m_pnum else None
                 for opt in live_options:
                     opt_name_low = (opt.get("name") or "").lower()
-                    if target_token and target_token in opt_name_low:
-                        return opt
-                    if any(t in opt_name_low for t in p_name_low.split() if len(t) >= 4):
+                    if target_token:
+                        m_opt_num = re.search(r"(?:gruppe|gr\.?|übung|tutorium)\s*0*(\d+[a-zA-Z]?)", opt_name_low)
+                        if m_opt_num and m_opt_num.group(1).lower() == target_token:
+                            return opt
+                        if re.search(rf"\b0*{re.escape(target_token)}\b", opt_name_low):
+                            return opt
+                    if any(t in opt_name_low for t in p_name_low.split() if len(t) >= 5 and t not in ["übung", "gruppe", "informatik", "mathematik", "uhr", "modul"]):
                         return opt
                 return None
 

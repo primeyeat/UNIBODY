@@ -98,10 +98,10 @@ async function fetchInitialState() {
   renderLogs(data.logs || []);
   updateBrowserBadge(data.browser_status);
 
-  // Mark existing completed jobs as already acknowledged so no old popup shows on initial load
+  // Mark existing completed and locked jobs as already acknowledged so no old popup shows on initial load
   if (data.jobs && Array.isArray(data.jobs)) {
     data.jobs.forEach((j) => {
-      if (j.status === "completed" && j.job_id) {
+      if ((j.status === "completed" || j.status === "locked") && j.job_id) {
         sessionStorage.setItem(`notified_job_${j.job_id}`, "1");
       }
     });
@@ -933,6 +933,18 @@ function bindUIEvents() {
     });
   }
 
+  // Enrollment locked modal: button handler
+  const btnLockedArmCountdown = document.getElementById("btnLockedArmCountdown");
+  if (btnLockedArmCountdown) {
+    btnLockedArmCountdown.addEventListener("click", () => {
+      document.getElementById("modalEnrollmentLocked").classList.add("hidden");
+      const step3Card = document.querySelector(".left-panel");
+      if (step3Card) {
+        step3Card.scrollIntoView({ behavior: "smooth", block: "start" });
+      }
+    });
+  }
+
   // Add Manual Schedule Event
   document.getElementById("formAddEvent").addEventListener("submit", async (e) => {
     e.preventDefault();
@@ -1116,13 +1128,111 @@ async function pollTelemetry() {
           sessionStorage.setItem(notifKey, "1");
           showEnrollmentSuccessModal(latest);
         }
+      } else if (latest.status === "locked") {
+        badge.className = "status-pill";
+        badge.style.background = "linear-gradient(180deg, #ffe082 0%, #ffb300 100%)";
+        badge.style.color = "#5c2e00";
+        badge.textContent = `⏳ ${latest.result_message}`;
+
+        // Show enrollment locked notification modal if not already notified
+        const notifKey = `notified_job_${latest.job_id}`;
+        if (!sessionStorage.getItem(notifKey)) {
+          sessionStorage.setItem(notifKey, "1");
+          showEnrollmentLockedModal(latest);
+        }
       } else if (latest.status === "running" || latest.status === "armed") {
         badge.className = "status-pill";
+        badge.style.background = "";
+        badge.style.color = "";
         badge.textContent = `⚡ ${latest.result_message}`;
+      } else if (latest.status === "failed") {
+        badge.className = "status-pill";
+        badge.style.background = "linear-gradient(180deg, #ffcdd2 0%, #ef5350 100%)";
+        badge.style.color = "#491212";
+        badge.textContent = `❌ ${latest.result_message}`;
       }
     }
   } catch (e) {
     // Ignore transient network errors
+  }
+}
+
+function showEnrollmentLockedModal(job) {
+  if (!job) return;
+  const host = job.platform_host || (job.course_url ? new URL(job.course_url).host : "elearn.informatik.uni-kiel.de");
+
+  // Platform pill
+  const pillEl = document.getElementById("lockedPlatformPill");
+  if (pillEl) {
+    if (host.includes("elearn")) {
+      pillEl.textContent = `⚡ Moodle (${host})`;
+    } else {
+      pillEl.textContent = `🏛️ OpenOlat (${host})`;
+    }
+  }
+
+  // Course Title
+  const courseObj = (appState.catalog || []).find(
+    (c) => c.course_id.toLowerCase() === (job.course_id || "").toLowerCase()
+  ) || appState.currentCourse;
+  const titleEl = document.getElementById("lockedCourseTitle");
+  if (titleEl) {
+    const fullTitle = job.course_title || (courseObj ? courseObj.title : job.course_id);
+    titleEl.textContent = `${fullTitle} (${job.course_id || ""})`;
+  }
+
+  // Lock Date Notice
+  const dateEl = document.getElementById("lockedDateNotice");
+  if (dateEl) {
+    const dateText = job.open_date || "Freitag, 23. Oktober 2026, 14:00 Uhr";
+    dateEl.innerHTML = `Freischaltung erst am: <strong>${dateText}</strong>`;
+  }
+
+  // Display Modal
+  const modal = document.getElementById("modalEnrollmentLocked");
+  if (modal) {
+    modal.classList.remove("hidden");
+  }
+
+  // Play gentle attention chime
+  playLockedNoticeChime();
+}
+
+function playLockedNoticeChime() {
+  try {
+    const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+    if (!AudioContextClass) return;
+    const ctx = new AudioContextClass();
+    if (ctx.state === "suspended") ctx.resume();
+    const now = ctx.currentTime;
+
+    // Note 1: F4 (349.23 Hz)
+    const osc1 = ctx.createOscillator();
+    const gain1 = ctx.createGain();
+    osc1.type = "sine";
+    osc1.frequency.setValueAtTime(349.23, now);
+    gain1.gain.setValueAtTime(0, now);
+    gain1.gain.linearRampToValueAtTime(0.20, now + 0.05);
+    gain1.gain.exponentialRampToValueAtTime(0.001, now + 0.50);
+    osc1.connect(gain1);
+    gain1.connect(ctx.destination);
+    osc1.start(now);
+    osc1.stop(now + 0.50);
+
+    // Note 2: A4 (440.00 Hz)
+    const osc2 = ctx.createOscillator();
+    const gain2 = ctx.createGain();
+    osc2.type = "sine";
+    osc2.frequency.setValueAtTime(440.00, now + 0.15);
+    gain2.gain.setValueAtTime(0, now + 0.15);
+    gain2.gain.linearRampToValueAtTime(0.22, now + 0.20);
+    gain2.gain.exponentialRampToValueAtTime(0.001, now + 0.80);
+    osc2.connect(gain2);
+    gain2.connect(ctx.destination);
+    osc2.start(now + 0.15);
+    osc2.stop(now + 0.80);
+  } catch (e) {
+    console.debug("Web Audio chime could not play:", e);
   }
 }
 
