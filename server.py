@@ -41,6 +41,20 @@ session_mgr = CAUBrowserSessionManager(profile_dir=CHROME_PROFILE_DIR)
 
 DEFAULT_SCHEDULE = [
     {
+        "id": "lec-infrecht-1",
+        "course_id": "Inf-InfRecht",
+        "univis_id": "080103",
+        "title": "VL Inf-InfRecht [#080103]: Informatikrecht (14-tägig)",
+        "day": 0,
+        "day_name": "Montag",
+        "start_time": "10:15",
+        "end_time": "11:45",
+        "room": "CAP3 - Hörsaal 3",
+        "type": "lecture",
+        "week_type": "A",
+        "enabled": True,
+    },
+    {
         "id": "lec-einf-1",
         "course_id": "infEInf-02a",
         "univis_id": "080058",

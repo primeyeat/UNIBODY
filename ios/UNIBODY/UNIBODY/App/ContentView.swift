@@ -21,6 +21,11 @@ public struct ContentView: View {
                 .tabItem {
                     Label("Sniper", systemImage: "cross.circle.fill")
                 }
+            
+            SettingsLoginView()
+                .tabItem {
+                    Label("Login & Tresor", systemImage: "key.fill")
+                }
         }
         .environmentObject(appState)
         .tint(AeroTheme.skyBlue)

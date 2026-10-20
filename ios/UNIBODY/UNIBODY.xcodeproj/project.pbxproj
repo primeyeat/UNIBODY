@@ -14,18 +14,19 @@
 		000020000000000000000005 /* ScheduleEvent.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000010000000000000000005 /* ScheduleEvent.swift */; };
 		000020000000000000000006 /* SniperJob.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000010000000000000000006 /* SniperJob.swift */; };
 		000020000000000000000007 /* AeroTheme.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000010000000000000000007 /* AeroTheme.swift */; };
-		000020000000000000000008 /* AddEventSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000010000000000000000008 /* AddEventSheet.swift */; };
-		000020000000000000000009 /* ScheduleEventCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000010000000000000000009 /* ScheduleEventCard.swift */; };
-		00002000000000000000000A /* ScheduleView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00001000000000000000000A /* ScheduleView.swift */; };
-		00002000000000000000000B /* AeroBadge.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00001000000000000000000B /* AeroBadge.swift */; };
-		00002000000000000000000C /* CapacityPill.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00001000000000000000000C /* CapacityPill.swift */; };
-		00002000000000000000000D /* CourseDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00001000000000000000000D /* CourseDetailView.swift */; };
-		00002000000000000000000E /* CoursesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00001000000000000000000E /* CoursesView.swift */; };
-		00002000000000000000000F /* SniperDashboardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00001000000000000000000F /* SniperDashboardView.swift */; };
-		000020000000000000000010 /* UnivISImportView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000010000000000000000010 /* UnivISImportView.swift */; };
-		000020000000000000000011 /* AppState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000010000000000000000011 /* AppState.swift */; };
-		000020000000000000000012 /* OptimizerEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000010000000000000000012 /* OptimizerEngine.swift */; };
-		000020000000000000000013 /* UnivISParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000010000000000000000013 /* UnivISParser.swift */; };
+		000020000000000000000008 /* SettingsLoginView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000010000000000000000008 /* SettingsLoginView.swift */; };
+		000020000000000000000009 /* AddEventSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000010000000000000000009 /* AddEventSheet.swift */; };
+		00002000000000000000000A /* ScheduleEventCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00001000000000000000000A /* ScheduleEventCard.swift */; };
+		00002000000000000000000B /* ScheduleView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00001000000000000000000B /* ScheduleView.swift */; };
+		00002000000000000000000C /* AeroBadge.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00001000000000000000000C /* AeroBadge.swift */; };
+		00002000000000000000000D /* CapacityPill.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00001000000000000000000D /* CapacityPill.swift */; };
+		00002000000000000000000E /* CourseDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00001000000000000000000E /* CourseDetailView.swift */; };
+		00002000000000000000000F /* CoursesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00001000000000000000000F /* CoursesView.swift */; };
+		000020000000000000000010 /* SniperDashboardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000010000000000000000010 /* SniperDashboardView.swift */; };
+		000020000000000000000011 /* UnivISImportView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000010000000000000000011 /* UnivISImportView.swift */; };
+		000020000000000000000012 /* AppState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000010000000000000000012 /* AppState.swift */; };
+		000020000000000000000013 /* OptimizerEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000010000000000000000013 /* OptimizerEngine.swift */; };
+		000020000000000000000014 /* UnivISParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000010000000000000000014 /* UnivISParser.swift */; };
 		0000200000000000000003E7 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 0000100000000000000003E7 /* Assets.xcassets */; };
 /* End PBXBuildFile section */
 
@@ -38,18 +39,19 @@
 		000010000000000000000005 /* ScheduleEvent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Models/ScheduleEvent.swift"; sourceTree = "<group>"; };
 		000010000000000000000006 /* SniperJob.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Models/SniperJob.swift"; sourceTree = "<group>"; };
 		000010000000000000000007 /* AeroTheme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Theme/AeroTheme.swift"; sourceTree = "<group>"; };
-		000010000000000000000008 /* AddEventSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Views/Schedule/AddEventSheet.swift"; sourceTree = "<group>"; };
-		000010000000000000000009 /* ScheduleEventCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Views/Schedule/ScheduleEventCard.swift"; sourceTree = "<group>"; };
-		00001000000000000000000A /* ScheduleView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Views/Schedule/ScheduleView.swift"; sourceTree = "<group>"; };
-		00001000000000000000000B /* AeroBadge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Views/Components/AeroBadge.swift"; sourceTree = "<group>"; };
-		00001000000000000000000C /* CapacityPill.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Views/Components/CapacityPill.swift"; sourceTree = "<group>"; };
-		00001000000000000000000D /* CourseDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Views/Courses/CourseDetailView.swift"; sourceTree = "<group>"; };
-		00001000000000000000000E /* CoursesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Views/Courses/CoursesView.swift"; sourceTree = "<group>"; };
-		00001000000000000000000F /* SniperDashboardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Views/Sniper/SniperDashboardView.swift"; sourceTree = "<group>"; };
-		000010000000000000000010 /* UnivISImportView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Views/Sync/UnivISImportView.swift"; sourceTree = "<group>"; };
-		000010000000000000000011 /* AppState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Services/AppState.swift"; sourceTree = "<group>"; };
-		000010000000000000000012 /* OptimizerEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Services/OptimizerEngine.swift"; sourceTree = "<group>"; };
-		000010000000000000000013 /* UnivISParser.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Services/UnivISParser.swift"; sourceTree = "<group>"; };
+		000010000000000000000008 /* SettingsLoginView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Views/Settings/SettingsLoginView.swift"; sourceTree = "<group>"; };
+		000010000000000000000009 /* AddEventSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Views/Schedule/AddEventSheet.swift"; sourceTree = "<group>"; };
+		00001000000000000000000A /* ScheduleEventCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Views/Schedule/ScheduleEventCard.swift"; sourceTree = "<group>"; };
+		00001000000000000000000B /* ScheduleView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Views/Schedule/ScheduleView.swift"; sourceTree = "<group>"; };
+		00001000000000000000000C /* AeroBadge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Views/Components/AeroBadge.swift"; sourceTree = "<group>"; };
+		00001000000000000000000D /* CapacityPill.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Views/Components/CapacityPill.swift"; sourceTree = "<group>"; };
+		00001000000000000000000E /* CourseDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Views/Courses/CourseDetailView.swift"; sourceTree = "<group>"; };
+		00001000000000000000000F /* CoursesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Views/Courses/CoursesView.swift"; sourceTree = "<group>"; };
+		000010000000000000000010 /* SniperDashboardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Views/Sniper/SniperDashboardView.swift"; sourceTree = "<group>"; };
+		000010000000000000000011 /* UnivISImportView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Views/Sync/UnivISImportView.swift"; sourceTree = "<group>"; };
+		000010000000000000000012 /* AppState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Services/AppState.swift"; sourceTree = "<group>"; };
+		000010000000000000000013 /* OptimizerEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Services/OptimizerEngine.swift"; sourceTree = "<group>"; };
+		000010000000000000000014 /* UnivISParser.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Services/UnivISParser.swift"; sourceTree = "<group>"; };
 		0000100000000000000003E7 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		0000100000000000000003E6 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -83,18 +85,19 @@
 				000010000000000000000005 /* ScheduleEvent.swift */,
 				000010000000000000000006 /* SniperJob.swift */,
 				000010000000000000000007 /* AeroTheme.swift */,
-				000010000000000000000008 /* AddEventSheet.swift */,
-				000010000000000000000009 /* ScheduleEventCard.swift */,
-				00001000000000000000000A /* ScheduleView.swift */,
-				00001000000000000000000B /* AeroBadge.swift */,
-				00001000000000000000000C /* CapacityPill.swift */,
-				00001000000000000000000D /* CourseDetailView.swift */,
-				00001000000000000000000E /* CoursesView.swift */,
-				00001000000000000000000F /* SniperDashboardView.swift */,
-				000010000000000000000010 /* UnivISImportView.swift */,
-				000010000000000000000011 /* AppState.swift */,
-				000010000000000000000012 /* OptimizerEngine.swift */,
-				000010000000000000000013 /* UnivISParser.swift */,
+				000010000000000000000008 /* SettingsLoginView.swift */,
+				000010000000000000000009 /* AddEventSheet.swift */,
+				00001000000000000000000A /* ScheduleEventCard.swift */,
+				00001000000000000000000B /* ScheduleView.swift */,
+				00001000000000000000000C /* AeroBadge.swift */,
+				00001000000000000000000D /* CapacityPill.swift */,
+				00001000000000000000000E /* CourseDetailView.swift */,
+				00001000000000000000000F /* CoursesView.swift */,
+				000010000000000000000010 /* SniperDashboardView.swift */,
+				000010000000000000000011 /* UnivISImportView.swift */,
+				000010000000000000000012 /* AppState.swift */,
+				000010000000000000000013 /* OptimizerEngine.swift */,
+				000010000000000000000014 /* UnivISParser.swift */,
 				0000100000000000000003E7 /* Assets.xcassets */,
 				0000100000000000000003E6 /* Info.plist */,
 			);
@@ -184,18 +187,19 @@
 				000020000000000000000005 /* ScheduleEvent.swift in Sources */,
 				000020000000000000000006 /* SniperJob.swift in Sources */,
 				000020000000000000000007 /* AeroTheme.swift in Sources */,
-				000020000000000000000008 /* AddEventSheet.swift in Sources */,
-				000020000000000000000009 /* ScheduleEventCard.swift in Sources */,
-				00002000000000000000000A /* ScheduleView.swift in Sources */,
-				00002000000000000000000B /* AeroBadge.swift in Sources */,
-				00002000000000000000000C /* CapacityPill.swift in Sources */,
-				00002000000000000000000D /* CourseDetailView.swift in Sources */,
-				00002000000000000000000E /* CoursesView.swift in Sources */,
-				00002000000000000000000F /* SniperDashboardView.swift in Sources */,
-				000020000000000000000010 /* UnivISImportView.swift in Sources */,
-				000020000000000000000011 /* AppState.swift in Sources */,
-				000020000000000000000012 /* OptimizerEngine.swift in Sources */,
-				000020000000000000000013 /* UnivISParser.swift in Sources */,
+				000020000000000000000008 /* SettingsLoginView.swift in Sources */,
+				000020000000000000000009 /* AddEventSheet.swift in Sources */,
+				00002000000000000000000A /* ScheduleEventCard.swift in Sources */,
+				00002000000000000000000B /* ScheduleView.swift in Sources */,
+				00002000000000000000000C /* AeroBadge.swift in Sources */,
+				00002000000000000000000D /* CapacityPill.swift in Sources */,
+				00002000000000000000000E /* CourseDetailView.swift in Sources */,
+				00002000000000000000000F /* CoursesView.swift in Sources */,
+				000020000000000000000010 /* SniperDashboardView.swift in Sources */,
+				000020000000000000000011 /* UnivISImportView.swift in Sources */,
+				000020000000000000000012 /* AppState.swift in Sources */,
+				000020000000000000000013 /* OptimizerEngine.swift in Sources */,
+				000020000000000000000014 /* UnivISParser.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
