@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>CAU Kiel · LMS Kurs-Sniper & Stundenplan-Optimizer</title>
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+  <!-- TOP HEADER -->
+  <header class="topbar">
+    <div class="brand">
+      <div class="cau-crest">CAU</div>
+      <div>
+        <h1>CAU Kiel · LMS Kurs-Sniper &amp; Optimizer</h1>
+        <p class="subtitle">Exakte Kurs-ID-Verifikation · Stundenplan-Kollisionsschutz · Sekundengenaue Übungsgruppen-Wahl auf <code>lms.uni-kiel.de</code></p>
+      </div>
+    </div>
+
+    <div class="session-controls">
+      <div id="ssoBadge" class="sso-badge disconnected">
+        <span class="dot"></span>
+        <span id="ssoStatusText">Shibboleth SSO: Bereit</span>
+      </div>
+      <button id="btnLaunchBrowser" class="btn btn-outline" title="Öffnet ein sichtbares Google Chrome Fenster für deinen CAU Single Sign-On Login">
+        🌐 CAU Login-Browser starten (SSO)
+      </button>
+    </div>
+  </header>
+
+  <!-- MAIN WORKSPACE GRID -->
+  <main class="workspace">
+    <!-- LEFT COLUMN: COURSE ID SNIPER + PREFERENCES + RANKED GROUPS -->
+    <section class="left-panel">
+      <!-- 1. STRICT COURSE ID LOOKUP CARD -->
+      <div class="card highlight-card">
+        <div class="card-header">
+          <div>
+            <span class="step-pill">SCHRITT 1</span>
+            <h2>Kurs-ID / UnivIS-Kennung / LMS-Code eingeben</h2>
+          </div>
+          <button id="btnOpenCustomCourseModal" class="btn btn-xs btn-ghost">+ Eigenen LMS-Kurs anlegen</button>
+        </div>
+
+        <p class="helper-text">
+          Gib den <strong>Wirtschaftsinformatik-Modulcode</strong> (z.&nbsp;B. <code>infEWInf-01a</code>, <code>infEInf-01a</code>, <code>Inf-Math-A</code>, <code>BWL-EinfBWL</code>), die <strong>UnivIS-Kennnummer</strong> (z.&nbsp;B. <code>080241</code>) oder die <strong>OpenOlat Repository-ID / URL</strong> ein.
+          <em>Sicherheits-Garantie:</em> Der Bot prüft die exakte Kennung und blockiert ungenaue Namens-Treffer.
+        </p>
+
+        <div class="search-bar">
+          <input
+            type="text"
+            id="courseQueryInput"
+            placeholder="z. B. infEWInf-01a, infEInf-01a, Inf-Math-A, BWL-EinfBWL, Inf-InfRecht..."
+            value="infEWInf-01a"
+            autocomplete="off"
+          />
+          <button id="btnVerifyCourse" class="btn btn-primary">
+            🔍 Kurs verifizieren &amp; berechnen
+          </button>
+        </div>
+
+        <!-- Quick-Select Verified CAU Courses -->
+        <div class="quick-chips" id="catalogChips"></div>
+
+        <!-- Verification Banner -->
+        <div id="verificationBanner" class="verification-banner hidden"></div>
+      </div>
+
+      <!-- 2. OPTIMIZER WEIGHTS & PREFERENCES CARD -->
+      <div class="card">
+        <div class="card-header">
+          <div>
+            <span class="step-pill">SCHRITT 2</span>
+            <h2>Optimierungs-Gewichtung (Dein perfekter Stundenplan)</h2>
+          </div>
+          <span class="live-recalc-tag">⚡ Live-Berechnung aktiv</span>
+        </div>
+
+        <div class="sliders-grid">
+          <div class="slider-item">
+            <div class="slider-label">
+              <span>🧲 Kompakte Tage (Minimale Freistunden)</span>
+              <strong id="valCompact">85%</strong>
+            </div>
+            <input type="range" id="sliderCompact" min="0" max="100" value="85" />
+          </div>
+
+          <div class="slider-item">
+            <div class="slider-label">
+              <span>🏖️ Freie Tage komplett freihalten</span>
+              <strong id="valFreeDays">80%</strong>
+            </div>
+            <input type="range" id="sliderFreeDays" min="0" max="100" value="80" />
+          </div>
+
+          <div class="slider-item">
+            <div class="slider-label">
+              <span>⏰ Wunsch-Zeitfenster einhalten</span>
+              <strong id="valTimeWindow">70%</strong>
+            </div>
+            <input type="range" id="sliderTimeWindow" min="0" max="100" value="70" />
+          </div>
+
+          <div class="slider-item">
+            <div class="slider-label">
+              <span>🏃 Campus-Raumwechsel-Puffer (&ge; 15m c.t.)</span>
+              <strong id="valCampus">50%</strong>
+            </div>
+            <input type="range" id="sliderCampus" min="0" max="100" value="50" />
+          </div>
+        </div>
+
+        <div class="time-pref-row">
+          <div class="field-inline">
+            <label for="prefEarliest">Frühestens ab:</label>
+            <input type="time" id="prefEarliest" value="09:30" />
+          </div>
+          <div class="field-inline">
+            <label for="prefLatest">Spätestens bis:</label>
+            <input type="time" id="prefLatest" value="16:30" />
+          </div>
+          <div class="field-inline free-days-picker">
+            <label>Wunsch-Frei:</label>
+            <div class="day-toggles" id="freeDayToggles">
+              <button type="button" data-day="0" class="day-btn">Mo</button>
+              <button type="button" data-day="1" class="day-btn">Di</button>
+              <button type="button" data-day="2" class="day-btn">Mi</button>
+              <button type="button" data-day="3" class="day-btn">Do</button>
+              <button type="button" data-day="4" class="day-btn active">Fr</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 3. RANKED EXERCISE GROUPS & SNIPER ACTION CARD -->
+      <div class="card">
+        <div class="card-header">
+          <div>
+            <span class="step-pill">SCHRITT 3</span>
+            <h2>Berechnetes Übungsgruppen-Ranking &amp; Auto-Einschreibung</h2>
+          </div>
+          <div class="mode-switch">
+            <label for="enrollModeSelect">Modus:</label>
+            <select id="enrollModeSelect">
+              <option value="sniper">🎯 First-Come-First-Served Sniper (Platz 1 + Auto-Fallback)</option>
+              <option value="priority">📊 Verteilungsverfahren (Prioritäten 1–3 eintragen)</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Action Bar for Sniper / Priority Execution -->
+        <div class="sniper-action-bar">
+          <div class="sniper-options">
+            <label class="checkbox-label" title="Simuliert, dass Wunsch #1 in derselben Sekunde voll wird, sodass der Bot automatisch in Millisekunden Wunsch #2 bucht">
+              <input type="checkbox" id="chkSimulateFallback" />
+              <span>Fallback-Test (Simuliere: Platz #1 ist voll &rarr; buche sofort #2)</span>
+            </label>
+          </div>
+          <div class="sniper-buttons">
+            <button id="btnArmCountdown" class="btn btn-secondary">
+              ⏱️ 5s Countdown-Sniper starten
+            </button>
+            <button id="btnExecuteNow" class="btn btn-accent">
+              ⚡ Jetzt sofort einschreiben (Bestplatz sichern)
+            </button>
+          </div>
+        </div>
+
+        <!-- Ranked Groups List -->
+        <div id="rankedGroupsContainer" class="ranked-groups-list"></div>
+      </div>
+    </section>
+
+    <!-- RIGHT COLUMN: INTERACTIVE WEEKLY SCHEDULE + UNIVIS ICS CLEANER + LIVE LOG -->
+    <section class="right-panel">
+      <!-- WEEKLY TIMETABLE CARD -->
+      <div class="card calendar-card">
+        <div class="card-header">
+          <div>
+            <h2>📅 Dein CAU Wochen-Stundenplan (Live-Kollisions-Vorschau)</h2>
+            <p class="helper-text">
+              Grün gestrichelt = Empfohlene Übungsgruppe (Platz #1) · Rot = Überschneidung · Klicke auf einen Termin zum Löschen oder Pausieren.
+            </p>
+          </div>
+          <div class="calendar-actions">
+            <button id="btnOpenIcsModal" class="btn btn-xs btn-outline">
+              🧹 UnivIS .ics Import &amp; Bereiniger
+            </button>
+            <button id="btnOpenAddEventModal" class="btn btn-xs btn-primary">
+              + Eigener Termin
+            </button>
+          </div>
+        </div>
+
+        <!-- Legend -->
+        <div class="calendar-legend">
+          <span class="legend-item"><i class="swatch lecture"></i> Feste Vorlesung / Termin</span>
+          <span class="legend-item"><i class="swatch enrolled"></i> Bereits eingeschriebene Übung</span>
+          <span class="legend-item"><i class="swatch candidate-best"></i> Top-Empfehlung (#1)</span>
+          <span class="legend-item"><i class="swatch candidate-alt"></i> Alternative (#2 / #3)</span>
+          <span class="legend-item"><i class="swatch candidate-conflict"></i> Zeitkonflikt (Blockiert)</span>
+        </div>
+
+        <!-- Timetable Grid (Mo - Fr, 08:00 - 18:00) -->
+        <div class="timetable-wrapper">
+          <div class="timetable" id="timetableGrid"></div>
+        </div>
+      </div>
+
+      <!-- BOT TELEMETRY & AUDIT LOG -->
+      <div class="card terminal-card">
+        <div class="card-header">
+          <div>
+            <h2>🛡️ Sniper-Telemetrie &amp; Sicherheits-Protokoll</h2>
+          </div>
+          <span id="jobStatusBadge" class="status-pill idle">Bereit</span>
+        </div>
+        <div id="terminalLogs" class="terminal-logs"></div>
+      </div>
+    </section>
+  </main>
+
+  <!-- MODAL 1: ADD MANUAL SCHEDULE BLOCK -->
+  <div id="modalAddEvent" class="modal-backdrop hidden">
+    <div class="modal">
+      <div class="modal-header">
+        <h3>+ Festen Termin zum Stundenplan hinzufügen</h3>
+        <button class="btn-close" data-close="modalAddEvent">&times;</button>
+      </div>
+      <form id="formAddEvent" class="modal-body">
+        <div class="form-group">
+          <label>Bezeichnung (z. B. Vorlesung, Nebenjob, Sport)</label>
+          <input type="text" id="evTitle" placeholder="z. B. VL Algorithmen & Datenstrukturen" required />
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Wochentag</label>
+            <select id="evDay">
+              <option value="0">Montag</option>
+              <option value="1">Dienstag</option>
+              <option value="2">Mittwoch</option>
+              <option value="3">Donnerstag</option>
+              <option value="4">Freitag</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Startzeit (c.t./s.t.)</label>
+            <input type="time" id="evStart" value="10:15" required />
+          </div>
+          <div class="form-group">
+            <label>Endzeit</label>
+            <input type="time" id="evEnd" value="11:45" required />
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Raum / Gebäude (optional)</label>
+          <input type="text" id="evRoom" placeholder="z. B. CAP3 - Hörsaal 1" />
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-ghost" data-close="modalAddEvent">Abbrechen</button>
+          <button type="submit" class="btn btn-primary">Termin speichern</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL 2: UNIVIS ICS SMART IMPORTER & CLEANER -->
+  <div id="modalIcsImport" class="modal-backdrop hidden">
+    <div class="modal modal-large">
+      <div class="modal-header">
+        <h3>🧹 UnivIS .ics Smart-Import &amp; Geistertermin-Filter</h3>
+        <button class="btn-close" data-close="modalIcsImport">&times;</button>
+      </div>
+      <div class="modal-body">
+        <p class="helper-text">
+          Da der <strong>CAU UnivIS-Export (.ics)</strong> oft sämtliche Parallel-Übungsgruppen und Platzhalter gleichzeitig einträgt,
+          erkennt unser Filter diese automatisch und wählt sie vorab ab. Du kannst jeden Termin vor dem Übernehmen einzeln an- oder abwählen!
+        </p>
+
+        <div class="ics-upload-bar">
+          <input type="file" id="icsFileInput" accept=".ics,text/calendar" />
+          <button type="button" id="btnLoadDemoIcs" class="btn btn-xs btn-outline">
+            📄 Typischen CAU UnivIS-Export (mit Geister-Übungen) als Demo laden
+          </button>
+        </div>
+
+        <div id="icsPreviewContainer" class="ics-preview-list">
+          <div class="empty-hint">Wähle eine <code>.ics</code>-Datei aus oder klicke auf „Typischen CAU UnivIS-Export als Demo laden“.</div>
+        </div>
+
+        <div class="modal-footer">
+          <button type="button" class="btn btn-ghost" data-close="modalIcsImport">Schließen</button>
+          <button type="button" id="btnApplyIcsSelection" class="btn btn-primary" disabled>
+            ✅ Ausgewählte Termine in meinen Stundenplan übernehmen
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL 3: CREATE CUSTOM LMS COURSE BY ID -->
+  <div id="modalCustomCourse" class="modal-backdrop hidden">
+    <div class="modal modal-large">
+      <div class="modal-header">
+        <h3>+ Eigenen CAU LMS-Kurs mit exakter ID hinterlegen</h3>
+        <button class="btn-close" data-close="modalCustomCourse">&times;</button>
+      </div>
+      <form id="formCustomCourse" class="modal-body">
+        <p class="helper-text">
+          Hinterlege hier beliebige weitere Kurse aus OpenOlat (<code>lms.uni-kiel.de</code>) oder Moodle mit ihrer eindeutigen ID und kopiere die angebotenen Übungsgruppen-Zeiten hinein.
+        </p>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Modulcode / Kurz-ID *</label>
+            <input type="text" id="custCourseId" placeholder="z. B. inf-ADS" required />
+          </div>
+          <div class="form-group">
+            <label>UnivIS-Nr. (optional)</label>
+            <input type="text" id="custUnivisId" placeholder="z. B. 080025" />
+          </div>
+          <div class="form-group">
+            <label>OpenOlat Repo-ID (optional)</label>
+            <input type="text" id="custOlatId" placeholder="z. B. 918273645" />
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group" style="flex:2">
+            <label>Vollständiger Kurstitel *</label>
+            <input type="text" id="custTitle" placeholder="z. B. inf-ADS: Algorithmen und Datenstrukturen" required />
+          </div>
+          <div class="form-group">
+            <label>Anmelde-Modus</label>
+            <select id="custMode">
+              <option value="sniper">First-Come-First-Served Sniper</option>
+              <option value="priority">Verteilungsverfahren (Prio 1-3)</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Übungsgruppen (eine pro Zeile, z. B. <code>Gruppe 1: Mo 14:15 - 15:45</code> oder <code>Übung B: Do 12:15-13:45</code>)</label>
+          <textarea id="custGroupsText" rows="5" required>Übungsgruppe 1: Mo 14:15 - 15:45
+Übungsgruppe 2: Di 16:15 - 17:45
+Übungsgruppe 3: Mi 12:15 - 13:45
+Übungsgruppe 4: Do 14:15 - 15:45</textarea>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-ghost" data-close="modalCustomCourse">Abbrechen</button>
+          <button type="submit" class="btn btn-primary">Kurs speichern &amp; berechnen</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script src="/app.js"></script>
+</body>
+</html>

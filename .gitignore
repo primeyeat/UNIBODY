@@ -1,0 +1,11 @@
+# Python virtual environment & bytecode
+.venv/
+__pycache__/
+*.py[cod]
+
+# Local browser session profile & runtime state (contains cookies / SSO session!)
+data/
+*.log
+
+# macOS
+.DS_Store
