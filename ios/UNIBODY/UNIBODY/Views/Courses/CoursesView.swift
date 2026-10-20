@@ -6,16 +6,7 @@ public struct CoursesView: View {
     public var body: some View {
         NavigationStack {
             ZStack {
-                // Background
-                LinearGradient(
-                    colors: [
-                        Color(red: 0.02, green: 0.08, blue: 0.16),
-                        Color(red: 0.01, green: 0.04, blue: 0.1)
-                    ],
-                    startPoint: .top,
-                    endPoint: .bottom
-                )
-                .ignoresSafeArea()
+                AeroBackgroundView()
                 
                 ScrollView {
                     LazyVStack(spacing: 16) {
@@ -54,7 +45,9 @@ private struct CourseCard: View {
                     HStack(spacing: 6) {
                         AeroBadge(course.platformHost, icon: course.platformId == "openolat" ? "building.columns.fill" : "bolt.fill")
                         
-                        if course.enrollmentMode == "sniper" {
+                        if course.isLectureOnly {
+                            AeroBadge("Reine Vorlesung", color: AeroTheme.skyBlue)
+                        } else if course.enrollmentMode == "sniper" {
                             AeroBadge("Sniper FCFS", color: AeroTheme.solarOrange)
                         } else {
                             AeroBadge("Prioritäten", color: Color.purple)
@@ -63,7 +56,7 @@ private struct CourseCard: View {
                     
                     Text(course.title)
                         .font(.system(.headline, design: .rounded).weight(.bold))
-                        .foregroundColor(.white)
+                        .foregroundColor(.primary)
                         .lineLimit(2)
                         .padding(.top, 2)
                     
@@ -86,29 +79,45 @@ private struct CourseCard: View {
                 .background(Color.white.opacity(0.1))
             
             HStack {
-                HStack(spacing: 4) {
-                    Image(systemName: "person.2")
-                        .font(.caption2)
-                    Text("\(course.groups.count) Übungsgruppen")
-                        .font(.caption.weight(.medium))
-                }
-                .foregroundColor(.secondary)
-                
-                Spacer()
-                
-                if let enrolled = enrolledGroup {
-                    HStack(spacing: 4) {
-                        Image(systemName: "checkmark.circle.fill")
-                            .foregroundColor(AeroTheme.emerald)
-                        Text(enrolled.name)
-                            .font(.caption.weight(.bold))
-                            .foregroundColor(AeroTheme.emerald)
-                            .lineLimit(1)
+                if course.isLectureOnly {
+                    HStack(spacing: 5) {
+                        Image(systemName: "books.vertical.fill")
+                            .font(.caption2)
+                        Text("Reine Vorlesung (Keine Übungsgruppen)")
+                            .font(.caption.weight(.medium))
                     }
+                    .foregroundColor(.secondary)
+                    
+                    Spacer()
+                    
+                    Text("Freie Belegung")
+                        .font(.caption.weight(.bold))
+                        .foregroundColor(AeroTheme.skyBlue)
                 } else {
-                    Text("Noch nicht belegt")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
+                    HStack(spacing: 4) {
+                        Image(systemName: "person.2")
+                            .font(.caption2)
+                        Text("\(course.groups.count) Übungsgruppen")
+                            .font(.caption.weight(.medium))
+                    }
+                    .foregroundColor(.secondary)
+                    
+                    Spacer()
+                    
+                    if let enrolled = enrolledGroup {
+                        HStack(spacing: 4) {
+                            Image(systemName: "checkmark.circle.fill")
+                                .foregroundColor(AeroTheme.emerald)
+                            Text(enrolled.name)
+                                .font(.caption.weight(.bold))
+                                .foregroundColor(AeroTheme.emerald)
+                                .lineLimit(1)
+                        }
+                    } else {
+                        Text("Noch nicht belegt")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
                 }
             }
         }

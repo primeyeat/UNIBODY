@@ -401,25 +401,11 @@ BUILTIN_CAU_COURSES: Dict[str, Dict[str, Any]] = {
         "lecturer": "Dr. Hermann Lindhorst",
         "semester": "WiSe 2026/27 (UnivIS 2026w)",
         "platform": "OpenOlat (lms.uni-kiel.de)",
-        "enrollment_mode": "sniper",
+        "enrollment_mode": "lecture_only",
         "enrollment_opens_at": "2026-10-23T12:00:00",
         "url": "https://lms.uni-kiel.de",
         "verified_tokens": ["inf-infrecht", "inf-infrech", "infrecht", "080103"],
-        "groups": [
-            {
-                "group_id": "080103-v1",
-                "name": "Vorlesung / Blocktermine [UnivIS #080103] (Mo 10:00 - 13:00 · CAP3 - Hörsaal 3)",
-                "day": 0,
-                "day_name": "Montag",
-                "start_time": "10:00",
-                "end_time": "13:00",
-                "room": "CAP3 - Hörsaal 3",
-                "tutor": "Dr. H. Lindhorst (Einzeltermine Mo 10-13 Uhr)",
-                "spots_free": 100,
-                "spots_total": 100,
-                "waitlist_available": True,
-            },
-        ],
+        "groups": [],
     },
 }
 

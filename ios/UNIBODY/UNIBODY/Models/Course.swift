@@ -16,6 +16,10 @@ public struct Course: Identifiable, Codable, Hashable {
     public var groups: [ExerciseGroup]
     public var enrolledGroupId: String?
     
+    public var isLectureOnly: Bool {
+        groups.isEmpty || enrollmentMode == "lecture_only" || enrollmentMode == "none"
+    }
+    
     public enum CodingKeys: String, CodingKey {
         case courseId = "course_id"
         case univisId = "univis_id"

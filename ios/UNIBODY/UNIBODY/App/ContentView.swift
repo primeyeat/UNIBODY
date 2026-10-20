@@ -29,15 +29,16 @@ public struct ContentView: View {
                     }
             }
             
-            // Floating Dynamic Island Campus Map & Room Navigator
+            // Native Dynamic Island Hardware Campus Map & Room Navigator
             if let event = appState.activeNavEvent ?? (appState.isDynamicIslandActive ? appState.nextUpcomingEvent : nil) {
                 DynamicCampusIslandView(event: event) {
                     appState.closeCampusNavigation()
                 }
+                .ignoresSafeArea(.container, edges: .top)
                 .zIndex(999)
                 .transition(.asymmetric(
-                    insertion: .move(edge: .top).combined(with: .opacity),
-                    removal: .move(edge: .top).combined(with: .opacity)
+                    insertion: .scale(scale: 0.9, anchor: .top).combined(with: .opacity),
+                    removal: .scale(scale: 0.9, anchor: .top).combined(with: .opacity)
                 ))
             }
         }

@@ -577,6 +577,23 @@ function renderRankedGroups() {
     return;
   }
 
+  if (appState.rankedGroups.length === 0) {
+    if (enrolledBanner) enrolledBanner.classList.add("hidden");
+    const isLectureOnly = (appState.currentCourse.enrollment_mode === "lecture_only") || (!appState.currentCourse.groups || appState.currentCourse.groups.length === 0);
+    container.innerHTML = `
+      <div style="padding:24px;text-align:center;background:var(--aero-glass-bg);border:1px solid var(--aero-glass-border);border-radius:var(--radius-lg);margin-top:8px;">
+        <div style="font-size:2rem;margin-bottom:8px;">📚</div>
+        <div style="font-size:1.05rem;font-weight:800;color:var(--aero-ink);margin-bottom:6px;">
+          ${isLectureOnly ? "Reine Vorlesung (Keine Übungsgruppen)" : "Keine Übungsgruppen vorhanden"}
+        </div>
+        <div style="font-size:0.85rem;color:var(--aero-ink-muted);max-width:440px;margin:0 auto;line-height:1.45;">
+          ${isLectureOnly ? "Dieses Modul (z. B. Informatikrecht) besteht ausschließlich aus einer Vorlesung. Eine Einschreibung oder ein Sniper ist nicht erforderlich – die Belegung ist frei." : "Zu diesem Modul wurden im UnivIS keine Übungsgruppen gefunden."}
+        </div>
+      </div>
+    `;
+    return;
+  }
+
   const enrolledGrp = appState.rankedGroups.find((g) => g.is_enrolled || g.group_id === appState.currentEnrolledGroupId);
   const rank1Grp = appState.rankedGroups.find((g) => g.rank === 1);
 

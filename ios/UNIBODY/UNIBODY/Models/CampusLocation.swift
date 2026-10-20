@@ -53,30 +53,30 @@ public struct ResolvedCampusRoom: Identifiable {
 // MARK: - Campus Location Engine
 public enum CampusLocationEngine {
     
-    // CAU Kiel Campus Buildings
+    // CAU Kiel Campus Buildings (Exact OpenStreetMap coordinates)
     public static let cap3 = CampusBuilding(
         id: "CAP3",
         code: "CAP 3",
-        name: "Audimax & Hörsaalzentrum",
+        name: "Hörsaalgebäude & Audimax",
         address: "Christian-Albrechts-Platz 3, 24118 Kiel",
-        coordinate: CLLocationCoordinate2D(latitude: 54.3478, longitude: 10.1175),
+        coordinate: CLLocationCoordinate2D(latitude: 54.338464, longitude: 10.121958),
         area: "Campus Mitte (Hauptcampus)",
-        busStops: ["Universitätsbibliothek (81, 60S, 61, 62)", "Mensa I"],
+        busStops: ["Universitätsbibliothek (81, 60S, 61, 62)", "Mensa I (Westring)"],
         walkingMinutes: 2,
-        description: "Zentrales Hörsaalgebäude der CAU mit Audimax, Hörsälen 1, 2, 3 und Klaus-Murmann-Hörsaal.",
-        entranceTip: "Haupteingang direkt am Christian-Albrechts-Platz, barrierefreier Zugang über die Nordrampe.",
+        description: "Zentrales Hörsaalgebäude der CAU mit Hörsaal 1 (Audimax), Hörsaal 2, Hörsaal 3 und Klaus-Murmann-Hörsaal.",
+        entranceTip: "Haupteingang direkt am Christian-Albrechts-Platz gegenüber Mensa I. Hörsäle liegen im Erdgeschoss.",
         iconName: "building.columns.fill"
     )
     
     public static let lms8 = CampusBuilding(
         id: "LMS8",
         code: "LMS 8",
-        name: "Informatik-Zentrum & Rechenzentrum",
+        name: "Institut für Informatik & Geographie",
         address: "Ludewig-Meyn-Straße 8, 24118 Kiel",
-        coordinate: CLLocationCoordinate2D(latitude: 54.3484, longitude: 10.1218),
-        area: "Campus Nord (Informatik & RZ)",
-        busStops: ["Botanischer Garten (50, 60S, 81)", "Leibnizstraße"],
-        walkingMinutes: 5,
+        coordinate: CLLocationCoordinate2D(latitude: 54.337512, longitude: 10.121552),
+        area: "Campus West (Informatik)",
+        busStops: ["Universitätsbibliothek", "Leibnizstraße / Ludewig-Meyn-Str."],
+        walkingMinutes: 4,
         description: "Institut für Informatik mit Seminar- und Übungsräumen, Linux-CIP-Pools und Serverräumen.",
         entranceTip: "Eingang über den Innenhof Ludewig-Meyn-Straße 8. Raum 018 liegt im Erdgeschoss rechts.",
         iconName: "desktopcomputer"
@@ -87,12 +87,12 @@ public enum CampusLocationEngine {
         code: "LMS 2-4",
         name: "Geowissenschaften & Seminarräume",
         address: "Ludewig-Meyn-Straße 2, 24118 Kiel",
-        coordinate: CLLocationCoordinate2D(latitude: 54.3479, longitude: 10.1202),
-        area: "Campus Nord",
-        busStops: ["Leibnizstraße / Ludewig-Meyn-Str."],
-        walkingMinutes: 4,
-        description: "Hörsäle und Übungsräume für Natur- und Geowissenschaften.",
-        entranceTip: "Haupteingang Ludewig-Meyn-Straße, Treppenaufgang zum Hochparterre.",
+        coordinate: CLLocationCoordinate2D(latitude: 54.337997, longitude: 10.121653),
+        area: "Campus West",
+        busStops: ["Christian-Albrechts-Platz", "Universitätsbibliothek"],
+        walkingMinutes: 3,
+        description: "Hörsäle und Übungsräume für Geowissenschaften und Naturwissenschaften.",
+        entranceTip: "Haupteingang Ludewig-Meyn-Straße 2, Treppenaufgang zum Hochparterre.",
         iconName: "globe.europe.africa.fill"
     )
     
@@ -101,10 +101,10 @@ public enum CampusLocationEngine {
         code: "HHP 6",
         name: "Mathematik-Institut & Physikzentrum",
         address: "Heinrich-Hecht-Platz 6, 24118 Kiel",
-        coordinate: CLLocationCoordinate2D(latitude: 54.3499, longitude: 10.1248),
+        coordinate: CLLocationCoordinate2D(latitude: 54.341271, longitude: 10.124403),
         area: "Campus Nordost (Physik & Mathematik)",
         busStops: ["Universitäts-Sportforum", "Leibnizstraße"],
-        walkingMinutes: 7,
+        walkingMinutes: 6,
         description: "Mathematisches Seminar & Physikalisches Institut mit Hörsaal 3 und Übungsräumen.",
         entranceTip: "Eingang über den Heinrich-Hecht-Platz. Raum EG.004 befindet sich im Erdgeschossflügel Mathematik.",
         iconName: "function"
@@ -112,15 +112,15 @@ public enum CampusLocationEngine {
     
     public static let oh14 = CampusBuilding(
         id: "OH14",
-        code: "OH 14",
-        name: "Chemiezentrum & Geowissenschaften",
-        address: "Olshausenstraße 14, 24118 Kiel",
-        coordinate: CLLocationCoordinate2D(latitude: 54.3465, longitude: 10.1192),
-        area: "Campus Südost",
+        code: "OS 40 / OH 14",
+        name: "Chemiezentrum & Geozentrum",
+        address: "Olshausenstraße 40, 24118 Kiel",
+        coordinate: CLLocationCoordinate2D(latitude: 54.339059, longitude: 10.124858),
+        area: "Campus Ost",
         busStops: ["Universitätsbibliothek / Olshausenstraße"],
         walkingMinutes: 3,
         description: "Chemie-Hörsäle und Praktikumsräume mit großem Flachtrakt.",
-        entranceTip: "Eingang über Olshausenstraße 14, Hörsäle im Erdgeschoss.",
+        entranceTip: "Eingang über Olshausenstraße, Hörsäle im Erdgeschoss.",
         iconName: "atom"
     )
     
@@ -129,10 +129,10 @@ public enum CampusLocationEngine {
         code: "WSP 7",
         name: "Wirtschafts- & Sozialwissenschaften",
         address: "Wilhelm-Seelig-Platz 7, 24118 Kiel",
-        coordinate: CLLocationCoordinate2D(latitude: 54.3448, longitude: 10.1180),
-        area: "Campus Süd (Hochhaus)",
-        busStops: ["Wilhelm-Seelig-Platz", "Westring"],
-        walkingMinutes: 6,
+        coordinate: CLLocationCoordinate2D(latitude: 54.339718, longitude: 10.123655),
+        area: "Campus Nord (WiSo-Hochhaus)",
+        busStops: ["Wilhelm-Seelig-Platz", "Universitätsbibliothek"],
+        walkingMinutes: 4,
         description: "Hochhaus am Wilhelm-Seelig-Platz mit Hörsälen und Institutsräumen.",
         entranceTip: "Haupteingang Wilhelm-Seelig-Platz, Fahrstühle zu den Obergeschossen.",
         iconName: "chart.bar.fill"
@@ -143,7 +143,7 @@ public enum CampusLocationEngine {
         code: "LMS Online",
         name: "Virtueller Hörsaal (OpenOlat / Moodle)",
         address: "lms.uni-kiel.de & elearn.informatik.uni-kiel.de",
-        coordinate: CLLocationCoordinate2D(latitude: 54.3478, longitude: 10.1175),
+        coordinate: CLLocationCoordinate2D(latitude: 54.338464, longitude: 10.121958),
         area: "Digitale Lehre",
         busStops: ["Keine Anfahrt nötig (Online)"],
         walkingMinutes: 0,

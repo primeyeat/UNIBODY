@@ -6,16 +6,7 @@ public struct SniperDashboardView: View {
     public var body: some View {
         NavigationStack {
             ZStack {
-                // Background
-                LinearGradient(
-                    colors: [
-                        Color(red: 0.02, green: 0.08, blue: 0.16),
-                        Color(red: 0.01, green: 0.04, blue: 0.1)
-                    ],
-                    startPoint: .top,
-                    endPoint: .bottom
-                )
-                .ignoresSafeArea()
+                AeroBackgroundView()
                 
                 ScrollView {
                     VStack(alignment: .leading, spacing: 18) {
@@ -27,7 +18,7 @@ public struct SniperDashboardView: View {
                                     .foregroundColor(AeroTheme.emerald)
                                 Text("UNIBODY-Sniper")
                                     .font(.system(.title3, design: .rounded).weight(.bold))
-                                    .foregroundColor(.white)
+                                    .foregroundColor(.primary)
                                 Spacer()
                                 AeroBadge("\(appState.jobs.count) Aktiv", color: AeroTheme.emerald)
                             }

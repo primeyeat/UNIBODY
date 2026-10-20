@@ -40,16 +40,7 @@ public struct CourseDetailView: View {
     
     public var body: some View {
         ZStack {
-            // Background
-            LinearGradient(
-                colors: [
-                    Color(red: 0.02, green: 0.08, blue: 0.16),
-                    Color(red: 0.01, green: 0.04, blue: 0.1)
-                ],
-                startPoint: .top,
-                endPoint: .bottom
-            )
-            .ignoresSafeArea()
+            AeroBackgroundView()
             
             ScrollView {
                 VStack(alignment: .leading, spacing: 18) {
@@ -57,12 +48,16 @@ public struct CourseDetailView: View {
                     VStack(alignment: .leading, spacing: 8) {
                         HStack(spacing: 6) {
                             AeroBadge(course.platformHost, icon: course.platformId == "openolat" ? "building.columns.fill" : "bolt.fill")
-                            AeroBadge(course.enrollmentMode == "sniper" ? "Sniper FCFS" : "Prioritäten", color: AeroTheme.solarOrange)
+                            if course.isLectureOnly {
+                                AeroBadge("Reine Vorlesung", color: AeroTheme.skyBlue)
+                            } else {
+                                AeroBadge(course.enrollmentMode == "sniper" ? "Sniper FCFS" : "Prioritäten", color: AeroTheme.solarOrange)
+                            }
                         }
                         
                         Text(course.title)
                             .font(.system(.title3, design: .rounded).weight(.bold))
-                            .foregroundColor(.white)
+                            .foregroundColor(.primary)
                         
                         if !course.lecturer.isEmpty {
                             Text("Dozent: \(course.lecturer)")
@@ -71,9 +66,9 @@ public struct CourseDetailView: View {
                         }
                         
                         HStack {
-                            Image(systemName: "timer")
+                            Image(systemName: course.isLectureOnly ? "checkmark.shield.fill" : "timer")
                                 .font(.caption2)
-                            Text("Anmeldebeginn: \(course.enrollmentOpensAt.replacingOccurrences(of: "T", with: " um ")) Uhr")
+                            Text(course.isLectureOnly ? "Keine Anmeldung erforderlich · Freie Belegung" : "Anmeldebeginn: \(course.enrollmentOpensAt.replacingOccurrences(of: "T", with: " um ")) Uhr")
                                 .font(.caption.weight(.medium))
                         }
                         .foregroundColor(AeroTheme.skyBlue)
@@ -83,35 +78,57 @@ public struct CourseDetailView: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .frutigerGlass(cornerRadius: 18)
                     
-                    // Sniper Shortcut
-                    Button {
-                        showSniperSheet = true
-                    } label: {
-                        HStack {
-                            Image(systemName: "cross.circle.fill")
-                                .font(.title3)
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text("Sniper / Prioritäten scharfstellen")
+                    if course.isLectureOnly {
+                        // Information card for lecture-only course
+                        VStack(alignment: .leading, spacing: 8) {
+                            HStack(spacing: 8) {
+                                Image(systemName: "info.circle.fill")
+                                    .font(.title3)
+                                    .foregroundColor(AeroTheme.skyBlue)
+                                Text("Reine Vorlesung – Keine Übungsgruppen")
                                     .font(.system(.subheadline, design: .rounded).weight(.bold))
-                                Text("Automatische Anmeldung sekundengenau bei Freischaltung")
-                                    .font(.caption2)
-                                    .foregroundColor(.white.opacity(0.8))
+                                    .foregroundColor(.white)
                             }
-                            Spacer()
-                            Image(systemName: "arrow.right.circle.fill")
-                                .font(.title3)
+                            
+                            Text("Dieses Modul besteht nach dem CAU-Modulhandbuch ausschließlich aus einer Vorlesung. Es gibt keine separaten Übungsgruppen, für die eine Einschreibung oder ein Sniper erforderlich ist. Die Termine sind in deinen Wochenplan integriert.")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                                .lineSpacing(3)
                         }
-                        .padding(14)
-                        .glossyButton(gradient: AeroTheme.auroraGradient, cornerRadius: 16)
+                        .padding(16)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .frutigerGlass(cornerRadius: 16)
+                    } else {
+                        // Sniper Shortcut
+                        Button {
+                            showSniperSheet = true
+                        } label: {
+                            HStack {
+                                Image(systemName: "cross.circle.fill")
+                                    .font(.title3)
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text("Sniper / Prioritäten scharfstellen")
+                                        .font(.system(.subheadline, design: .rounded).weight(.bold))
+                                    Text("Automatische Anmeldung sekundengenau bei Freischaltung")
+                                        .font(.caption2)
+                                        .foregroundColor(.white.opacity(0.8))
+                                }
+                                Spacer()
+                                Image(systemName: "arrow.right.circle.fill")
+                                    .font(.title3)
+                            }
+                            .padding(14)
+                            .glossyButton(gradient: AeroTheme.auroraGradient, cornerRadius: 16)
+                        }
+                        .buttonStyle(.plain)
+                        
+                        // Group List Header
+                        Text("Verfügbare Übungsgruppen (\(course.groups.count))")
+                            .font(.system(.headline, design: .rounded).weight(.bold))
+                            .foregroundColor(.white)
+                            .padding(.horizontal, 4)
+                            .padding(.top, 6)
                     }
-                    .buttonStyle(.plain)
-                    
-                    // Group List Header
-                    Text("Verfügbare Übungsgruppen (\(course.groups.count))")
-                        .font(.system(.headline, design: .rounded).weight(.bold))
-                        .foregroundColor(.white)
-                        .padding(.horizontal, 4)
-                        .padding(.top, 6)
                     
                     // Active Enrolled Group Banner with Unenroll Option
                     if let gid = enrolledGroupId, let grp = course.groups.first(where: { $0.groupId == gid }) {

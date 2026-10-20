@@ -16,16 +16,7 @@ public struct SettingsLoginView: View {
     public var body: some View {
         NavigationStack {
             ZStack {
-                // Background
-                LinearGradient(
-                    colors: [
-                        Color(red: 0.02, green: 0.08, blue: 0.16),
-                        Color(red: 0.01, green: 0.04, blue: 0.1)
-                    ],
-                    startPoint: .top,
-                    endPoint: .bottom
-                )
-                .ignoresSafeArea()
+                AeroBackgroundView()
                 
                 ScrollView {
                     VStack(alignment: .leading, spacing: 20) {
@@ -37,7 +28,7 @@ public struct SettingsLoginView: View {
                                     .foregroundColor(appState.isVaultSaved ? AeroTheme.emerald : AeroTheme.solarOrange)
                                 Text("CAU Login & Auto-Fill Tresor")
                                     .font(.system(.title3, design: .rounded).weight(.bold))
-                                    .foregroundColor(.white)
+                                    .foregroundColor(.primary)
                                 Spacer()
                                 AeroBadge(
                                     appState.isVaultSaved ? "Aktiv" : "Nicht konfiguriert",

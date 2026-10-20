@@ -266,23 +266,9 @@ public class AppState: ObservableObject {
                 platformHost: "lms.uni-kiel.de",
                 platformBadge: "🏛️ lms.uni-kiel.de",
                 url: "https://lms.uni-kiel.de",
-                enrollmentMode: "sniper",
+                enrollmentMode: "lecture_only",
                 enrollmentOpensAt: "2026-10-23T12:00:00",
-                groups: [
-                    ExerciseGroup(
-                        groupId: "080103-v1",
-                        name: "Vorlesung / 14-tägig (Mo 10:15–11:45 · CAP3)",
-                        day: 0,
-                        dayName: "Montag",
-                        startTime: "10:15",
-                        endTime: "11:45",
-                        room: "CAP3 - Hörsaal 3",
-                        tutor: "Dr. Lindhorst",
-                        spotsFree: 100,
-                        spotsTotal: 100,
-                        weekType: "A"
-                    )
-                ]
+                groups: []
             ),
             Course(
                 courseId: "infEWInf-01a",
