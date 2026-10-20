@@ -378,7 +378,13 @@ def evaluate_group_candidate(
         score -= 40.0
         reasons.append("⚠️ Aktuell voll belegt (nur Warteliste / Nachrücken möglich)")
     elif spots_free is not None and spots_total is not None and spots_total > 0:
-        reasons.append(f"🟢 {spots_free} von {spots_total} Plätzen frei")
+        taken = max(0, spots_total - spots_free)
+        if taken == 0:
+            reasons.append(f"🟢 Alle {spots_total} Plätze verfügbar (0/{spots_total} belegt)")
+        elif spots_free <= 3:
+            reasons.append(f"⚠️ Nur noch {spots_free} Restplätze ({taken}/{spots_total} belegt) – Schnell sein!")
+        else:
+            reasons.append(f"🟢 {spots_free} freie Plätze ({taken}/{spots_total} belegt)")
 
     display_score = max(1, min(100, round(score)))
     if is_full:

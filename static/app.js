@@ -352,6 +352,45 @@ async function pinGroupAsRank1(groupId) {
   }
 }
 
+function formatCapacityTag(g, course) {
+  const total = Number(g.spots_total) || 28;
+  const free = g.spots_free !== undefined && g.spots_free !== null ? Number(g.spots_free) : total;
+  const taken = Math.max(0, total - free);
+
+  // Check if course or group registration has not opened yet
+  const openDateStr = g.enrollment_opens_at || (course ? course.enrollment_opens_at : null);
+  let isOpenFuture = false;
+  let dateLabel = "demnächst";
+  if (openDateStr) {
+    const d = new Date(openDateStr);
+    if (!isNaN(d.getTime()) && d > new Date()) {
+      isOpenFuture = true;
+      dateLabel = `${String(d.getDate()).padStart(2, "0")}.${String(d.getMonth() + 1).padStart(2, "0")}.`;
+    }
+  }
+
+  if (g.is_locked) {
+    return `<span class="spots-pill spots-locked" title="Anmeldung durch Dozenten noch gesperrt (${total} Plätze vorbereitet)">🔒 Gesperrt (${total} Plätze)</span>`;
+  }
+
+  if (isOpenFuture && taken === 0) {
+    return `<span class="spots-pill spots-locked" title="Einschreibung öffnet am ${openDateStr} · Alle ${total} Plätze verfügbar">🔒 Start: ${dateLabel} (${total} Plätze)</span>`;
+  }
+
+  if (free <= 0) {
+    return `<span class="spots-pill spots-full" title="Alle ${total} Plätze belegt · Warteliste aktiv">🔴 Voll (${total}/${total}) · Warteliste</span>`;
+  }
+
+  if (taken > 0) {
+    if (free <= 4) {
+      return `<span class="spots-pill spots-few" title="${free} freie Restplätze (${taken}/${total} belegt)">⚠️ Nur noch ${free} frei (${taken}/${total})</span>`;
+    }
+    return `<span class="spots-pill spots-open" title="${free} freie Plätze (${taken}/${total} belegt)">🟢 ${free} frei (${taken}/${total} belegt)</span>`;
+  }
+
+  return `<span class="spots-pill spots-open" title="Alle ${total} Plätze frei verfügbar (0 belegt)">🟢 Alle ${total} Plätze frei (0/${total})</span>`;
+}
+
 function renderRankedGroups() {
   const container = document.getElementById("rankedGroupsContainer");
   const enrolledBanner = document.getElementById("currentCourseEnrolledBanner");
@@ -445,7 +484,7 @@ function renderRankedGroups() {
       </div>
       <div class="group-right">
         <div class="score-circle">${g.is_conflict ? "Blockiert" : `${g.display_score}% Match`}</div>
-        <div class="spots-tag">${g.spots_free} / ${g.spots_total} Plätze frei</div>
+        <div class="spots-tag">${formatCapacityTag(g, appState.currentCourse)}</div>
         <button type="button" class="btn-mark-enrolled" style="${enrollToggleBtnStyle}" title="Klicke hier, wenn du dich in diese Übungsgruppe schon manuell auf OpenOlat/Moodle eingetragen hast – UNIBODY trägt sie sofort fest in deinen Stundenplan ein!">
           ${isEnrolled ? "✅ Bereits gebucht (Aktiv)" : "☑️ Schon manuell gebucht?"}
         </button>
@@ -622,6 +661,9 @@ function renderTimetable() {
   });
 
   Object.values(slotBuckets).forEach((bucket) => {
+    // CRITICAL: Stable sort by group_id so parallel groups NEVER swap horizontal columns under cursor!
+    bucket.sort((a, b) => String(a.group_id || a.name).localeCompare(String(b.group_id || b.name)));
+
     bucket.forEach((g, idxInBucket) => {
       const dayIdx = Number(g.day);
       const isHovered = appState.highlightedGroupId === g.group_id;
@@ -638,28 +680,40 @@ function renderTimetable() {
       else if (isRank1) variant = "candidate-rank-1";
 
       el.className = `tt-event candidate-overlay ${variant}`;
-      // If multiple groups of the same course share the exact same time slot, split width side-by-side
+      el.setAttribute("data-group-id", g.group_id);
+
+      // If multiple groups of the same course share the exact same time slot, split width side-by-side with clear gap
       if (bucket.length > 1) {
-        const widthPct = 96 / bucket.length;
-        const leftPct = 2 + idxInBucket * widthPct;
+        const gapPct = 1.5;
+        const totalGaps = (bucket.length - 1) * gapPct;
+        const widthPct = (96 - totalGaps) / bucket.length;
+        const leftPct = 2 + idxInBucket * (widthPct + gapPct);
         el.style.left = `${leftPct}%`;
         el.style.right = "auto";
-        el.style.width = `${widthPct - 1}%`;
+        el.style.width = `${widthPct}%`;
+      } else {
+        el.style.left = "4px";
+        el.style.right = "4px";
+        el.style.width = "auto";
       }
 
-      if (isHovered) {
-        el.style.transform = "scale(1.03)";
-        el.style.zIndex = "35";
-      }
       el.style.top = `${topPx}px`;
       el.style.height = `${heightPx}px`;
+      el.style.boxSizing = "border-box";
+      el.style.cursor = g.is_conflict ? "not-allowed" : "pointer";
+
+      if (isHovered) {
+        el.style.transform = "translateY(-2px) scale(1.02)";
+        el.style.zIndex = "45";
+      }
+
       el.title = g.is_conflict
-        ? "Zeitkonflikt"
+        ? "Zeitkonflikt mit deinem Stundenplan"
         : isRank1
-        ? "Aktuell als Wunsch #1 ausgewählt! (Erneut klicken für Automatik)"
+        ? `Aktuell als Wunsch #1 (${g.name}) ausgewählt! (Klicke erneut zum Aufheben)`
         : `Klicke auf diesen Kasten, um '${g.name}' sofort als Wunsch #1 (Grün) für Schritt 3 auszuwählen!`;
 
-      const pinIcon = g.is_pinned ? "📌 " : "⭐ ";
+      const pinIcon = g.is_pinned ? "📌 " : (isRank1 ? "🏆 " : "⭐ ");
       const badge = g.is_conflict
         ? "❌ KONFLIKT"
         : `${pinIcon}Wunsch #${g.rank} (${g.display_score}%)`;
@@ -670,6 +724,7 @@ function renderTimetable() {
 
       if (!g.is_conflict) {
         el.addEventListener("click", (e) => {
+          e.preventDefault();
           e.stopPropagation();
           pinGroupAsRank1(g.group_id);
         });
@@ -677,9 +732,15 @@ function renderTimetable() {
 
       el.addEventListener("mouseenter", () => {
         appState.highlightedGroupId = g.group_id;
+        el.style.zIndex = "45";
+        el.style.transform = "translateY(-2px) scale(1.02)";
       });
       el.addEventListener("mouseleave", () => {
         appState.highlightedGroupId = null;
+        if (!isHovered) {
+          el.style.zIndex = isRank1 ? "24" : "22";
+          el.style.transform = "";
+        }
       });
 
       dayCols[dayIdx].appendChild(el);

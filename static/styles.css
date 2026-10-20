@@ -695,6 +695,53 @@ code {
   font-size: 0.73rem;
   font-weight: 700;
   color: var(--aero-ink-muted);
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 5px;
+  margin-top: 3px;
+}
+
+.spots-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 9px;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 800;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.8), 0 2px 5px rgba(0, 60, 120, 0.08);
+  white-space: nowrap;
+}
+
+.spots-pill.spots-open {
+  background: linear-gradient(180deg, #dcfce7 0%, #bbf7d0 100%);
+  color: #14532d;
+  border: 1px solid #86efac;
+}
+
+.spots-pill.spots-few {
+  background: linear-gradient(180deg, #fef3c7 0%, #fde68a 100%);
+  color: #92400e;
+  border: 1px solid #fcd34d;
+}
+
+.spots-pill.spots-full {
+  background: linear-gradient(180deg, #fee2e2 0%, #fecaca 100%);
+  color: #991b1b;
+  border: 1px solid #fca5a5;
+}
+
+.spots-pill.spots-locked {
+  background: linear-gradient(180deg, #f1f5f9 0%, #e2e8f0 100%);
+  color: #334155;
+  border: 1px solid #cbd5e1;
+}
+
+.spots-pill.spots-live {
+  background: linear-gradient(180deg, #e0f2fe 0%, #bae6fd 100%);
+  color: #0369a1;
+  border: 1px solid #7dd3fc;
 }
 
 /* WEEKLY TIMETABLE GRID - Frutiger Aero Glass Calendar */
@@ -883,18 +930,32 @@ code {
 }
 
 .tt-event.candidate-overlay {
-  z-index: 20;
+  z-index: 22;
   pointer-events: auto;
+  cursor: pointer;
+  box-sizing: border-box;
+  user-select: none;
+}
+
+.tt-event.candidate-overlay:hover {
+  transform: translateY(-2px) scale(1.02) !important;
+  z-index: 45 !important;
+  box-shadow: 0 8px 24px rgba(0, 80, 160, 0.35);
+}
+
+.tt-event.candidate-overlay:active {
+  transform: scale(0.97) !important;
 }
 
 /* Rank #1 Candidate: Lush Frutiger Eco-Green Gel Capsule */
 .tt-event.candidate-rank-1 {
+  z-index: 24;
   background: linear-gradient(
     180deg,
-    rgba(110, 245, 130, 0.94) 0%,
-    rgba(40, 205, 65, 0.92) 49%,
-    rgba(22, 168, 46, 0.94) 51%,
-    rgba(55, 222, 82, 0.95) 100%
+    rgba(110, 245, 130, 0.96) 0%,
+    rgba(40, 205, 65, 0.94) 49%,
+    rgba(22, 168, 46, 0.96) 51%,
+    rgba(55, 222, 82, 0.97) 100%
   );
   border: 2px solid #ffffff;
   outline: 1.5px solid #15803d;
@@ -905,10 +966,11 @@ code {
 
 /* Rank #2/#3 Alternatives: Translucent Warm Amber Glass */
 .tt-event.candidate-rank-alt {
+  z-index: 22;
   background: linear-gradient(
     180deg,
-    rgba(255, 224, 130, 0.78) 0%,
-    rgba(255, 179, 0, 0.65) 100%
+    rgba(255, 224, 130, 0.85) 0%,
+    rgba(255, 179, 0, 0.72) 100%
   );
   border: 2px dashed #d97706;
   color: #5c2800;
@@ -919,7 +981,8 @@ code {
   background: rgba(255, 195, 205, 0.75);
   border: 2px dashed var(--aero-red);
   color: #7f1d1d;
-  z-index: 25;
+  z-index: 26;
+  cursor: not-allowed;
 }
 
 .tt-ev-title {
