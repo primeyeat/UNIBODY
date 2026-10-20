@@ -101,40 +101,29 @@ code {
   gap: 15px;
 }
 
-/* Glossy 3D Aqua Sphere Orb Logo */
+/* UNIBODY Frutiger Aero Globe Logo */
 .cau-crest {
-  width: 50px;
-  height: 50px;
-  border-radius: 50%;
-  background: radial-gradient(circle at 65% 80%, #48ff91 0%, #00a8ff 45%, #0052a3 100%);
+  width: 58px;
+  height: 58px;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-weight: 800;
-  font-size: 1rem;
-  letter-spacing: 0.5px;
-  color: #ffffff;
-  text-shadow: 0 1px 3px rgba(0, 35, 80, 0.7);
-  border: 2px solid rgba(255, 255, 255, 0.95);
-  box-shadow:
-    0 6px 16px rgba(0, 120, 215, 0.42),
-    inset 0 -4px 8px rgba(0, 255, 170, 0.45),
-    inset 0 2px 4px rgba(255, 255, 255, 0.9);
+  flex-shrink: 0;
   position: relative;
-  overflow: hidden;
 }
 
-/* Classic Aqua top oval lens reflection */
-.cau-crest::after {
-  content: "";
-  position: absolute;
-  top: 3px;
-  left: 14%;
-  width: 72%;
-  height: 44%;
-  border-radius: 50%;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.92) 0%, rgba(255, 255, 255, 0.1) 100%);
-  pointer-events: none;
+.unibody-logo-img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
+  filter: drop-shadow(0 4px 10px rgba(0, 145, 235, 0.38));
+  transition: transform 0.25s cubic-bezier(0.22, 1, 0.36, 1), filter 0.25s ease;
+}
+
+.cau-crest:hover .unibody-logo-img {
+  transform: scale(1.08) rotate(-4deg);
+  filter: drop-shadow(0 6px 16px rgba(34, 211, 238, 0.65));
 }
 
 .brand h1 {
