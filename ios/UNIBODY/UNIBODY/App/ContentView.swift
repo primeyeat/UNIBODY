@@ -29,6 +29,10 @@ public struct ContentView: View {
         }
         .environmentObject(appState)
         .tint(AeroTheme.skyBlue)
-        .preferredColorScheme(.dark)
+        .preferredColorScheme(appState.isDarkMode ? .dark : .light)
+        .sheet(isPresented: $appState.showClaireEasterEgg) {
+            ClaireEasterEggModalView()
+                .presentationDetents([.fraction(0.68), .large])
+        }
     }
 }

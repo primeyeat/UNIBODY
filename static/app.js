@@ -64,6 +64,101 @@ document.addEventListener("DOMContentLoaded", async () => {
   setInterval(pollTelemetry, 1800);
 });
 
+let themeToggleClickTimestamps = [];
+let claireHeartInterval = null;
+
+function checkClaireEasterEgg() {
+  const now = Date.now();
+  themeToggleClickTimestamps.push(now);
+  // Keep clicks within the last 3.5 seconds
+  themeToggleClickTimestamps = themeToggleClickTimestamps.filter((t) => now - t <= 3500);
+
+  // Trigger when rapidly toggled 7 times
+  if (themeToggleClickTimestamps.length >= 7) {
+    themeToggleClickTimestamps = [];
+    showClaireEasterEggModal();
+  }
+}
+
+function showClaireEasterEggModal() {
+  const modal = document.getElementById("modalClaireEasterEgg");
+  if (!modal) return;
+  modal.classList.remove("hidden");
+
+  playClaireChime();
+  launchClaireHearts();
+}
+
+function launchClaireHearts() {
+  const container = document.getElementById("claireHeartsContainer");
+  if (!container) return;
+  container.innerHTML = "";
+
+  const symbols = ["💖", "💕", "🌸", "✨", "💗", "🌷", "🎀", "🤍"];
+
+  function spawnHeart() {
+    if (!container) return;
+    const el = document.createElement("span");
+    el.className = "claire-particle";
+    el.textContent = symbols[Math.floor(Math.random() * symbols.length)];
+    el.style.left = Math.random() * 85 + 5 + "%";
+    el.style.fontSize = Math.random() * 1.2 + 1.0 + "rem";
+    el.style.animationDuration = Math.random() * 1.5 + 2.0 + "s";
+    container.appendChild(el);
+    setTimeout(() => {
+      el.remove();
+    }, 3200);
+  }
+
+  // Initial burst of floating hearts
+  for (let i = 0; i < 16; i++) {
+    setTimeout(spawnHeart, i * 100);
+  }
+
+  if (claireHeartInterval) clearInterval(claireHeartInterval);
+  claireHeartInterval = setInterval(spawnHeart, 300);
+}
+
+function playClaireChime() {
+  try {
+    const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+    if (!AudioContextClass) return;
+    const ctx = new AudioContextClass();
+    if (ctx.state === "suspended") {
+      ctx.resume();
+    }
+    const now = ctx.currentTime;
+    // Music box arpeggio: F5, A5, C6, E6, G6, C7
+    const notes = [
+      { freq: 698.46, delay: 0.0 },   // F5
+      { freq: 880.00, delay: 0.12 },  // A5
+      { freq: 1046.50, delay: 0.24 }, // C6
+      { freq: 1318.51, delay: 0.36 }, // E6
+      { freq: 1567.98, delay: 0.48 }, // G6
+      { freq: 2093.00, delay: 0.60 }, // C7
+    ];
+
+    notes.forEach((n) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = "sine";
+      osc.frequency.setValueAtTime(n.freq, now + n.delay);
+
+      gain.gain.setValueAtTime(0.001, now + n.delay);
+      gain.gain.linearRampToValueAtTime(0.18, now + n.delay + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + n.delay + 0.85);
+
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+
+      osc.start(now + n.delay);
+      osc.stop(now + n.delay + 0.85);
+    });
+  } catch (e) {
+    console.debug("Claire chime audio could not play:", e);
+  }
+}
+
 function initThemeMode() {
   const savedTheme = localStorage.getItem("cau_dorfic_theme") || "light";
   const btn = document.getElementById("btnToggleDarkMode");
@@ -76,6 +171,7 @@ function initThemeMode() {
       const isDark = document.body.classList.toggle("dark-mode");
       localStorage.setItem("cau_dorfic_theme", isDark ? "dark" : "light");
       btn.textContent = isDark ? "☀️ Daylight Mode" : "🌙 Dark Mode";
+      checkClaireEasterEgg();
     });
   }
 }
@@ -1146,7 +1242,13 @@ function bindUIEvents() {
 
   document.querySelectorAll("[data-close]").forEach((btn) => {
     btn.addEventListener("click", () => {
-      document.getElementById(btn.dataset.close).classList.add("hidden");
+      const modalId = btn.dataset.close;
+      const targetModal = document.getElementById(modalId);
+      if (targetModal) targetModal.classList.add("hidden");
+      if (modalId === "modalClaireEasterEgg" && claireHeartInterval) {
+        clearInterval(claireHeartInterval);
+        claireHeartInterval = null;
+      }
     });
   });
 

@@ -2397,4 +2397,253 @@ body.dark-mode .locked-explanation p {
   color: #cbd5e1;
 }
 
+/* ============================================================
+   EASTER EGG: FÜR CLAIRE (ROSA / HERZ / GLOSSY FRUTIGER AERO)
+   ============================================================ */
+
+.modal-claire-easter-egg {
+  position: relative;
+  max-width: 440px;
+  width: 92%;
+  border-radius: 28px;
+  overflow: hidden;
+  background: linear-gradient(150deg, #fff5f8 0%, #ffe4ec 45%, #ffd1df 100%);
+  border: 2px solid rgba(255, 105, 180, 0.7);
+  box-shadow: 
+    0 24px 60px rgba(255, 77, 136, 0.4),
+    0 0 50px rgba(255, 182, 193, 0.5),
+    inset 0 2px 3px rgba(255, 255, 255, 0.95),
+    inset 0 -3px 8px rgba(255, 105, 180, 0.2);
+  text-align: center;
+  padding: 0;
+  animation: claireModalPop 0.45s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+@keyframes claireModalPop {
+  0% {
+    transform: scale(0.7) translateY(20px);
+    opacity: 0;
+  }
+  100% {
+    transform: scale(1) translateY(0);
+    opacity: 1;
+  }
+}
+
+.claire-gloss-bar {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 38%;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.85) 0%, rgba(255, 255, 255, 0.1) 100%);
+  border-radius: 26px 26px 80px 80px / 26px 26px 25px 25px;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.claire-hearts-container {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  z-index: 2;
+}
+
+.claire-btn-close {
+  position: absolute;
+  top: 14px;
+  right: 16px;
+  z-index: 10;
+  background: rgba(255, 255, 255, 0.6);
+  border: 1px solid rgba(255, 105, 180, 0.4);
+  color: #be123c;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.3rem;
+  line-height: 1;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.claire-btn-close:hover {
+  background: #ff3377;
+  color: white;
+  transform: scale(1.1) rotate(90deg);
+}
+
+.claire-body {
+  position: relative;
+  z-index: 3;
+  padding: 36px 28px 30px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.claire-heart-wrapper {
+  position: relative;
+  width: 90px;
+  height: 90px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 8px;
+}
+
+.claire-halo {
+  position: absolute;
+  width: 110px;
+  height: 110px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(255, 105, 180, 0.5) 0%, rgba(255, 192, 203, 0) 70%);
+  animation: claireHaloPulse 2s infinite ease-in-out;
+}
+
+.claire-floating-heart {
+  font-size: 3.8rem;
+  line-height: 1;
+  filter: drop-shadow(0 4px 12px rgba(255, 77, 136, 0.5));
+  animation: claireHeartBeat 1.4s infinite ease-in-out;
+}
+
+@keyframes claireHeartBeat {
+  0%, 100% {
+    transform: scale(1);
+  }
+  30% {
+    transform: scale(1.18);
+  }
+  50% {
+    transform: scale(1.08);
+  }
+  70% {
+    transform: scale(1.22);
+  }
+}
+
+@keyframes claireHaloPulse {
+  0%, 100% {
+    transform: scale(0.9);
+    opacity: 0.5;
+  }
+  50% {
+    transform: scale(1.25);
+    opacity: 0.9;
+  }
+}
+
+.claire-heading {
+  margin: 4px 0 6px;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+  font-size: 2.2rem;
+  font-weight: 900;
+  letter-spacing: -0.5px;
+  background: linear-gradient(135deg, #e11d48 0%, #db2777 50%, #9d174d 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  filter: drop-shadow(0 1px 2px rgba(225, 29, 72, 0.15));
+}
+
+.claire-tag {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 14px;
+  background: linear-gradient(180deg, #ffffff 0%, #ffe4ec 100%);
+  border: 1px solid rgba(255, 105, 180, 0.45);
+  border-radius: 999px;
+  color: #be123c;
+  font-size: 0.8rem;
+  font-weight: 700;
+  box-shadow: 0 2px 6px rgba(255, 105, 180, 0.2);
+  margin-bottom: 12px;
+}
+
+.claire-text {
+  color: #4c0519;
+  font-size: 0.98rem;
+  line-height: 1.5;
+  margin: 0 0 16px;
+  max-width: 320px;
+  font-weight: 500;
+}
+
+.claire-decorations {
+  display: flex;
+  gap: 12px;
+  font-size: 1.3rem;
+  margin-bottom: 22px;
+}
+
+.decor-item {
+  animation: decorBob 2s infinite ease-in-out;
+}
+.decor-item:nth-child(2) { animation-delay: 0.3s; }
+.decor-item:nth-child(3) { animation-delay: 0.6s; }
+.decor-item:nth-child(4) { animation-delay: 0.9s; }
+.decor-item:nth-child(5) { animation-delay: 1.2s; }
+
+@keyframes decorBob {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-6px); }
+}
+
+.claire-action-wrap {
+  width: 100%;
+}
+
+.btn-claire-action {
+  width: 100%;
+  padding: 12px 24px;
+  border-radius: 999px;
+  border: 1px solid #be123c;
+  background: linear-gradient(180deg, #ff6699 0%, #ff3377 50%, #e11d48 100%);
+  color: #ffffff;
+  font-size: 0.98rem;
+  font-weight: 800;
+  letter-spacing: 0.3px;
+  cursor: pointer;
+  box-shadow: 
+    0 4px 18px rgba(225, 29, 72, 0.45),
+    inset 0 1px 2px rgba(255, 255, 255, 0.85);
+  transition: all 0.2s ease;
+}
+
+.btn-claire-action:hover {
+  transform: translateY(-2px);
+  box-shadow: 
+    0 6px 24px rgba(225, 29, 72, 0.6),
+    inset 0 1px 2px rgba(255, 255, 255, 0.95);
+  background: linear-gradient(180deg, #ff77aa 0%, #ff4785 50%, #f43f5e 100%);
+}
+
+.claire-particle {
+  position: absolute;
+  bottom: 0;
+  pointer-events: none;
+  font-size: 1.4rem;
+  animation: floatClaireHeart 3s ease-out forwards;
+}
+
+@keyframes floatClaireHeart {
+  0% {
+    transform: translateY(0) scale(0.6) rotate(0deg);
+    opacity: 0;
+  }
+  15% {
+    opacity: 0.95;
+  }
+  85% {
+    opacity: 0.8;
+  }
+  100% {
+    transform: translateY(-320px) scale(1.2) rotate(25deg);
+    opacity: 0;
+  }
+}
+
 

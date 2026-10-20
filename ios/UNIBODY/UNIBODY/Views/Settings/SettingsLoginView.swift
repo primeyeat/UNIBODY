@@ -241,6 +241,46 @@ public struct SettingsLoginView: View {
                         .padding(18)
                         .frutigerGlass(cornerRadius: 18)
                         
+                        // Appearance & Theme Mode Section
+                        VStack(alignment: .leading, spacing: 12) {
+                            HStack {
+                                Image(systemName: appState.isDarkMode ? "moon.stars.fill" : "sun.max.fill")
+                                    .font(.title3)
+                                    .foregroundColor(appState.isDarkMode ? AeroTheme.skyBlue : AeroTheme.solarOrange)
+                                Text("Erscheinungsbild")
+                                    .font(.system(.headline, design: .rounded).weight(.bold))
+                                    .foregroundColor(.white)
+                                Spacer()
+                                AeroBadge(
+                                    appState.isDarkMode ? "🌙 Dark Mode" : "☀️ Daylight Mode",
+                                    color: appState.isDarkMode ? AeroTheme.skyBlue : AeroTheme.solarOrange
+                                )
+                            }
+                            
+                            Text("Passe das Design zwischen Deep Ocean Dark Mode und Frutiger Aero Daylight an.")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                            
+                            Button {
+                                withAnimation {
+                                    appState.toggleDarkMode()
+                                }
+                            } label: {
+                                HStack {
+                                    Image(systemName: appState.isDarkMode ? "sun.max.fill" : "moon.stars.fill")
+                                    Text(appState.isDarkMode ? "Zu Daylight Mode wechseln" : "Zu Dark Mode wechseln")
+                                }
+                                .font(.subheadline.weight(.semibold))
+                                .foregroundColor(.white)
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 12)
+                                .frutigerGlass(cornerRadius: 12)
+                            }
+                            .buttonStyle(.plain)
+                        }
+                        .padding(18)
+                        .frutigerGlass(cornerRadius: 18)
+                        
                         // Backend Sync Section
                         VStack(alignment: .leading, spacing: 12) {
                             HStack {

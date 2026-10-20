@@ -27,6 +27,29 @@ public class AppState: ObservableObject {
     
     @Published public var lastSyncDate: Date? = nil
     
+    // Theme & Easter Egg
+    @Published public var isDarkMode: Bool = true
+    @Published public var showClaireEasterEgg: Bool = false
+    private var themeToggleTimestamps: [Date] = []
+    
+    public func toggleDarkMode() {
+        isDarkMode.toggle()
+        #if canImport(UIKit)
+        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+        #endif
+        
+        let now = Date()
+        themeToggleTimestamps.append(now)
+        themeToggleTimestamps = themeToggleTimestamps.filter { now.timeIntervalSince($0) <= 3.5 }
+        if themeToggleTimestamps.count >= 7 {
+            themeToggleTimestamps.removeAll()
+            #if canImport(UIKit)
+            UINotificationFeedbackGenerator().notificationOccurred(.success)
+            #endif
+            showClaireEasterEgg = true
+        }
+    }
+    
     public init() {
         loadCredentialsFromStorage()
         loadInitialData()

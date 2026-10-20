@@ -112,12 +112,24 @@ public struct ScheduleView: View {
                     }
                 }
                 ToolbarItem(placement: .navigationBarTrailing) {
-                    Button {
-                        showAddEventSheet = true
-                    } label: {
-                        Image(systemName: "plus.circle.fill")
-                            .font(.title3)
-                            .foregroundColor(AeroTheme.skyBlue)
+                    HStack(spacing: 12) {
+                        Button {
+                            withAnimation {
+                                appState.toggleDarkMode()
+                            }
+                        } label: {
+                            Image(systemName: appState.isDarkMode ? "sun.max.fill" : "moon.stars.fill")
+                                .font(.title3)
+                                .foregroundColor(AeroTheme.skyBlue)
+                        }
+                        
+                        Button {
+                            showAddEventSheet = true
+                        } label: {
+                            Image(systemName: "plus.circle.fill")
+                                .font(.title3)
+                                .foregroundColor(AeroTheme.skyBlue)
+                        }
                     }
                 }
             }
