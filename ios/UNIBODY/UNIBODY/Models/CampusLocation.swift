@@ -1,5 +1,8 @@
 import SwiftUI
 import CoreLocation
+#if canImport(UIKit)
+import UIKit
+#endif
 
 // MARK: - Campus Building Model
 public struct CampusBuilding: Identifiable, Hashable {
@@ -70,7 +73,7 @@ public enum CampusLocationEngine {
     
     public static let cap2 = CampusBuilding(
         id: "CAP2",
-        code: "CAP 2",
+        code: "CAP 2 (Audimax)",
         name: "Audimax (Auditorium Maximum)",
         address: "Christian-Albrechts-Platz 2, 24118 Kiel",
         coordinate: CLLocationCoordinate2D(latitude: 54.338236, longitude: 10.123757),
@@ -80,6 +83,20 @@ public enum CampusLocationEngine {
         description: "Großes Hauptauditorium der CAU mit Frederik-Paulsen-Hörsaal und Hörsälen A bis K.",
         entranceTip: "Haupteingang über die Freitreppe am Christian-Albrechts-Platz / Westring ins Audimax-Foyer.",
         iconName: "building.columns.fill"
+    )
+    
+    public static let cap4 = CampusBuilding(
+        id: "CAP4",
+        code: "CAP 4",
+        name: "Hochhaus & Seminarräume CAP 4",
+        address: "Christian-Albrechts-Platz 4, 24118 Kiel",
+        coordinate: CLLocationCoordinate2D(latitude: 54.338920, longitude: 10.121980),
+        area: "Campus Mitte",
+        busStops: ["Christian-Albrechts-Platz", "Universitätsbibliothek"],
+        walkingMinutes: 2,
+        description: "Universitäts-Hochhaus mit Institutsräumen und Seminarräumen.",
+        entranceTip: "Haupteingang Christian-Albrechts-Platz 4 über das Hochhausfoyer.",
+        iconName: "building.2.fill"
     )
     
     public static let mensa1 = CampusBuilding(
@@ -93,6 +110,20 @@ public enum CampusLocationEngine {
         walkingMinutes: 1,
         description: "Zentrale Universitätsmensa mit Cafeteria, Kaffeebar und AStA-Büros.",
         entranceTip: "Eingang über den Westring oder direkt von der Platzebene Christian-Albrechts-Platz.",
+        iconName: "fork.knife"
+    )
+    
+    public static let mensa2 = CampusBuilding(
+        id: "Mensa2",
+        code: "Mensa II",
+        name: "Mensa II (Campus Nord)",
+        address: "Leibnizstraße 14, 24118 Kiel",
+        coordinate: CLLocationCoordinate2D(latitude: 54.344400, longitude: 10.118600),
+        area: "Campus Nord",
+        busStops: ["Botanischer Garten", "Universitäts-Sportforum"],
+        walkingMinutes: 7,
+        description: "Mensa II im Norden des Campus an der Leibnizstraße.",
+        entranceTip: "Haupteingang an der Leibnizstraße 14.",
         iconName: "fork.knife"
     )
     
@@ -112,8 +143,8 @@ public enum CampusLocationEngine {
     
     public static let lms2 = CampusBuilding(
         id: "LMS2",
-        code: "LMS 2-4",
-        name: "Geowissenschaften & Seminarräume",
+        code: "LMS 2",
+        name: "Geowissenschaften & Seminarräume LMS 2",
         address: "Ludewig-Meyn-Straße 2, 24118 Kiel",
         coordinate: CLLocationCoordinate2D(latitude: 54.337997, longitude: 10.121653),
         area: "Campus West",
@@ -122,6 +153,48 @@ public enum CampusLocationEngine {
         description: "Hörsäle und Übungsräume für Geowissenschaften und Naturwissenschaften.",
         entranceTip: "Haupteingang Ludewig-Meyn-Straße 2, Treppenaufgang zum Hochparterre.",
         iconName: "globe.europe.africa.fill"
+    )
+    
+    public static let lms4 = CampusBuilding(
+        id: "LMS4",
+        code: "LMS 4",
+        name: "Mathematik & Informatik LMS 4",
+        address: "Ludewig-Meyn-Straße 4, 24118 Kiel",
+        coordinate: CLLocationCoordinate2D(latitude: 54.337850, longitude: 10.121600),
+        area: "Campus West",
+        busStops: ["Universitätsbibliothek", "Christian-Albrechts-Platz"],
+        walkingMinutes: 3,
+        description: "Seminarräume und Rechenpools LMS 4.",
+        entranceTip: "Eingang Ludewig-Meyn-Straße 4.",
+        iconName: "desktopcomputer"
+    )
+    
+    public static let lms6 = CampusBuilding(
+        id: "LMS6",
+        code: "LMS 6",
+        name: "Geowissenschaften LMS 6",
+        address: "Ludewig-Meyn-Straße 6, 24118 Kiel",
+        coordinate: CLLocationCoordinate2D(latitude: 54.337680, longitude: 10.121570),
+        area: "Campus West",
+        busStops: ["Universitätsbibliothek"],
+        walkingMinutes: 3,
+        description: "Seminarräume und Hörsäle LMS 6.",
+        entranceTip: "Eingang Ludewig-Meyn-Straße 6.",
+        iconName: "building.2"
+    )
+    
+    public static let lms11a = CampusBuilding(
+        id: "LMS11",
+        code: "LMS 11a",
+        name: "Bio- & Agrarwissenschaften LMS 11a",
+        address: "Ludewig-Meyn-Straße 11a, 24118 Kiel",
+        coordinate: CLLocationCoordinate2D(latitude: 54.336900, longitude: 10.122100),
+        area: "Campus West",
+        busStops: ["Mensa I (Westring)", "Universitätsbibliothek"],
+        walkingMinutes: 4,
+        description: "Übungsräume LMS 11a.",
+        entranceTip: "Eingang Ludewig-Meyn-Straße 11a.",
+        iconName: "leaf.fill"
     )
     
     public static let hhp6 = CampusBuilding(
@@ -152,6 +225,48 @@ public enum CampusLocationEngine {
         iconName: "atom"
     )
     
+    public static let os75 = CampusBuilding(
+        id: "OS75",
+        code: "OS 75",
+        name: "Hörsaalgebäude OS 75",
+        address: "Olshausenstraße 75, 24118 Kiel",
+        coordinate: CLLocationCoordinate2D(latitude: 54.343602, longitude: 10.117215),
+        area: "Campus Nord",
+        busStops: ["Botanischer Garten", "Universitäts-Sportforum"],
+        walkingMinutes: 6,
+        description: "Großes Hörsaalgebäude an der Olshausenstraße 75.",
+        entranceTip: "Haupteingang an der Olshausenstraße 75.",
+        iconName: "building.columns.fill"
+    )
+    
+    public static let ohp5 = CampusBuilding(
+        id: "OHP5",
+        code: "OHP 5",
+        name: "Otto-Hahn-Platz 5 (Chemie II)",
+        address: "Otto-Hahn-Platz 5, 24118 Kiel",
+        coordinate: CLLocationCoordinate2D(latitude: 54.339832, longitude: 10.126442),
+        area: "Campus Ost",
+        busStops: ["Universitätsbibliothek", "Waitzstraße"],
+        walkingMinutes: 5,
+        description: "Chemie II Institut am Otto-Hahn-Platz 5.",
+        entranceTip: "Eingang über den Otto-Hahn-Platz.",
+        iconName: "atom"
+    )
+    
+    public static let wsp3 = CampusBuilding(
+        id: "WSP3",
+        code: "WSP 3",
+        name: "Seminarräume Wilhelm-Seelig-Platz 3",
+        address: "Wilhelm-Seelig-Platz 3, 24118 Kiel",
+        coordinate: CLLocationCoordinate2D(latitude: 54.339550, longitude: 10.123500),
+        area: "Campus Nord (WiSo)",
+        busStops: ["Wilhelm-Seelig-Platz", "Universitätsbibliothek"],
+        walkingMinutes: 3,
+        description: "Seminarräume am Wilhelm-Seelig-Platz 3.",
+        entranceTip: "Eingang Wilhelm-Seelig-Platz 3.",
+        iconName: "chart.bar.fill"
+    )
+    
     public static let wsp7 = CampusBuilding(
         id: "WSP7",
         code: "WSP 7",
@@ -180,7 +295,7 @@ public enum CampusLocationEngine {
         iconName: "video.fill"
     )
     
-    public static let allBuildings = [cap3, cap2, mensa1, lms8, lms2, hhp6, oh14, wsp7]
+    public static let allBuildings = [cap3, cap2, cap4, mensa1, mensa2, lms8, lms2, lms4, lms6, lms11a, hhp6, os75, oh14, ohp5, wsp3, wsp7]
     
     // Resolve any room string
     public static func resolve(room: String) -> ResolvedCampusRoom {
@@ -220,7 +335,7 @@ public enum CampusLocationEngine {
         }
         
         // 3. CAP 3 (Hörsaalgebäude mit Hörsaal 1, 2, 3)
-        if lower.contains("cap3") || lower.contains("cap 3") || lower.contains("christian-albrechts-platz") {
+        if lower.contains("cap3") || lower.contains("cap 3") || lower.contains("christian-albrechts-platz 3") {
             let rName = extractRoomName(from: raw, fallback: "Hörsaal 2")
             let floor = lower.contains("og") ? "1. Obergeschoss (1. OG)" : "Erdgeschoss (EG)"
             return ResolvedCampusRoom(
@@ -240,7 +355,37 @@ public enum CampusLocationEngine {
             )
         }
         
-        // 3. LMS 8 (Informatik)
+        // 4. CAP 4 (Hochhaus)
+        if lower.contains("cap4") || lower.contains("cap 4") || lower.contains("christian-albrechts-platz 4") {
+            let rName = extractRoomName(from: raw, fallback: "CAP 4")
+            return ResolvedCampusRoom(
+                rawRoomString: raw,
+                building: cap4,
+                roomName: rName,
+                floor: "Christian-Albrechts-Platz 4",
+                isOnline: false,
+                floorRooms: [],
+                walkingDistanceMeters: 220,
+                navigationTip: "Hochhaus Christian-Albrechts-Platz 4."
+            )
+        }
+        
+        // 5. LMS 11a / LMS 11
+        if lower.contains("lms11") || lower.contains("lms 11") {
+            let rName = extractRoomName(from: raw, fallback: "LMS 11a")
+            return ResolvedCampusRoom(
+                rawRoomString: raw,
+                building: lms11a,
+                roomName: rName,
+                floor: "Erdgeschoss",
+                isOnline: false,
+                floorRooms: [],
+                walkingDistanceMeters: 350,
+                navigationTip: "Ludewig-Meyn-Straße 11a."
+            )
+        }
+        
+        // 6. LMS 8 (Informatik)
         if lower.contains("lms8") || lower.contains("lms 8") || lower.contains("ludewig-meyn-str. 8") || lower.contains("cip") || lower.contains("018") || lower.contains("informatik") {
             let rName = extractRoomName(from: raw, fallback: "Raum 018")
             let floor = lower.contains("1. og") || lower.contains("og") ? "1. Obergeschoss (1. OG)" : "Erdgeschoss (EG)"
@@ -261,7 +406,52 @@ public enum CampusLocationEngine {
             )
         }
         
-        // 4. HHP 6 (Mathematik & Physik)
+        // 7. LMS 6
+        if lower.contains("lms6") || lower.contains("lms 6") {
+            let rName = extractRoomName(from: raw, fallback: "LMS 6")
+            return ResolvedCampusRoom(
+                rawRoomString: raw,
+                building: lms6,
+                roomName: rName,
+                floor: "Ludewig-Meyn-Straße 6",
+                isOnline: false,
+                floorRooms: [],
+                walkingDistanceMeters: 360,
+                navigationTip: "Ludewig-Meyn-Straße 6."
+            )
+        }
+        
+        // 8. LMS 4
+        if lower.contains("lms4") || lower.contains("lms 4") {
+            let rName = extractRoomName(from: raw, fallback: "LMS 4")
+            return ResolvedCampusRoom(
+                rawRoomString: raw,
+                building: lms4,
+                roomName: rName,
+                floor: "Ludewig-Meyn-Straße 4",
+                isOnline: false,
+                floorRooms: [],
+                walkingDistanceMeters: 340,
+                navigationTip: "Ludewig-Meyn-Straße 4."
+            )
+        }
+        
+        // 9. LMS 2
+        if lower.contains("lms2") || lower.contains("lms 2") || lower.contains("ludewig-meyn-str. 2") {
+            let rName = extractRoomName(from: raw, fallback: "LMS 2")
+            return ResolvedCampusRoom(
+                rawRoomString: raw,
+                building: lms2,
+                roomName: rName,
+                floor: "Ludewig-Meyn-Straße 2",
+                isOnline: false,
+                floorRooms: [],
+                walkingDistanceMeters: 320,
+                navigationTip: "Ludewig-Meyn-Straße 2, Hochparterre."
+            )
+        }
+        
+        // 10. HHP 6 (Mathematik & Physik)
         if lower.contains("hhp6") || lower.contains("hhp 6") || lower.contains("heinrich-hecht") || lower.contains("060098") || lower.contains("eg.004") || lower.contains("mathe") {
             let rName = extractRoomName(from: raw, fallback: "R.EG.004")
             return ResolvedCampusRoom(
@@ -280,8 +470,23 @@ public enum CampusLocationEngine {
             )
         }
         
-        // 5. OH 14 (Chemie)
-        if lower.contains("oh14") || lower.contains("oh 14") || lower.contains("olshausenstr. 14") || lower.contains("chemie") {
+        // 11. OS 75
+        if lower.contains("os75") || lower.contains("os 75") || lower.contains("olshausenstr. 75") || lower.contains("olshausenstraße 75") {
+            let rName = extractRoomName(from: raw, fallback: "Hörsaal 1")
+            return ResolvedCampusRoom(
+                rawRoomString: raw,
+                building: os75,
+                roomName: rName,
+                floor: "Erdgeschoss",
+                isOnline: false,
+                floorRooms: [],
+                walkingDistanceMeters: 520,
+                navigationTip: "Hörsaalgebäude Olshausenstraße 75."
+            )
+        }
+        
+        // 12. OH 14 / OS 40 (Chemiezentrum)
+        if lower.contains("oh14") || lower.contains("oh 14") || lower.contains("os40") || lower.contains("os 40") || lower.contains("olshausenstr. 40") || lower.contains("olshausenstraße 40") || lower.contains("chemie i") {
             let rName = extractRoomName(from: raw, fallback: "Hörsaal Chemie")
             return ResolvedCampusRoom(
                 rawRoomString: raw,
@@ -293,12 +498,57 @@ public enum CampusLocationEngine {
                     FloorRoom(name: "Hörsaal Chemie I", code: "HS CH1", isTarget: true, xFraction: 0.20, yFraction: 0.35, widthFraction: 0.60, heightFraction: 0.45, details: "Chemie Hörsaalzentrum"),
                 ],
                 walkingDistanceMeters: 290,
-                navigationTip: "Olshausenstraße 14, direkt gegenüber der Universitätsbibliothek."
+                navigationTip: "Olshausenstraße 40, gegenüber der Universitätsbibliothek."
             )
         }
         
-        // Default: CAP 3 / Campus Mitte
-        let defName = raw.isEmpty ? "Hörsaal / Campus" : raw
+        // 13. OHP 5 (Chemie II)
+        if lower.contains("ohp5") || lower.contains("ohp 5") || lower.contains("ohp") || lower.contains("otto-hahn") || lower.contains("chemie ii") {
+            let rName = extractRoomName(from: raw, fallback: "Chemie II")
+            return ResolvedCampusRoom(
+                rawRoomString: raw,
+                building: ohp5,
+                roomName: rName,
+                floor: "Erdgeschoss",
+                isOnline: false,
+                floorRooms: [],
+                walkingDistanceMeters: 310,
+                navigationTip: "Otto-Hahn-Platz 5."
+            )
+        }
+        
+        // 14. WSP 3
+        if lower.contains("wsp3") || lower.contains("wsp 3") {
+            let rName = extractRoomName(from: raw, fallback: "SR 2")
+            return ResolvedCampusRoom(
+                rawRoomString: raw,
+                building: wsp3,
+                roomName: rName,
+                floor: "Erdgeschoss",
+                isOnline: false,
+                floorRooms: [],
+                walkingDistanceMeters: 300,
+                navigationTip: "Wilhelm-Seelig-Platz 3."
+            )
+        }
+        
+        // 15. WSP 7
+        if lower.contains("wsp7") || lower.contains("wsp 7") || lower.contains("wsp") || lower.contains("wilhelm-seelig") {
+            let rName = extractRoomName(from: raw, fallback: "WSP 7")
+            return ResolvedCampusRoom(
+                rawRoomString: raw,
+                building: wsp7,
+                roomName: rName,
+                floor: "Wilhelm-Seelig-Platz 7",
+                isOnline: false,
+                floorRooms: [],
+                walkingDistanceMeters: 310,
+                navigationTip: "Hochhaus Wilhelm-Seelig-Platz 7."
+            )
+        }
+        
+        // Default: CAP 3 / Christian-Albrechts-Platz 3
+        let defName = raw.isEmpty ? "CAP 3" : raw
         return ResolvedCampusRoom(
             rawRoomString: raw,
             building: cap3,
@@ -311,6 +561,29 @@ public enum CampusLocationEngine {
             walkingDistanceMeters: 250,
             navigationTip: "Campus Olshausenstraße, zentral am Christian-Albrechts-Platz erreichbar."
         )
+    }
+    
+    // Generates direct Apple Maps URL targeting building code and exact coordinates
+    public static func appleMapsURL(for room: String) -> URL? {
+        let resolved = resolve(room: room)
+        if resolved.isOnline { return nil }
+        
+        let building = resolved.building
+        let label = building.code
+        let lat = building.coordinate.latitude
+        let lon = building.coordinate.longitude
+        let encodedLabel = label.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? ""
+        return URL(string: "http://maps.apple.com/?q=\(encodedLabel)&ll=\(lat),\(lon)&z=18")
+    }
+    
+    // Opens the target building in Apple Maps directly, dropping pin on the exact building
+    public static func openInAppleMaps(for room: String) {
+        guard let url = appleMapsURL(for: room) else { return }
+        #if canImport(UIKit)
+        DispatchQueue.main.async {
+            UIApplication.shared.open(url)
+        }
+        #endif
     }
     
     private static func extractRoomName(from raw: String, fallback: String) -> String {

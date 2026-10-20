@@ -176,7 +176,12 @@ public struct CourseDetailView: View {
                             HStack(spacing: 12) {
                                 Label("\(grp.dayName) \(grp.startTime)–\(grp.endTime)", systemImage: "clock")
                                 if !grp.room.isEmpty {
-                                    Label(grp.room, systemImage: "mappin.and.ellipse")
+                                    Button {
+                                        CampusLocationEngine.openInAppleMaps(for: grp.room)
+                                    } label: {
+                                        Label(grp.room, systemImage: "mappin.and.ellipse")
+                                    }
+                                    .buttonStyle(.plain)
                                 }
                             }
                             .font(.caption2)
@@ -318,7 +323,12 @@ private struct GroupDetailCard: View {
             HStack(spacing: 12) {
                 Label("\(group.dayName) \(group.startTime)–\(group.endTime)", systemImage: "clock")
                 if !group.room.isEmpty {
-                    Label(group.room, systemImage: "mappin.and.ellipse")
+                    Button {
+                        CampusLocationEngine.openInAppleMaps(for: group.room)
+                    } label: {
+                        Label(group.room, systemImage: "mappin.and.ellipse")
+                    }
+                    .buttonStyle(.plain)
                 }
             }
             .font(.caption)

@@ -82,13 +82,18 @@ public struct ScheduleEventCard: View {
                 }
                 
                 if !event.room.isEmpty {
-                    HStack(spacing: 4) {
-                        Image(systemName: "mappin.and.ellipse")
-                            .font(.caption2)
-                        Text(event.room)
-                            .font(.caption.weight(.medium))
-                            .lineLimit(1)
+                    Button {
+                        CampusLocationEngine.openInAppleMaps(for: event.room)
+                    } label: {
+                        HStack(spacing: 4) {
+                            Image(systemName: "mappin.and.ellipse")
+                                .font(.caption2)
+                            Text(event.room)
+                                .font(.caption.weight(.medium))
+                                .lineLimit(1)
+                        }
                     }
+                    .buttonStyle(.plain)
                 }
             }
             .foregroundColor(.secondary)
@@ -136,14 +141,11 @@ public struct ScheduleEventCard: View {
                 }
                 
                 if !event.room.lowercased().contains("online") {
+                    let resolved = CampusLocationEngine.resolve(room: event.room)
                     Button {
-                        let query = "Christian-Albrechts-Universität Kiel \(event.room)"
-                            .addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? ""
-                        if let url = URL(string: "http://maps.apple.com/?q=\(query)") {
-                            UIApplication.shared.open(url)
-                        }
+                        CampusLocationEngine.openInAppleMaps(for: event.room)
                     } label: {
-                        Label("In Apple Maps zeigen", systemImage: "map.fill")
+                        Label("\(resolved.building.code) in Apple Maps zeigen", systemImage: "map.fill")
                     }
                 }
             }
