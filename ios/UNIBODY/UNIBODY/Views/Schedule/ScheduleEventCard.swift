@@ -1,6 +1,7 @@
 import SwiftUI
 
 public struct ScheduleEventCard: View {
+    @EnvironmentObject var appState: AppState
     public let event: ScheduleEvent
     public var onToggle: () -> Void = {}
     public var onDelete: () -> Void = {}
@@ -171,9 +172,21 @@ public struct ScheduleEventCard: View {
             
             Divider()
             
-            // 5. Löschen
-            Button(role: .destructive, action: onDelete) {
-                Label("Aus Plan entfernen", systemImage: "trash")
+            // 5. Löschen / Austragen
+            if isEnrolled {
+                Button(role: .destructive) {
+                    if let cid = event.courseId {
+                        appState.clearEnrollment(courseId: cid)
+                    } else {
+                        onDelete()
+                    }
+                } label: {
+                    Label("Aus Übung austragen", systemImage: "xmark.seal.fill")
+                }
+            } else {
+                Button(role: .destructive, action: onDelete) {
+                    Label("Aus Plan entfernen", systemImage: "trash")
+                }
             }
         } preview: {
             EventPreviewCard(event: event)

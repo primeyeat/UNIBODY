@@ -679,6 +679,28 @@ class CAUBotRequestHandler(SimpleHTTPRequestHandler):
                 })
             return
 
+        if path == "/api/course/unenroll":
+            course_id = (body.get("course_id") or "").strip()
+            with STATE_LOCK:
+                res = lookup_course_by_identifier(course_id, APP_STATE["custom_courses"], session_mgr)
+                if not res.get("ok"):
+                    self._send_json(res, status=200)
+                    return
+                course = res["course"]
+                ckey = course["course_id"].lower()
+                _apply_enrolled_group_to_state(course, None)
+                if "enrolled_groups" in APP_STATE:
+                    APP_STATE["enrolled_groups"].pop(ckey, None)
+                session_mgr.add_log("SUCCESS", f"Aus Kurs '{course['course_id']}' ausgetragen und aus dem Stundenplan entfernt.")
+                save_state(APP_STATE)
+                self._send_json({
+                    "ok": True,
+                    "course_id": course["course_id"],
+                    "enrolled_groups": APP_STATE.get("enrolled_groups", {}),
+                    "schedule": APP_STATE["schedule"],
+                })
+            return
+
         if path == "/api/course/sync-enrolled":
             with STATE_LOCK:
                 all_courses = {**BUILTIN_CAU_COURSES, **APP_STATE["custom_courses"]}

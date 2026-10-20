@@ -346,8 +346,28 @@ public class AppState: ObservableObject {
     }
     
     public func clearEnrollment(courseId: String) {
+        let cidKey = courseId.lowercased()
         enrolledGroups.removeValue(forKey: courseId)
-        schedule.removeAll { $0.courseId == courseId && $0.type == "enrolled_exercise" }
+        enrolledGroups.removeValue(forKey: cidKey)
+        schedule.removeAll {
+            ($0.courseId?.lowercased() == cidKey || $0.id.lowercased().contains(cidKey)) &&
+            $0.type == "enrolled_exercise"
+        }
+        for i in 0..<courses.count {
+            if courses[i].courseId.lowercased() == cidKey {
+                courses[i].enrolledGroupId = nil
+            }
+        }
+        #if canImport(UIKit)
+        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+        #endif
+        
+        let server = serverURL
+        Task {
+            if let host = await SyncService.shared.discoverActiveServer(preferredURL: server) {
+                _ = await SyncService.shared.postUnenroll(serverURL: host, courseId: courseId)
+            }
+        }
     }
     
     public func toggleEvent(id: String) {

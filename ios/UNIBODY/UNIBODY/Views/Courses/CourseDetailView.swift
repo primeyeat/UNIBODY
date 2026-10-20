@@ -85,6 +85,54 @@ public struct CourseDetailView: View {
                         .padding(.horizontal, 4)
                         .padding(.top, 6)
                     
+                    // Active Enrolled Group Banner with Unenroll Option
+                    if let gid = enrolledGroupId, let grp = course.groups.first(where: { $0.groupId == gid }) {
+                        VStack(alignment: .leading, spacing: 10) {
+                            HStack {
+                                Image(systemName: "checkmark.seal.fill")
+                                    .foregroundColor(AeroTheme.emerald)
+                                    .font(.title3)
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text("Aktuell belegte Gruppe")
+                                        .font(.caption.weight(.bold))
+                                        .foregroundColor(AeroTheme.emerald)
+                                    Text(grp.name)
+                                        .font(.system(.subheadline, design: .rounded).weight(.bold))
+                                        .foregroundColor(.white)
+                                }
+                                Spacer()
+                                Button(role: .destructive) {
+                                    appState.clearEnrollment(courseId: course.courseId)
+                                } label: {
+                                    Label("Austragen", systemImage: "xmark.circle.fill")
+                                        .font(.caption.weight(.bold))
+                                        .padding(.horizontal, 12)
+                                        .padding(.vertical, 6)
+                                        .background(Capsule().fill(Color.red.opacity(0.85)))
+                                        .foregroundColor(.white)
+                                }
+                            }
+                            
+                            HStack(spacing: 12) {
+                                Label("\(grp.dayName) \(grp.startTime)–\(grp.endTime)", systemImage: "clock")
+                                if !grp.room.isEmpty {
+                                    Label(grp.room, systemImage: "mappin.and.ellipse")
+                                }
+                            }
+                            .font(.caption2)
+                            .foregroundColor(.white.opacity(0.8))
+                        }
+                        .padding(14)
+                        .background(
+                            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                                .fill(AeroTheme.emerald.opacity(0.12))
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 16, style: .continuous)
+                                        .strokeBorder(AeroTheme.emerald.opacity(0.4), lineWidth: 1)
+                                )
+                        )
+                    }
+                    
                     // Groups
                     LazyVStack(spacing: 12) {
                         ForEach(course.groups) { grp in
@@ -152,12 +200,12 @@ private struct GroupDetailCard: View {
                 Spacer()
                 
                 if isEnrolled {
-                    Button(action: onClear) {
-                        Label("Belegt", systemImage: "checkmark.circle.fill")
+                    Button(role: .destructive, action: onClear) {
+                        Label("Austragen", systemImage: "xmark.circle.fill")
                             .font(.caption.weight(.bold))
                             .padding(.horizontal, 10)
                             .padding(.vertical, 6)
-                            .background(Capsule().fill(AeroTheme.emerald))
+                            .background(Capsule().fill(Color.red.opacity(0.85)))
                             .foregroundColor(.white)
                     }
                 } else {

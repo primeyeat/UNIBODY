@@ -424,8 +424,8 @@ function renderRankedGroups() {
             }
           </div>
         </div>
-        <button type="button" id="btnClearEnrolledCurrent" class="btn btn-xs btn-outline" title="Markierung als gebuchte Gruppe wieder aufheben">
-          ✕ Buchung aufheben
+        <button type="button" id="btnClearEnrolledCurrent" class="btn" style="background:#dc2626; color:#fff; font-weight:700; border-radius:10px; padding:6px 14px; border:none; cursor:pointer; font-size:0.8rem; box-shadow:0 2px 8px rgba(220,38,38,0.4);" title="Aus diesem Kurs austragen und aus dem Stundenplan entfernen">
+          ✕ Aus Kurs austragen
         </button>
       `;
       const clearBtn = document.getElementById("btnClearEnrolledCurrent");
@@ -467,7 +467,7 @@ function renderRankedGroups() {
       : `<span style="font-size:0.72rem;color:#35658a;margin-left:6px;">👆 Klick = als #1 priorisieren</span>`;
 
     const enrollToggleBtnStyle = isEnrolled
-      ? "background:linear-gradient(180deg,#42f5d4 0%,#00bfa5 100%);color:#002b24;border:1px solid #00897b;font-weight:800;padding:4px 10px;border-radius:999px;font-size:0.71rem;cursor:pointer;margin-top:6px;display:inline-flex;align-items:center;gap:4px;"
+      ? "background:rgba(239,68,68,0.18);color:#fca5a5;border:1px solid #ef4444;font-weight:800;padding:4px 10px;border-radius:999px;font-size:0.71rem;cursor:pointer;margin-top:6px;display:inline-flex;align-items:center;gap:4px;"
       : "background:rgba(0,140,230,0.12);color:inherit;border:1px solid rgba(0,150,240,0.4);font-weight:700;padding:4px 10px;border-radius:999px;font-size:0.71rem;cursor:pointer;margin-top:6px;display:inline-flex;align-items:center;gap:4px;";
 
     card.innerHTML = `
@@ -486,8 +486,8 @@ function renderRankedGroups() {
       <div class="group-right">
         <div class="score-circle">${g.is_conflict ? "Blockiert" : `${g.display_score}% Match`}</div>
         <div class="spots-tag">${formatCapacityTag(g, appState.currentCourse)}</div>
-        <button type="button" class="btn-mark-enrolled" style="${enrollToggleBtnStyle}" title="Klicke hier, wenn du dich in diese Übungsgruppe schon manuell auf OpenOlat/Moodle eingetragen hast – UNIBODY trägt sie sofort fest in deinen Stundenplan ein!">
-          ${isEnrolled ? "✅ Bereits gebucht (Aktiv)" : "☑️ Schon manuell gebucht?"}
+        <button type="button" class="btn-mark-enrolled" style="${enrollToggleBtnStyle}" title="${isEnrolled ? 'Klicke hier, um dich aus dieser Übungsgruppe auszutragen' : 'Klicke hier, um diese Übungsgruppe als gebucht einzutragen'}">
+          ${isEnrolled ? "✕ Aus Gruppe austragen" : "☑️ Schon manuell gebucht?"}
         </button>
       </div>
     `;

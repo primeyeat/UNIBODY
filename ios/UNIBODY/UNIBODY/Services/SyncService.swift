@@ -120,4 +120,20 @@ public class SyncService {
         }
         return UnivISParser.parseICS(text)
     }
+    
+    /// Unenrolls a course on the local UNIBODY Core server
+    public func postUnenroll(serverURL: String, courseId: String) async -> Bool {
+        guard let url = URL(string: "\(serverURL)/api/course/unenroll") else { return false }
+        var req = URLRequest(url: url)
+        req.httpMethod = "POST"
+        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        req.httpBody = try? JSONSerialization.data(withJSONObject: ["course_id": courseId])
+        req.timeoutInterval = 3.0
+        do {
+            let (_, response) = try await URLSession.shared.data(for: req)
+            return (response as? HTTPURLResponse)?.statusCode == 200
+        } catch {
+            return false
+        }
+    }
 }
