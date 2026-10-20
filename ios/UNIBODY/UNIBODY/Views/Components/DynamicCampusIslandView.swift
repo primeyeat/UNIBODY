@@ -7,9 +7,9 @@ public struct DynamicCampusIslandView: View {
     public var onClose: () -> Void = {}
     
     @State private var mapDisplayMode: MapDisplayMode = .campusPlan
-    @State private var isExpanded: Bool = true
+    @State private var isExpanded: Bool
     @State private var pulseAnimation: Bool = false
-    @State private var isPressingCameraNotch: Bool = false
+    @State private var isNotchPressed: Bool = false
     
     public enum MapDisplayMode: String, CaseIterable, Identifiable {
         case campusPlan = "Campus-Plan"
@@ -30,13 +30,16 @@ public struct DynamicCampusIslandView: View {
         CampusLocationEngine.resolve(room: event.room)
     }
     
-    public init(event: ScheduleEvent, onClose: @escaping () -> Void = {}) {
+    public init(event: ScheduleEvent, startExpanded: Bool = false, onClose: @escaping () -> Void = {}) {
         self.event = event
+        self._isExpanded = State(initialValue: startExpanded)
         self.onClose = onClose
     }
     
     public var body: some View {
         GeometryReader { geo in
+            let centerX = geo.size.width / 2
+            
             ZStack(alignment: .top) {
                 // Dimming backdrop when island is expanded
                 if isExpanded {
@@ -48,29 +51,41 @@ public struct DynamicCampusIslandView: View {
                         .transition(.opacity)
                 }
                 
-                // NATIVE DYNAMIC ISLAND INTEGRATION:
+                // NATIVE DYNAMIC ISLAND:
                 // Anchored directly at the physical iPhone TrueDepth camera notch (y = 11pt, height = 37pt).
-                // Minimized: Compact pill hugging the camera sensor cutout.
-                // Expanded: Card morphs directly from the camera notch downwards.
+                // Minimized: Compact black pill hugging the camera sensor cutout.
+                // Expanded: Full campus navigator card morphing directly out of the camera notch.
                 if isExpanded {
                     expandedIslandCard(in: geo)
-                        .padding(.top, 11) // Begins directly at the camera notch level
-                        .padding(.horizontal, 14) // Safe inside physical display corner curvature
+                        .padding(.top, 11)
+                        .padding(.horizontal, 14)
                         .transition(.asymmetric(
                             insertion: .scale(scale: 0.88, anchor: .top).combined(with: .opacity),
                             removal: .scale(scale: 0.88, anchor: .top).combined(with: .opacity)
                         ))
                 } else {
                     compactIslandHardwareNotch(in: geo)
-                        .padding(.top, 11) // Exactly where the camera cutout is located in the notch!
+                        .padding(.top, 11)
                         .transition(.asymmetric(
                             insertion: .scale(scale: 0.90, anchor: .top).combined(with: .opacity),
                             removal: .scale(scale: 0.90, anchor: .top).combined(with: .opacity)
                         ))
                 }
+                
+                // ========================================================
+                // NOTCH HARDWARE INTERACTION ZONE (Centered at camera cutout)
+                // Width 260pt, Height 60pt (y: 0 to 60pt)
+                // Catches Long Press directly on the camera notch to open and close!
+                // ========================================================
+                NotchHardwareTouchZone {
+                    toggleIsland()
+                }
+                .frame(width: 260, height: 60)
+                .position(x: centerX, y: 30) // Perfectly covers the camera notch and status bar area!
+                .zIndex(1000)
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-            .animation(.spring(response: 0.36, dampingFraction: 0.78), value: isExpanded)
+            .animation(.spring(response: 0.38, dampingFraction: 0.76), value: isExpanded)
             .animation(.spring(response: 0.30, dampingFraction: 0.82), value: mapDisplayMode)
             .onAppear {
                 pulseAnimation = true
@@ -78,11 +93,21 @@ public struct DynamicCampusIslandView: View {
         }
     }
     
+    // Toggle Dynamic Island open and close with heavy haptic feedback
+    private func toggleIsland() {
+        #if canImport(UIKit)
+        UIImpactFeedbackGenerator(style: .heavy).impactOccurred()
+        #endif
+        withAnimation(.spring(response: 0.38, dampingFraction: 0.76)) {
+            isExpanded.toggle()
+        }
+    }
+    
     private func expandFromIsland() {
         #if canImport(UIKit)
         UIImpactFeedbackGenerator(style: .heavy).impactOccurred()
         #endif
-        withAnimation(.spring(response: 0.36, dampingFraction: 0.78)) {
+        withAnimation(.spring(response: 0.38, dampingFraction: 0.76)) {
             isExpanded = true
         }
     }
@@ -91,7 +116,7 @@ public struct DynamicCampusIslandView: View {
         #if canImport(UIKit)
         UIImpactFeedbackGenerator(style: .heavy).impactOccurred()
         #endif
-        withAnimation(.spring(response: 0.36, dampingFraction: 0.78)) {
+        withAnimation(.spring(response: 0.38, dampingFraction: 0.76)) {
             isExpanded = false
         }
     }
@@ -149,19 +174,13 @@ public struct DynamicCampusIslandView: View {
                 )
                 .shadow(color: Color.black.opacity(0.85), radius: 10, y: 4)
         )
-        .scaleEffect(isPressingCameraNotch ? 0.94 : 1.0)
-        .animation(.easeInOut(duration: 0.15), value: isPressingCameraNotch)
         .contentShape(Rectangle())
-        // Long-press directly on the camera notch location expands the island
-        .highPriorityGesture(
-            LongPressGesture(minimumDuration: 0.22)
-                .onEnded { _ in
-                    expandFromIsland()
-                }
-        )
+        .onLongPressGesture(minimumDuration: 0.2, maximumDistance: 50) {
+            toggleIsland()
+        }
         .simultaneousGesture(
             TapGesture().onEnded {
-                expandFromIsland()
+                toggleIsland()
             }
         )
     }
@@ -192,34 +211,28 @@ public struct DynamicCampusIslandView: View {
                 Spacer(minLength: 16)
                 
                 // Center Camera Notch Touch Zone (where camera is physically located!)
-                // User can long-press or tap right here on the camera location to minimize!
                 ZStack {
                     Capsule()
-                        .fill(Color.white.opacity(0.06))
-                        .frame(width: 90, height: 26)
+                        .fill(Color.white.opacity(0.08))
+                        .frame(width: 80, height: 24)
                         .overlay(
                             Capsule()
-                                .strokeBorder(Color.white.opacity(0.12), lineWidth: 0.8)
+                                .strokeBorder(Color.white.opacity(0.15), lineWidth: 0.8)
                         )
                     
                     HStack(spacing: 4) {
                         Image(systemName: "chevron.up")
                             .font(.system(size: 9, weight: .heavy))
-                            .foregroundColor(.white.opacity(0.65))
+                            .foregroundColor(.white.opacity(0.7))
                     }
                 }
                 .contentShape(Rectangle())
-                .scaleEffect(isPressingCameraNotch ? 0.92 : 1.0)
-                .animation(.easeInOut(duration: 0.15), value: isPressingCameraNotch)
-                .highPriorityGesture(
-                    LongPressGesture(minimumDuration: 0.22)
-                        .onEnded { _ in
-                            minimizeToIsland()
-                        }
-                )
+                .onLongPressGesture(minimumDuration: 0.2, maximumDistance: 50) {
+                    toggleIsland()
+                }
                 .simultaneousGesture(
                     TapGesture().onEnded {
-                        minimizeToIsland()
+                        toggleIsland()
                     }
                 )
                 
@@ -250,13 +263,10 @@ public struct DynamicCampusIslandView: View {
             }
             .frame(height: 37) // Exact height matching the camera notch
             .padding(.top, 4)
-            // Entire top notch row supports long press on the camera location to minimize
-            .highPriorityGesture(
-                LongPressGesture(minimumDuration: 0.22)
-                    .onEnded { _ in
-                        minimizeToIsland()
-                    }
-            )
+            .contentShape(Rectangle())
+            .onLongPressGesture(minimumDuration: 0.2, maximumDistance: 50) {
+                toggleIsland()
+            }
             
             // ============================================
             // EVENT & LOCATION HEADER
@@ -444,14 +454,66 @@ public struct DynamicCampusIslandView: View {
             )
             .shadow(color: Color.black.opacity(0.85), radius: 24, y: 12)
         )
-        .gesture(
-            DragGesture(minimumDistance: 25)
-                .onEnded { value in
-                    if value.translation.height < -30 {
-                        minimizeToIsland()
-                    }
-                }
-        )
+    }
+}
+
+// MARK: - Notch Hardware Touch Zone (UIKit Gesture Recognizer hooked directly to the notch)
+struct NotchHardwareTouchZone: UIViewRepresentable {
+    var onToggle: () -> Void
+    
+    func makeUIView(context: Context) -> UIView {
+        let view = TouchPassThroughView()
+        view.backgroundColor = .clear
+        view.isUserInteractionEnabled = true
+        
+        let longPress = UILongPressGestureRecognizer(target: context.coordinator, action: #selector(Coordinator.handleLongPress(_:)))
+        longPress.minimumPressDuration = 0.20
+        longPress.allowableMovement = 60.0
+        longPress.cancelsTouchesInView = false
+        view.addGestureRecognizer(longPress)
+        
+        let tap = UITapGestureRecognizer(target: context.coordinator, action: #selector(Coordinator.handleTap(_:)))
+        tap.cancelsTouchesInView = false
+        view.addGestureRecognizer(tap)
+        
+        return view
+    }
+    
+    func updateUIView(_ uiView: UIView, context: Context) {
+        context.coordinator.onToggle = onToggle
+    }
+    
+    func makeCoordinator() -> Coordinator {
+        Coordinator(onToggle: onToggle)
+    }
+    
+    class Coordinator: NSObject {
+        var onToggle: () -> Void
+        private var lastTriggerTime: Date = .distantPast
+        
+        init(onToggle: @escaping () -> Void) {
+            self.onToggle = onToggle
+        }
+        
+        @objc func handleLongPress(_ gesture: UILongPressGestureRecognizer) {
+            if gesture.state == .began {
+                guard Date().timeIntervalSince(lastTriggerTime) > 0.35 else { return }
+                lastTriggerTime = Date()
+                onToggle()
+            }
+        }
+        
+        @objc func handleTap(_ gesture: UITapGestureRecognizer) {
+            guard Date().timeIntervalSince(lastTriggerTime) > 0.35 else { return }
+            lastTriggerTime = Date()
+            onToggle()
+        }
+    }
+}
+
+class TouchPassThroughView: UIView {
+    override func point(inside point: CGPoint, with event: UIEvent?) -> Bool {
+        return self.bounds.contains(point)
     }
 }
 

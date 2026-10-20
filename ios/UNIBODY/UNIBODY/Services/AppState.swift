@@ -34,7 +34,7 @@ public class AppState: ObservableObject {
     
     // Dynamic Island Campus Map & Room Navigator
     @Published public var activeNavEvent: ScheduleEvent? = nil
-    @Published public var isDynamicIslandActive: Bool = false
+    @Published public var isDynamicIslandActive: Bool = true
     
     public func navigateToCampusRoom(for event: ScheduleEvent) {
         self.activeNavEvent = event
