@@ -5,122 +5,125 @@
 <h1 align="center">🫧 UNIBODY</h1>
 <p align="center">
   <strong>CAU Kiel Dual-Platform Kurs-Sniper &amp; Echtzeit-Stundenplan-Optimizer (WiSe 2026/27)</strong><br/>
-  Automatische Kurswahl, Kollisionsschutz &amp; 1-Klick Auto-Login für <code>lms.uni-kiel.de</code> (OpenOlat) und <code>elearn.informatik.uni-kiel.de</code> (Informatik-Moodle)
+  Vollautomatisches Einschreiben, intelligentes Plattform-Routing, Kollisionsschutz &amp; 1-Klick Auto-Login für <code>lms.uni-kiel.de</code> (OpenOlat) und <code>elearn.informatik.uni-kiel.de</code> (Informatik-Moodle)
+</p>
+
+<p align="center">
+  <img src="https://img.shields.io/badge/Python-3.9+-3776AB?style=flat-square&logo=python&logoColor=white" alt="Python 3.9+" />
+  <img src="https://img.shields.io/badge/Design-Frutiger%20Aero%20Glass-00a8ff?style=flat-square" alt="Frutiger Aero" />
+  <img src="https://img.shields.io/badge/Plattformen-OpenOlat%20%7C%20Moodle-10b981?style=flat-square" alt="OpenOlat & Moodle" />
+  <img src="https://img.shields.io/badge/Zero--Dependency-Stdlib%20Only-blueviolet?style=flat-square" alt="Zero Dependencies" />
+  <img src="https://img.shields.io/badge/Lizenz-MIT-orange?style=flat-square" alt="License" />
 </p>
 
 ---
 
-## 🌍 Warum UNIBODY?
+## 🌟 Was ist UNIBODY?
 
-Als Wirtschaftsinformatiker/in an der **CAU Kiel** sind deine Kurse und Übungsgruppen auf **zwei völlig verschiedene Plattformen** verteilt:
-1. **🏛️ `lms.uni-kiel.de` (CAU OpenOlat)** – hier liegen u. a. *Einführung in die Wirtschaftsinformatik* (`infEWInf-01a`), *Mathematik für die Informatik A* (`Inf-Math-A`), *Einführung in die BWL* (`BWL-EinfBWL`) und *Informatikrecht* (`Inf-InfRecht`).
-2. **💻 `elearn.informatik.uni-kiel.de` (Informatik Moodle)** – hier liegen die Übungsgruppen für *Einführung in die Informatik* (`infEInf-02a` / `infEInf-01a`, Moodle-Kurs `id=470`) sowie weitere Informatik-Module.
+An der **Christian-Albrechts-Universität zu Kiel (CAU)** sind Kurse und Übungsgruppen je nach Institut über **zwei getrennte Plattformen** verteilt:
+1. **🏛️ `lms.uni-kiel.de` (CAU OpenOlat):** u. a. *Einführung in die Wirtschaftsinformatik* (`infEWInf-01a`), *Mathematik für die Informatik A* (`Inf-Math-A`), *Einführung in die BWL* (`BWL-EinfBWL`) und *Informatikrecht* (`Inf-InfRecht`).
+2. **💻 `elearn.informatik.uni-kiel.de` (Informatik Moodle):** u. a. *Einführung in die Informatik* (`infEInf-02a` / `infEInf-01a`, Kurs `id=470`) und weitere Informatik-Module.
 
-**UNIBODY** verbindet beide Systeme zu einer einzigen Oberfläche im **Frutiger Aero Design** (inklusive *Deep Ocean Aurora Dark Mode*):
-- Du hinterlegst deine CAU-Kennung (`stu...`) und dein Passwort **ein einziges Mal**.
-- **UNIBODY erkennt bei jedem Kurs vollautomatisch, auf welcher der beiden Seiten er gelistet ist**, loggt dich im Browser auf beiden Plattformen automatisch ein und sichert dir sekundengenau deine Wunsch-Übungsgruppe!
-
----
-
-## 🚀 Komplette Schritt-für-Schritt-Anleitung (Auch für absolute Einsteiger!)
-
-Du brauchst **keine Programmierkenntnisse** und musst **keine extra Pakete (`pip`)** installieren. UNIBODY nutzt ausschließlich Funktionen, die in Python bereits standardmäßig eingebaut sind.
-
-### Was du auf deinem Computer brauchst:
-1. **Google Chrome** (als Browser für den automatischen CAU-Login)
-2. **Python 3**
-   - *Auf dem Mac:* Ist oft schon vorinstalliert (falls nicht, fragt dich dein Mac beim ersten Befehl automatisch, ob er es mit einem Klick installieren soll, oder lade es auf [python.org/downloads](https://www.python.org/downloads/) herunter).
-   - *Auf Windows:* Lade Python kostenlos auf [python.org/downloads](https://www.python.org/downloads/) herunter. **Wichtig bei Windows:** Setze ganz unten im Installationsfenster unbedingt das Häkchen bei **„Add python.exe to PATH“**!
+**UNIBODY** vereint beide Welten in einer einzigen, reaktionsschnellen Web-App im **Frutiger Aero Glass-Design** (inkl. *Deep Ocean Aurora Dark Mode*):
+- 🔑 **1-Klick CAU Auto-Login:** Hinterlege deine CAU-Kennung (`stu...`) einmalig im Tresor. UNIBODY meldet dich auf beiden Plattformen automatisch per Shibboleth SSO an.
+- 🎯 **Intelligentes Routing:** UNIBODY erkennt bei jeder Kurs-ID oder UnivIS-Nummer von selbst, ob der Kurs in OpenOlat oder im Informatik-Moodle liegt.
+- ⚡ **Millisekunden-Sniper & Auto-Fallback:** Buche deine Wunschgruppe per Sofortklick oder mit Countdown-Timer. Ist Platz #1 zeitgleich belegt, greift binnen 12 ms automatisch der Fallback auf Platz #2!
+- 🔒 **Sperrfrist-Erkennung:** Sind Gruppen von Dozenten noch gesperrt (z. B. bis zum *23. Oktober*), erkennt UNIBODY das Datum live, informiert dich per Popup und beendet Chrome sicher.
+- 🛑 **Automatischer Chrome-Shutdown:** Nach Abschluss des Auftrags beendet UNIBODY den Google Chrome Browser automatisch und gibt RAM und CPU wieder frei.
+- 🪟 **Interaktive Popups & Audio-Feedback:** Detaillierte Erfolgs- und Sperr-Benachrichtigungen mit Bestätigungstoken, Raum, Uhrzeit und sanften Sound-Chimes.
 
 ---
 
-### 🍏 Anleitung für Mac (macOS)
+## 🚀 Schnellanleitung (In 3 Schritten startklar!)
 
-#### Schritt 1: UNIBODY herunterladen
-Du hast zwei Möglichkeiten (wähle einfach die, die dir leichter fällt):
+UNIBODY benötigt **keine externen Pakete (`pip`)** oder Datenbanken. Alles läuft über die in Python eingebaute Standardbibliothek!
 
-- **Variante A – Ohne Git (Einfach per Mausklick als ZIP):**
-  1. Klicke ganz oben rechts auf dieser GitHub-Seite auf den grünen Button **`<> Code`**.
-  2. Klicke im Menü auf **`Download ZIP`**.
-  3. Öffne deinen `Downloads`-Ordner und mache einen Doppelklick auf `UNIBODY-main.zip`, sodass der Ordner **`UNIBODY-main`** entpackt wird.
-
-- **Variante B – Über das Terminal (mit Git):**
-  1. Drücke gleichzeitig **`Cmd ⌘` + `Leertaste`** (Spotlight-Suche), tippe **`Terminal`** ein und drücke **`Enter`**.
-  2. Kopiere diesen Befehl hinein und drücke **`Enter`**:
-     ```bash
-     git clone https://github.com/primeyeat/UNIBODY.git
-     ```
-
-#### Schritt 2: UNIBODY starten
-1. Öffne die App **Terminal** (falls noch nicht offen: `Cmd ⌘` + `Leertaste` $\rightarrow$ `Terminal` $\rightarrow$ `Enter`).
-2. **Profi-Trick für Einsteiger:**
-   - Tippe im Terminal `cd ` ein (wichtig: mit einem **Leerzeichen** hinter dem `cd`!) – drücke noch **nicht** Enter.
-   - Ziehe jetzt einfach deinen heruntergeladenen **`UNIBODY`**-Ordner (bzw. `UNIBODY-main`) mit der Maus aus dem Finder direkt in das Terminal-Fenster! Das Terminal setzt den Pfad automatisch ein.
-   - Drücke jetzt **`Enter`**.
-3. Starte nun den UNIBODY-Server mit diesem Befehl und drücke **`Enter`**:
-   ```bash
-   python3 server.py
-   ```
-4. Im Terminal steht jetzt:
-   `CAU Kiel LMS Sniper & Schedule Optimizer running on http://127.0.0.1:8765`
-   *(Lass dieses Terminal-Fenster einfach im Hintergrund offen, solange du UNIBODY benutzt!)*
-
-#### Schritt 3: UNIBODY im Browser öffnen
-Öffne deinen normalen Webbrowser (Safari, Chrome, Arc, Firefox etc.) und klicke auf diesen Link (oder gib ihn oben in die Adresszeile ein):
-
-👉 **[http://127.0.0.1:8765](http://127.0.0.1:8765)**
+### Voraussetzungen:
+1. **Google Chrome** (wird für die sichere Browser-Automatisierung via Chrome DevTools Protocol genutzt)
+2. **Python 3.9 oder neuer** ([python.org/downloads](https://www.python.org/downloads/))
 
 ---
 
-### 🪟 Anleitung für Windows
+### 🍏 Installation & Start auf macOS
 
-1. **Herunterladen:** Klicke oben auf dieser GitHub-Seite auf den grünen Button **`<> Code`** $\rightarrow$ **`Download ZIP`** und entpacke den ZIP-Ordner (z. B. auf deinen Desktop).
-2. **Ordner im Terminal öffnen:**
-   - Öffne den entpackten Ordner `UNIBODY-main` im Windows-Explorer.
-   - Klicke oben in die Adresszeile des Ordners, tippe **`cmd`** ein und drücke **`Enter`**. Es öffnet sich ein schwarzes Fenster direkt im richtigen Ordner.
-3. **Server starten:** Tippe folgenden Befehl ein und drücke **`Enter`**:
+#### 1. Repository klonen
+Öffne das **Terminal** (`Cmd ⌘` + `Leertaste` $\rightarrow$ `Terminal` $\rightarrow$ `Enter`) und führe aus:
+```bash
+git clone https://github.com/primeyeat/UNIBODY.git
+cd UNIBODY
+```
+
+*(Alternativ: Lade das Projekt oben rechts über den grünen Button **`<> Code`** $\rightarrow$ **`Download ZIP`** herunter und entpacke den Ordner.)*
+
+#### 2. UNIBODY starten
+```bash
+python3 server.py
+```
+Im Terminal erscheint:
+```text
+CAU Kiel LMS Sniper & Schedule Optimizer running on http://127.0.0.1:8765 and http://localhost:8765
+```
+
+#### 3. Im Browser öffnen
+Rufe die Web-Oberfläche in Safari, Chrome oder Firefox auf:  
+👉 **[http://localhost:8765](http://localhost:8765)** *(oder [http://127.0.0.1:8765](http://127.0.0.1:8765))*
+
+---
+
+### 🪟 Installation & Start auf Windows
+
+1. **Herunterladen:**
+   - Klicke oben auf **`<> Code`** $\rightarrow$ **`Download ZIP`** und entpacke den Ordner (oder nutze `git clone https://github.com/primeyeat/UNIBODY.git` in der Eingabeaufforderung).
+2. **Terminal im Ordner öffnen:**
+   - Öffne den entpackten Ordner `UNIBODY` im Explorer.
+   - Tippe oben in die Pfadzeile **`cmd`** ein und drücke `Enter`.
+3. **Server starten:**
    ```bat
    python server.py
    ```
-4. **Website öffnen:** Öffne deinen Browser und gehe auf:
-   👉 **[http://127.0.0.1:8765](http://127.0.0.1:8765)**
+4. **Website aufrufen:**  
+   👉 **[http://localhost:8765](http://localhost:8765)**
 
 ---
 
-## 🎮 Wie bediene ich UNIBODY auf der Website? (In 4 einfachen Schritten)
+## 🎮 Funktionsübersicht & Bedienung
 
-Sobald du **[http://127.0.0.1:8765](http://127.0.0.1:8765)** geöffnet hast, funktioniert alles bequem per Mausklick:
+### 1️⃣ CAU Account Tresor (Oben links)
+- Gib deine **CAU-Kennung** (`stu123456`) und dein **Passwort** ein.
+- Klicke auf **`🚀 Speichern & beide Plattformen im Browser einloggen`**.
+- **Sicherheit:** Deine Daten werden lokal auf deinem Rechner im **macOS Schlüsselbund (Keychain)** bzw. in einer lokalen Datei (`data/credentials.json`) verschlüsselt hinterlegt. Der Ordner `data/` ist über `.gitignore` geschützt und gelangt **niemals** auf GitHub!
+- UNIBODY öffnet Chrome und loggt dich auf `lms.uni-kiel.de` und `elearn.informatik.uni-kiel.de` ein.
 
-### 1️⃣ CAU-Account einmalig hinterlegen (Oben links: „🫧 UNIBODY TRESOR“)
-- Trage deine **CAU-Kennung** (z. B. `stu123456`) und dein **Passwort** ein.
-- Klicke auf den grünen Button **`🚀 Speichern & beide Plattformen im Browser einloggen`**.
-- **Was passiert jetzt?**
-  - Dein Passwort wird sicher lokal im **macOS Schlüsselbund (Keychain)** gespeichert (es verlässt niemals deinen Computer!).
-  - Es öffnet sich ein Google-Chrome-Fenster, das automatisch sowohl **`lms.uni-kiel.de` (OpenOlat)** als auch **`elearn.informatik.uni-kiel.de` (Informatik-Moodle)** öffnet, deine Login-Daten von selbst einträgt und dich auf beiden Seiten anmeldet!
+### 2️⃣ Wochenplan & Kurs-Auswahl (Schritt 1)
+- **Klick-Auswahl im Stundenplan:** Klicke einfach auf einen der blauen **Vorlesungs-Blöcke** im interaktiven Wochenplan, um den Kurs sofort in Schritt 1 auszuwählen.
+- **Schnellauswahl:** Nutze die vorgefertigten Chips (`infEWInf-01a`, `infEInf-02a`, `Inf-Math-A`, `BWL-EinfBWL`, `Inf-InfRecht`) oder gib eine beliebige **UnivIS-Kennung** (z. B. `080058`) ein.
+- **Auto-Sync:** Ein Klick auf **`🔄 Bereits belegte Gruppen aus Browser synchronisieren`** scannt deine offenen LMS-Tabs und trägt deine bereits fest gebuchten Gruppen direkt in deinen Stundenplan ein!
 
-### 2️⃣ Kurs auswählen (Per Klick im Kalender oder über Schritt 1)
-- **Schnellster Weg:** Klicke rechts im **Wochen-Stundenplan** einfach direkt auf einen der **blauen Vorlesungs-Blöcke** (z. B. auf *Einführung in die Informatik* am Montag oder *Einführung in die Wirtschaftsinformatik* am Donnerstag).
-- **Alternativ:** Klicke links in **Schritt 1** auf einen der Kurs-Buttons (`infEWInf-01a`, `infEInf-02a`, `Inf-Math-A`, `BWL-EinfBWL`, `Inf-InfRecht`) oder tippe irgendeine **6-stellige UnivIS-Kennung** ein – UNIBODY lädt die echten Termine live von `univis.uni-kiel.de`!
-- Im grünen Banner siehst du sofort, wohin **UNIBODY** den Kurs routet (`🫧 UNIBODY -> lms.uni-kiel.de` oder `🫧 UNIBODY -> elearn.informatik.uni-kiel.de`).
+### 3️⃣ Wunsch-Gruppe priorisieren (Schritt 2 & 3)
+- Im Wochenplan erscheinen alle verfügbaren Gruppen des Kurses als interaktive Blöcke:
+  - 🟩 **Grün (#1):** Deine Top-Empfehlung (nach deinen Freie-Tage- und Zeitfenster-Präferenzen)
+  - 🟧 **Orange (#2 / #3):** Konfliktfreie Alternativen
+  - 🟥 **Rot:** Zeitkonflikt mit einer bestehenden Vorlesung oder Übung
+- **Wunsch ändern:** Gefällt dir eine andere Zeit besser? **Klicke einfach auf den entsprechenden Kasten im Kalender!** Er wird sofort als dein **📌 Wunsch #1** fixiert.
 
-### 3️⃣ Deine Wunsch-Übungsgruppe priorisieren
-- Im Wochen-Stundenplan werden dir alle möglichen Übungsgruppen des ausgewählten Kurses als **gestrichelte Blöcke** angezeigt:
-  - 🟩 **Grün (#1):** Deine aktuell beste Empfehlung / dein Wunsch #1
-  - 🟧 **Orange (#2 / #3):** Gute Alternativen ohne Zeitkonflikt
-  - 🟥 **Rot:** Blockiert, weil du zu dieser Zeit schon eine andere Vorlesung hast!
-- **Per Klick priorisieren:** Gefällt dir eine bestimmte orangefarbene Übung im Stundenplan am besten? **Klicke einfach im Kalender auf den gestrichelten Kasten!** Er färbt sich sofort **grün** und wird in **Schritt 3** automatisch als dein **📌 Wunsch #1** ganz nach oben gesetzt.
+### 4️⃣ Live-Einschreibung & Sniper (Schritt 3)
+- **`⚡ Jetzt sofort einschreiben`**: Schreibt dich direkt in Millisekunden in deine Wunschgruppe ein.
+- **`⏱️ 5s Countdown-Sniper starten`**: Für den Ernstfall, wenn eine Einschreibung pünktlich freigeschaltet wird.
+- **Automatischer Fallback-Schutz:** Ist dein Wunsch #1 in derselben Sekunde voll, bucht UNIBODY sofort automatisch **Wunsch #2**!
 
-### 4️⃣ Einschreiben / Sniper abfeuern (Schritt 3)
-- Klicke in **Schritt 3** auf:
-  - **`⚡ Jetzt sofort einschreiben (Bestplatz sichern)`** – um dich direkt in deinen Wunsch #1 einzutragen.
-  - **`⏱️ 5s Countdown-Sniper starten`** – für den Ernstfall, wenn die Anmeldung zu einer vollen Stunde freigeschaltet wird.
-- **Automatischer Fallback-Schutz:** Sollte dein Wunsch #1 in derselben Millisekunde voll werden, bricht UNIBODY nicht ab, sondern bucht in **12 Millisekunden automatisch deinen Platz #2**!
+### 5️⃣ Intelligente Benachrichtigungen & Auto-Shutdown
+- **🎉 Erfolgs-Popup (`#modalEnrollmentSuccess`):**  
+  Zeigt dir sofort nach erfolgreicher Buchung Kursname, Gruppe, Raum, Wochentag, Uhrzeit und Bestätigungs-Token an – inklusive 1-Klick-Button zum Wochenplan und dezentem Audio-Chime.
+- **⏳ Sperrfrist-Popup (`#modalEnrollmentLocked`):**  
+  Haben Dozenten die Anmeldung noch nicht eröffnet (z. B. Moodle-Sperre bis 23. Oktober), liest UNIBODY das Datum aus, informiert dich transparent und schließt Chrome automatisch.
+- **🛑 Chrome-Shutdown:**  
+  Sobald der Auftrag erledigt oder die Sperre festgestellt wurde, beendet UNIBODY Google Chrome vollständig im Hintergrund, um Systemressourcen zu schonen.
 
 ---
 
-## 📊 Überblick der vorinstallierten CAU Wirtschaftsinformatik-Kurse (WiSe 26/27)
+## 📚 Enthaltene Standardkurse (WiSe 2026/27)
 
-| Modulcode | Veranstaltung | UnivIS-Kennung (VL / ÜB) | UNIBODY Ziel-Plattform |
+| Modulcode | Veranstaltung | UnivIS-ID (VL / ÜB) | Ziel-Plattform |
 | :--- | :--- | :--- | :--- |
 | **`infEWInf-01a`** | Einführung in die Wirtschaftsinformatik (Prof. Cordes) | `080038` / `080042` | 🏛️ `lms.uni-kiel.de` (OpenOlat) |
 | **`infEInf-02a`** | Einführung in die Informatik (Prof. Mühling / Dr. Esquivel) | `080058` / `080056` | 💻 `elearn.informatik.uni-kiel.de` (Moodle `#470`) |
@@ -128,15 +131,44 @@ Sobald du **[http://127.0.0.1:8765](http://127.0.0.1:8765)** geöffnet hast, fun
 | **`BWL-EinfBWL`** | Einführung in die Betriebswirtschaftslehre (Prof. Walter) | `030225` / `030189`–`030315` | 🏛️ `lms.uni-kiel.de` (OpenOlat) |
 | **`Inf-InfRecht`** | Informatikrecht (Dr. Lindhorst) | `080103` | 🏛️ `lms.uni-kiel.de` (OpenOlat) |
 
-*(Jederzeit erweiterbar über den Button **`+ Eigenen LMS-Kurs anlegen`** oder **`✏️ Echte Gruppen aus LMS einfügen / anpassen`**!)*
+*Über die Buttons **`+ Eigenen LMS-Kurs anlegen`** und **`✏️ Gruppenzeiten anpassen`** kannst du jederzeit weitere CAU-Kurse beliebig hinzufügen!*
 
 ---
 
-## ❓ Häufige Fragen (FAQ für Einsteiger)
+## 🧹 UnivIS .ics Import & Smart Cleaner
 
-- **Wie schalte ich zwischen Light Mode und Dark Mode um?**
-  Oben rechts im Header findest du den Button **`🌙 Dark Mode`** bzw. **`☀️ Daylight Mode`**, der zwischen hellem *Frutiger Aero Daylight* und dunklem *Deep Ocean Aurora Glass* wechselt.
-- **Sind meine CAU-Login-Daten sicher?**
-  Ja, zu 100 %. Deine Zugangsdaten werden im **macOS Schlüsselbund (Keychain)** bzw. lokal im Ordner `data/` gespeichert. Der gesamte Ordner `data/` ist über `.gitignore` gesperrt und wird niemals ins Internet oder zu GitHub hochgeladen.
-- **Wie beende ich UNIBODY wieder?**
-  Klicke in das geöffnete Terminal-Fenster und drücke **`Ctrl + C`** (bzw. **`Strg + C`**) oder schließe einfach das Terminal-Fenster.
+UnivIS exportiert oft überladene Kalenderdateien mit unbereinigten Doppelungen.
+- Klicke im Wochenplan auf **`🧹 UnivIS .ics Import & Bereiniger`**.
+- Lade deine `.ics`-Datei hoch.
+- UNIBODY filtert verdächtige oder doppelte Einträge automatisch heraus und übernimmt nur deine echten Vorlesungen in den Stundenplan.
+
+---
+
+## ❓ FAQ & Fehlerbehebung
+
+<details>
+<summary><strong>Woher weiß ich, dass meine Zugangsdaten sicher sind?</strong></summary>
+UNIBODY speichert Passwörter im lokalen macOS Schlüsselbund bzw. in der lokalen Datei <code>data/credentials.json</code>. Das Verzeichnis <code>data/</code> ist in <code>.gitignore</code> eingetragen und wird niemals auf GitHub übertragen. Der Quellcode ist 100 % Open Source und auditierbar.
+</details>
+
+<details>
+<summary><strong>Warum schließt sich Google Chrome nach dem Sniper automatisch?</strong></summary>
+Das ist ein gewünschtes Sicherheits- und Performance-Feature! Sobald UNIBODY deinen Platz gebucht hat (oder festgestellt hat, dass die Übungsgruppen von den Dozenten noch gesperrt sind), wird Chrome sauber geschlossen, um RAM und CPU freizugeben.
+</details>
+
+<details>
+<summary><strong>Wie beende ich den Server?</strong></summary>
+Drücke im Terminal einfach <code>Ctrl + C</code> (bzw. <code>Strg + C</code> auf Windows) oder schließe das Terminal-Fenster.
+</details>
+
+<details>
+<summary><strong>Kann ich zwischen Hell- und Dunkelmodus wechseln?</strong></summary>
+Ja! Klicke oben rechts auf <code>🌙 Dark Mode</code> bzw. <code>☀️ Daylight Mode</code>. Dein gewähltes Design wird im Browser gespeichert.
+</details>
+
+---
+
+## 📄 Lizenz & Haftungsausschluss
+
+Dieses Projekt steht unter der **MIT-Lizenz**.  
+*Hinweis:* UNIBODY ist ein inoffizielles Hilfswerkzeug von Studierenden für Studierende der Christian-Albrechts-Universität zu Kiel und steht in keiner offiziellen Verbindung zur CAU Kiel, OpenOlat oder Moodle.
