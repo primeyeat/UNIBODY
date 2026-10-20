@@ -47,11 +47,28 @@ async function apiPost(path, payload) {
 
 /* INITIALIZATION */
 document.addEventListener("DOMContentLoaded", async () => {
+  initThemeMode();
   bindUIEvents();
   await fetchInitialState();
   await verifyAndRankCourse(document.getElementById("courseQueryInput").value);
   setInterval(pollTelemetry, 1800);
 });
+
+function initThemeMode() {
+  const savedTheme = localStorage.getItem("cau_dorfic_theme") || "light";
+  const btn = document.getElementById("btnToggleDarkMode");
+  if (savedTheme === "dark") {
+    document.body.classList.add("dark-mode");
+    if (btn) btn.textContent = "☀️ Daylight Mode";
+  }
+  if (btn) {
+    btn.addEventListener("click", () => {
+      const isDark = document.body.classList.toggle("dark-mode");
+      localStorage.setItem("cau_dorfic_theme", isDark ? "dark" : "light");
+      btn.textContent = isDark ? "☀️ Daylight Mode" : "🌙 Dark Mode";
+    });
+  }
+}
 
 async function fetchInitialState() {
   const data = await apiGet("/api/state");
@@ -93,7 +110,7 @@ function syncPreferencesUI() {
 
 function renderCatalogChips() {
   const container = document.getElementById("catalogChips");
-  container.innerHTML = `<span style="font-size:0.75rem;color:#94a3b8;margin-right:4px;">Verifizierte CAU-Kurse:</span>`;
+  container.innerHTML = `<span style="font-size:0.75rem;color:#525c68;font-weight:800;text-transform:uppercase;margin-right:4px;">Verifizierte CAU-Kurse:</span>`;
   appState.catalog.forEach((c) => {
     const btn = document.createElement("button");
     btn.type = "button";
@@ -101,7 +118,7 @@ function renderCatalogChips() {
     if (appState.currentCourse && appState.currentCourse.course_id === c.course_id) {
       btn.classList.add("active");
     }
-    btn.innerHTML = `<strong>${c.course_id}</strong> <span style="opacity:0.75">(UnivIS ${c.univis_id})</span>`;
+    btn.innerHTML = `<strong>${c.course_id}</strong> <span style="opacity:0.8">(${c.univis_id})</span>`;
     btn.addEventListener("click", () => {
       document.getElementById("courseQueryInput").value = c.course_id;
       verifyAndRankCourse(c.course_id);
@@ -134,11 +151,11 @@ async function verifyAndRankCourse(queryId) {
   banner.innerHTML = `
     <div>
       ✅ <strong>Exakte Kurs-ID verifiziert:</strong> ${res.course.title}<br/>
-      <span style="font-size:0.77rem;opacity:0.9;">
-        Modulcode: <code>${res.course.course_id}</code> · UnivIS-Nr.: <code>${res.course.univis_id}</code> · OpenOlat-ID: <code>${res.course.olat_repo_id}</code> · Dozent/in: ${res.course.lecturer}
+      <span style="font-size:0.77rem;opacity:0.95;">
+        Modulcode: <code>${res.course.course_id}</code> · UnivIS-Nr.: <code>${res.course.univis_id}</code> · OpenOlat/LMS: <code>${res.course.olat_repo_id}</code> · Dozent/in: ${res.course.lecturer}
       </span>
     </div>
-    <span class="step-pill" style="background:rgba(16,185,129,0.25);color:#6ee7b7;">ID SICHER</span>
+    <span class="step-pill">ID SICHER</span>
   `;
 
   renderCatalogChips();
@@ -158,11 +175,10 @@ async function pinGroupAsRank1(groupId) {
     appState.pinnedGroupId = res.pinned_group_id || null;
     renderRankedGroups();
     renderTimetable();
-    // Smoothly highlight the newly promoted Rank #1 card in Step 3
     const firstCard = document.querySelector("#rankedGroupsContainer .group-card.rank-1");
     if (firstCard) {
       firstCard.scrollIntoView({ behavior: "smooth", block: "nearest" });
-      firstCard.style.boxShadow = "0 0 0 3px #10b981, 0 8px 25px rgba(16, 185, 129, 0.4)";
+      firstCard.style.boxShadow = "0 0 0 3px #1db933, 0 8px 25px rgba(29, 185, 51, 0.35)";
       setTimeout(() => {
         firstCard.style.boxShadow = "";
       }, 900);
@@ -175,7 +191,7 @@ function renderRankedGroups() {
   container.innerHTML = "";
 
   if (!appState.currentCourse) {
-    container.innerHTML = `<div style="padding:18px;text-align:center;color:#94a3b8;font-size:0.85rem;">Bitte gib oben eine verifizierte Kurs-ID ein, um die optimalen Übungsgruppen zu berechnen.</div>`;
+    container.innerHTML = `<div style="padding:18px;text-align:center;color:#525c68;font-size:0.85rem;">Bitte gib oben eine verifizierte Kurs-ID ein, um die optimalen Übungsgruppen zu berechnen.</div>`;
     return;
   }
 
@@ -196,10 +212,10 @@ function renderRankedGroups() {
       .join("");
 
     const pinBadge = isPinned
-      ? `<span style="background:#10b981;color:#052e16;font-size:0.7rem;padding:2px 7px;border-radius:99px;margin-left:6px;font-weight:800;">📌 Manuell Priorisiert (Wunsch #1)</span>`
+      ? `<span style="background:linear-gradient(180deg,#52eb68 0%,#1db933 50%,#0e8a21 100%);color:#ffffff;font-size:0.7rem;padding:2px 8px;border-radius:99px;margin-left:6px;font-weight:900;border:1px solid #0b6e1a;">📌 Manuell Priorisiert (Wunsch #1)</span>`
       : isRank1
-      ? `<span style="color:#34d399;font-size:0.8rem;margin-left:4px;">🏆 (Bester Platz)</span>`
-      : `<span style="font-size:0.72rem;color:#94a3b8;margin-left:6px;opacity:0.85;">👆 Klick = als #1 priorisieren</span>`;
+      ? `<span style="color:#0f8a22;font-size:0.8rem;font-weight:900;margin-left:4px;">🏆 (Bester Platz)</span>`
+      : `<span style="font-size:0.72rem;color:#35658a;margin-left:6px;">👆 Klick = als #1 priorisieren</span>`;
 
     card.innerHTML = `
       <div class="group-left">
