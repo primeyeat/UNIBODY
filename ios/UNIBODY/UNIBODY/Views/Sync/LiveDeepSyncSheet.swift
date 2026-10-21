@@ -401,7 +401,7 @@ private struct LiveDeepSyncWebView: UIViewRepresentable {
             let fraction = Double(currentCourseIndex) / Double(max(1, coursesToScan.count))
             let prog = 0.20 + fraction * 0.70
             
-            parent.onStatusUpdate("Prüfe \(course.title)... (\(currentCourseIndex + 1)/\(coursesToScan.count))", prog)
+            parent.onStatusUpdate("Öffne \(course.title)... (\(currentCourseIndex + 1)/\(coursesToScan.count))", prog)
             wv.load(URLRequest(url: course.targetEnrollmentURL))
         }
         
@@ -438,8 +438,8 @@ private struct LiveDeepSyncWebView: UIViewRepresentable {
             
             let course = coursesToScan[currentCourseIndex]
             
-            // Timeout per course: If after ~14 ticks (5.6s) nothing found, move to next course
-            if currentCourseTicks > 14 {
+            // Timeout per course: If after ~20 ticks (8.0s) nothing found, move to next course
+            if currentCourseTicks > 20 {
                 advanceToNextCourse()
                 return
             }
@@ -576,86 +576,158 @@ private struct LiveDeepSyncWebView: UIViewRepresentable {
                     return { action: "LOGIN_GENERIC", msg: "Melde bei Informatik-Moodle an..." };
                 }
                 
-                // 3. OPENOLAT TREE NAVIGATION: CLICK "EINSCHREIBUNG" IF TABLE NOT PRESENT
-                const table = document.querySelector('table.o_table, table.table');
-                if (!table && location.hostname.includes('lms.uni-kiel.de')) {
-                    const links = Array.from(document.querySelectorAll('.o_tree a, .o_course_menu a, nav a, .o_subnav a, a.o_tree_link, #o_main_container a, .o_course_run a'));
-                    let targetLink = links.find(a => {
-                        const txt = (a.innerText || a.getAttribute('title') || '').trim().toLowerCase();
-                        return txt === 'einschreibung' || txt === 'anmeldung zur übung' || txt === 'anmeldung' || txt === 'übungsgruppen';
+                // 3. TREE NAVIGATION: Find & Click "Übung" / "Anmeldung zur Übung"
+                function openExerciseSection() {
+                    const closeBtn = document.querySelector('.modal-header .close, button.close, .o_modal_close');
+                    if (closeBtn) closeBtn.click();
+                    
+                    const allLinks = Array.from(document.querySelectorAll('#o_main_left a, .o_tree a, .o_course_menu a, nav a, .o_subnav a, a.o_tree_link, a.o_tree_opener, #o_main_container a'));
+                    
+                    // 1. Expand tree folder if closed: e.g. "Unterelemente von Übung"
+                    const ubOpener = allLinks.find(el => {
+                        const title = (el.getAttribute('title') || '').toLowerCase();
+                        const txt = (el.innerText || '').toLowerCase();
+                        return title.includes('unterelemente von übung') || title.includes('unterelemente von uebung') || (el.classList.contains('o_tree_opener') && (title.includes('übung') || txt.includes('übung')));
                     });
-                    if (!targetLink) {
-                        targetLink = links.find(a => /einschreib|anmeldung|gruppenwahl|übungsgruppen/i.test((a.innerText || a.getAttribute('title') || '').trim().toLowerCase()));
+                    if (ubOpener) {
+                        let code = (ubOpener.getAttribute('onclick') || '').replace(/return\\s+false\\s*;?/g, '');
+                        if (code) {
+                            try { (new Function(code)).call(ubOpener); } catch(e) {}
+                        }
+                        ubOpener.click();
                     }
-                    if (targetLink) {
+                    
+                    // 2. Click specific registration node
+                    let target = allLinks.find(el => {
+                        const txt = (el.innerText || '').trim().toLowerCase();
+                        return txt === 'anmeldung zur übung' || txt === 'anmeldung zur uebung' ||
+                               txt === 'anmeldung' || txt === 'einschreibung' || 
+                               txt === 'übungsgruppen' || txt === 'uebungsgruppen' || 
+                               txt === 'gruppenwahl';
+                    });
+                    
+                    if (!target) {
+                        target = allLinks.find(el => {
+                            const txt = (el.innerText || '').trim().toLowerCase();
+                            return /(?:anmeldung|einschreib|gruppenwahl|übungsgruppe|uebungsgruppe)/i.test(txt);
+                        });
+                    }
+                    
+                    if (!target) {
+                        target = allLinks.find(el => {
+                            const txt = (el.innerText || '').trim().toLowerCase();
+                            return txt === 'übung' || txt === 'uebung' || txt === 'übungen' || txt === 'uebungen';
+                        });
+                    }
+                    
+                    if (target) {
                         const now = Date.now();
-                        if (!window.__lastNodeClick || (now - window.__lastNodeClick > 3000)) {
-                            window.__lastNodeClick = now;
-                            const label = (targetLink.innerText || 'Einschreibung').trim();
-                            targetLink.click();
-                            return { action: "CLICKED_NODE", msg: "Öffne " + label + " für " + COURSE.courseId + "..." };
+                        if (!window.__lastTreeClick || (now - window.__lastTreeClick > 2500)) {
+                            window.__lastTreeClick = now;
+                            let code = (target.getAttribute('onclick') || '').replace(/return\\s+false\\s*;?/g, '');
+                            if (code) {
+                                try { (new Function(code)).call(target); } catch(e) {}
+                            }
+                            target.click();
+                            target.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, view: window }));
+                            return (target.innerText || 'Übung').trim();
                         }
                     }
+                    return null;
                 }
                 
-                // 4. OPENOLAT GROUPS TABLE LIVE SCRAPE
-                if (table && location.hostname.includes('lms.uni-kiel.de')) {
-                    const rows = Array.from(table.querySelectorAll('tbody tr'));
-                    let enrolledRowFound = null;
-                    
-                    for (const tr of rows) {
-                        const text = (tr.innerText || '').toLowerCase();
-                        const isEnrolled = text.includes('eingeschrieben') || 
-                                           text.includes('angemeldet') || 
-                                           tr.querySelector('a[onclick*="cmd.enrolled.cancel"], a[onclick*="cmd.cancel"], a[onclick*="cancel"]') !== null ||
-                                           Array.from(tr.querySelectorAll('a, button')).some(b => /austragen|abmelden/i.test(b.innerText || b.value || ''));
+                // 4. FIND EXERCISE TABLE (Must have capacity or enrollment actions)
+                function findExerciseTable() {
+                    const tables = Array.from(document.querySelectorAll('table.o_table, table.table'));
+                    for (const t of tables) {
+                        const html = t.innerHTML.toLowerCase();
+                        const text = t.innerText.toLowerCase();
+                        const hasCapacity = /\\d+\\s*\\/\\s*\\d+/.test(text);
+                        const hasEnrollAction = /cmd\\.enrolled\\.cancel|cmd\\.cancel|einschreiben|austragen|abmelden/i.test(html);
+                        const hasGroupRows = /gruppe|gr\\.|übung|uebung/i.test(text);
                         
-                        // Exclude "nicht eingeschrieben"
-                        if (isEnrolled && !text.includes('nicht eingeschrieben')) {
-                            const tds = Array.from(tr.querySelectorAll('td, th')).map(td => (td.innerText || '').trim());
-                            const rawName = tds[0] || (tr.querySelector('td') ? tr.querySelector('td').innerText : '');
-                            const rawDesc = tds[1] || '';
-                            const combined = `${rawName} ${rawDesc}`;
-                            const slot = parseGermanTimeslot(combined);
-                            
-                            // Extract exact room if present
-                            let room = "CAU Campus";
-                            const roomMatch = combined.match(/([a-z0-9]+\\s*-\\s*r\\.[a-z0-9./]+|[a-z0-9]+\\s*-\\s*hörsaal\\s*\\d+|cap\\d+\\s*-\\s*[^\\n,]+)/i);
-                            if (roomMatch) {
-                                room = roomMatch[1].trim();
-                            }
-                            
-                            // Extract weekType if present
-                            let weekType = "all";
-                            if (/(?:woche\\s*a|\\bw1\\b)/i.test(combined)) {
-                                weekType = "A";
-                            } else if (/(?:woche\\s*b|\\bw2\\b)/i.test(combined)) {
-                                weekType = "B";
-                            }
-                            
-                            enrolledRowFound = {
-                                groupName: rawName.replace(/\\s+/g, ' ').trim(),
-                                day: slot ? slot.day : 0,
-                                dayName: slot ? slot.dayName : "Montag",
-                                startTime: slot ? slot.startTime : "10:15",
-                                endTime: slot ? slot.endTime : "11:45",
-                                time: slot ? slot.time : "10:15–11:45",
-                                room: room,
-                                weekType: weekType,
-                                hasSlot: slot !== null
-                            };
-                            break;
+                        // Exclude overview tables that only show the course container "EBWL 26/27"
+                        if ((hasCapacity || hasEnrollAction) && hasGroupRows) {
+                            return t;
                         }
                     }
-                    
-                    return {
-                        action: "SCANNED_COURSE_TABLE",
-                        enrolled: enrolledRowFound,
-                        rowCount: rows.length
-                    };
+                    if (tables.length === 1) {
+                        const text = tables[0].innerText.toLowerCase();
+                        if (/\\d+\\s*\\/\\s*\\d+/.test(text) || /cmd\\.enrolled\\.cancel|einschreiben|austragen/i.test(tables[0].innerHTML)) {
+                            return tables[0];
+                        }
+                    }
+                    return null;
                 }
                 
-                // 5. MOODLE CHOICEGROUP LIVE SCRAPE
+                // 5. EXECUTE NAVIGATION & SCRAPING
+                if (location.hostname.includes('lms.uni-kiel.de')) {
+                    const table = findExerciseTable();
+                    
+                    if (table) {
+                        const rows = Array.from(table.querySelectorAll('tbody tr'));
+                        let enrolledRowFound = null;
+                        
+                        for (const tr of rows) {
+                            const text = (tr.innerText || '').toLowerCase();
+                            const isEnrolled = text.includes('eingeschrieben') || 
+                                               text.includes('angemeldet') || 
+                                               tr.querySelector('a[onclick*="cmd.enrolled.cancel"], a[onclick*="cmd.cancel"], a[onclick*="cancel"]') !== null ||
+                                               Array.from(tr.querySelectorAll('a, button')).some(b => /austragen|abmelden/i.test(b.innerText || b.value || ''));
+                            
+                            // Exclude "nicht eingeschrieben"
+                            if (isEnrolled && !text.includes('nicht eingeschrieben')) {
+                                const tds = Array.from(tr.querySelectorAll('td, th')).map(td => (td.innerText || '').trim());
+                                const rawName = tds[0] || (tr.querySelector('td') ? tr.querySelector('td').innerText : '');
+                                const rawDesc = tds[1] || '';
+                                const combined = `${rawName} ${rawDesc}`;
+                                const slot = parseGermanTimeslot(combined);
+                                
+                                // Extract exact room if present
+                                let room = "CAU Campus";
+                                const roomMatch = combined.match(/([a-z0-9]+\\s*-\\s*r\\.[a-z0-9./]+|[a-z0-9]+\\s*-\\s*hörsaal\\s*\\d+|cap\\d+\\s*-\\s*[^\\n,]+)/i);
+                                if (roomMatch) {
+                                    room = roomMatch[1].trim();
+                                }
+                                
+                                // Extract weekType if present
+                                let weekType = "all";
+                                if (/(?:woche\\s*a|\\bw1\\b)/i.test(combined)) {
+                                    weekType = "A";
+                                } else if (/(?:woche\\s*b|\\bw2\\b)/i.test(combined)) {
+                                    weekType = "B";
+                                }
+                                
+                                enrolledRowFound = {
+                                    groupName: rawName.replace(/\\s+/g, ' ').trim(),
+                                    day: slot ? slot.day : 0,
+                                    dayName: slot ? slot.dayName : "Montag",
+                                    startTime: slot ? slot.startTime : "10:15",
+                                    endTime: slot ? slot.endTime : "11:45",
+                                    time: slot ? slot.time : "10:15–11:45",
+                                    room: room,
+                                    weekType: weekType,
+                                    hasSlot: slot !== null
+                                };
+                                break;
+                            }
+                        }
+                        
+                        return {
+                            action: "SCANNED_COURSE_TABLE",
+                            enrolled: enrolledRowFound,
+                            rowCount: rows.length
+                        };
+                    }
+                    
+                    // Table not present yet -> try clicking left menu!
+                    const clickedNode = openExerciseSection();
+                    if (clickedNode) {
+                        return { action: "CLICKED_NODE", msg: "Öffne " + clickedNode + " für " + COURSE.courseId + "..." };
+                    }
+                }
+                
+                // 6. MOODLE CHOICEGROUP LIVE SCRAPE
                 if (location.hostname.includes('elearn.informatik')) {
                     const checkedRadio = document.querySelector('input[type="radio"]:checked');
                     if (checkedRadio) {
