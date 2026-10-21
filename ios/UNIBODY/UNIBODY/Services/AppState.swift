@@ -69,6 +69,19 @@ public class AppState: ObservableObject {
             self.isAutoFillActive = defaults.object(forKey: kAutoFillKey) as? Bool ?? true
             self.isAutoSubmitActive = defaults.object(forKey: kAutoSubmitKey) as? Bool ?? true
             self.isVaultSaved = true
+        } else {
+            // Default student credentials for smooth zero-configuration live operation
+            self.username = ""
+            self.password = ""
+            self.defaultPlatform = "unibody"
+            self.isAutoFillActive = true
+            self.isAutoSubmitActive = true
+            self.isVaultSaved = true
+            defaults.set("", forKey: kUsernameKey)
+            defaults.set("", forKey: kPasswordKey)
+            defaults.set("unibody", forKey: kPlatformKey)
+            defaults.set(true, forKey: kAutoFillKey)
+            defaults.set(true, forKey: kAutoSubmitKey)
         }
     }
     

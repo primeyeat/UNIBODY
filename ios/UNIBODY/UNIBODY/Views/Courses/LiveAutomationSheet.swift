@@ -134,7 +134,38 @@ public struct LiveAutomationSheet: View {
                         }
                     )
                     .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-                    .padding(8)
+                    .padding(.horizontal, 10)
+                    .padding(.top, 8)
+                    .padding(.bottom, 6)
+                    
+                    // Fixed Bottom Done / Close Button (elevated above home bar, perfectly tappable)
+                    Button {
+                        dismiss()
+                    } label: {
+                        HStack(spacing: 8) {
+                            Image(systemName: isSuccess ? "checkmark.circle.fill" : "xmark.circle")
+                                .font(.system(size: 16, weight: .bold))
+                            Text(isSuccess ? "Erledigt" : "Abbrechen")
+                                .font(.system(.body, design: .rounded).weight(.bold))
+                        }
+                        .foregroundColor(.white)
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 50)
+                        .background(
+                            ZStack {
+                                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                                    .fill(isSuccess ? AeroTheme.auroraGradient : AeroTheme.oceanGradient)
+                                
+                                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                                    .strokeBorder(Color.white.opacity(0.35), lineWidth: 1)
+                            }
+                        )
+                        .shadow(color: isSuccess ? AeroTheme.emerald.opacity(0.3) : Color.clear, radius: 8, x: 0, y: 3)
+                    }
+                    .buttonStyle(.plain)
+                    .padding(.horizontal, 16)
+                    .padding(.top, 4)
+                    .padding(.bottom, 16)
                 }
             }
             .navigationBarTitleDisplayMode(.inline)
@@ -223,9 +254,12 @@ private struct LiveAutomationWebView: UIViewRepresentable {
             guard !hasSucceeded, let wv = webView else { return }
             stepCounter += 1
             
+            let effectiveUser = parent.username.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "" : parent.username.trimmingCharacters(in: .whitespacesAndNewlines)
+            let effectivePass = parent.password.isEmpty ? "" : parent.password
+            
             let params: [String: Any] = [
-                "username": parent.username.trimmingCharacters(in: .whitespacesAndNewlines),
-                "password": parent.password,
+                "username": effectiveUser,
+                "password": effectivePass,
                 "isEnroll": parent.task.isEnroll,
                 "targetName": parent.task.group?.name ?? "",
                 "targetDay": parent.task.group?.dayName ?? "",
@@ -240,164 +274,268 @@ private struct LiveAutomationWebView: UIViewRepresentable {
             let js = """
             (function() {
                 const PARAMS = \(jsonString);
-                const USERNAME = PARAMS.username;
-                const PASSWORD = PARAMS.password;
+                const USERNAME = PARAMS.username || "";
+                const PASSWORD = PARAMS.password || "";
                 const IS_ENROLL = PARAMS.isEnroll;
                 const TARGET_NAME = (PARAMS.targetName || "").toLowerCase();
                 const TARGET_DAY = (PARAMS.targetDay || "").toLowerCase();
                 const TARGET_TIME = (PARAMS.targetTime || "").toLowerCase();
                 const TARGET_ID = (PARAMS.targetId || "").toLowerCase();
                 
-                // 1. Check for Confirmation Modal Dialog first
-                const modal = document.querySelector('.modal-dialog, .modal-content, .o_modal');
-                if (modal) {
-                    const btn = modal.querySelector('button.btn-primary, input[type="submit"]') ||
-                                Array.from(modal.querySelectorAll('button, a.btn, input[type="button"]')).find(b => /(ja|einschreiben|anmelden|austragen|abmelden|bestätigen|speichern|ok|yes)/i.test((b.innerText || b.value || '').trim()));
-                    if (btn) {
-                        btn.click();
-                        return { action: "MODAL_CONFIRMED", msg: "Bestätige Buchungs-Dialog..." };
+                // Helper: Robustly set input value with native descriptor + jQuery + full DOM events
+                function setVal(el, val) {
+                    if (!el || val === undefined || val === null) return false;
+                    try {
+                        el.focus();
+                        const proto = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value');
+                        if (proto && proto.set) {
+                            proto.set.call(el, val);
+                        } else {
+                            el.value = val;
+                        }
+                        if (window.jQuery) {
+                            try { window.jQuery(el).val(val).trigger('input').trigger('change'); } catch(e) {}
+                        }
+                        el.dispatchEvent(new Event('input', { bubbles: true }));
+                        el.dispatchEvent(new Event('change', { bubbles: true }));
+                        el.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true }));
+                        el.dispatchEvent(new KeyboardEvent('keyup', { bubbles: true }));
+                        return true;
+                    } catch (e) {
+                        el.value = val;
+                        return true;
                     }
                 }
                 
-                // 2. OpenOlat 21+ FlexiForm AJAX Login (`#ofo_oolat_login`)
+                // Helper: Trigger OpenOlat FlexiForm submit
+                function triggerOlatSubmit() {
+                    const du = document.getElementById('ofo_oolat_login_dispatchuri');
+                    const ev = document.getElementById('ofo_oolat_login_eventval');
+                    if (du) du.value = 'o_fiooolat_login_button';
+                    if (ev) ev.value = '2';
+                    if (window.o_info) window.o_info.preventOnchange = true;
+                    
+                    const btn = document.getElementById('o_fiooolat_login_button');
+                    if (btn) {
+                        try {
+                            if (typeof btn.onclick === 'function') {
+                                btn.onclick.call(btn, new MouseEvent('click', { bubbles: true, cancelable: true }));
+                            }
+                        } catch(e) {}
+                        btn.click();
+                        btn.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, view: window }));
+                    }
+                    if (typeof window.o_XHRSubmit === 'function') {
+                        try { window.o_XHRSubmit('ofo_oolat_login'); } catch(e) {}
+                    }
+                }
+                
+                // ==========================================
+                // 1. OPENOLAT FLEXIFORM LOGIN (lms.uni-kiel.de/dmz/)
+                // ==========================================
                 const olatForm = document.getElementById('ofo_oolat_login');
                 const olatNameInput = document.getElementById('o_fiooolat_login_name');
                 const olatPassInput = document.getElementById('o_fiooolat_login_pass');
-                const olatBtn = document.getElementById('o_fiooolat_login_button');
                 
                 if (olatForm && (olatNameInput || olatPassInput)) {
-                    // Check Step 2: Password first
+                    // Step 2: Password input is visible
                     if (olatPassInput && olatPassInput.offsetParent !== null) {
-                        if (olatPassInput.value !== PASSWORD && PASSWORD.length > 0) {
-                            olatPassInput.focus();
-                            olatPassInput.value = PASSWORD;
-                            olatPassInput.dispatchEvent(new Event('input', { bubbles: true }));
-                            olatPassInput.dispatchEvent(new Event('change', { bubbles: true }));
+                        if (olatNameInput && olatNameInput.offsetParent !== null && olatNameInput.value !== USERNAME) {
+                            setVal(olatNameInput, USERNAME);
                         }
-                        const du = document.getElementById('ofo_oolat_login_dispatchuri');
-                        const ev = document.getElementById('ofo_oolat_login_eventval');
-                        if (du) du.value = 'o_fiooolat_login_button';
-                        if (ev) ev.value = '2';
-                        if (typeof window.o_XHRSubmit === 'function') {
-                            window.o_XHRSubmit('ofo_oolat_login');
-                        } else if (olatBtn) {
-                            olatBtn.click();
+                        setVal(olatPassInput, PASSWORD);
+                        
+                        const now = Date.now();
+                        if (!window.__lastStep2Ts || (now - window.__lastStep2Ts > 2500)) {
+                            window.__lastStep2Ts = now;
+                            setTimeout(triggerOlatSubmit, 100);
                         }
                         return { action: "LOGIN_STEP2", msg: "Übermittle CAU-Passwort..." };
                     }
                     
-                    // Step 1: Username
-                    if (olatNameInput && (!olatPassInput || olatPassInput.offsetParent === null)) {
-                        if (olatNameInput.value !== USERNAME && USERNAME.length > 0) {
-                            olatNameInput.focus();
-                            olatNameInput.value = USERNAME;
-                            olatNameInput.dispatchEvent(new Event('input', { bubbles: true }));
-                            olatNameInput.dispatchEvent(new Event('change', { bubbles: true }));
+                    // Step 1: Username input is visible
+                    if (olatNameInput && olatNameInput.offsetParent !== null) {
+                        setVal(olatNameInput, USERNAME);
+                        
+                        const now = Date.now();
+                        if (!window.__lastStep1Ts || (now - window.__lastStep1Ts > 2500)) {
+                            window.__lastStep1Ts = now;
+                            setTimeout(triggerOlatSubmit, 100);
                         }
-                        const du = document.getElementById('ofo_oolat_login_dispatchuri');
-                        const ev = document.getElementById('ofo_oolat_login_eventval');
-                        if (du) du.value = 'o_fiooolat_login_button';
-                        if (ev) ev.value = '2';
-                        if (typeof window.o_XHRSubmit === 'function') {
-                            window.o_XHRSubmit('ofo_oolat_login');
-                        } else if (olatBtn) {
-                            olatBtn.click();
-                        }
-                        return { action: "LOGIN_STEP1", msg: "Melde " + (USERNAME || "Benutzer") + " an..." };
+                        return { action: "LOGIN_STEP1", msg: "Melde " + USERNAME + " an..." };
                     }
                 }
                 
-                // 3. Moodle Login
-                const moodleUser = document.querySelector('form#login input#username, input[name="username"]');
-                const moodlePass = document.querySelector('form#login input#password, input[name="password"]');
-                const moodleBtn = document.querySelector('form#login button#loginbtn, button[type="submit"]');
-                if (moodleUser && moodlePass && moodleBtn) {
-                    moodleUser.value = USERNAME;
-                    moodlePass.value = PASSWORD;
-                    moodleBtn.click();
-                    return { action: "LOGIN_MOODLE", msg: "Melde bei Moodle an..." };
+                // ==========================================
+                // 2. MOODLE / SHIBBOLETH / CAU-IDP LOGIN
+                // ==========================================
+                const moodleUser = document.querySelector('form#login input#username, input[name="username"], input[name="j_username"]');
+                const moodlePass = document.querySelector('form#login input#password, input[name="password"], input[name="j_password"]');
+                const moodleBtn = document.querySelector('form#login button#loginbtn, button[type="submit"], input[type="submit"], button[name="_eventId_proceed"]');
+                if (moodleUser && moodlePass && moodleBtn && moodleUser.offsetParent !== null && moodlePass.offsetParent !== null) {
+                    setVal(moodleUser, USERNAME);
+                    setVal(moodlePass, PASSWORD);
+                    const now = Date.now();
+                    if (!window.__lastMoodleTs || (now - window.__lastMoodleTs > 3000)) {
+                        window.__lastMoodleTs = now;
+                        setTimeout(() => { moodleBtn.click(); }, 120);
+                    }
+                    return { action: "LOGIN_GENERIC", msg: "CAU-Zentral-Login für " + USERNAME + "..." };
                 }
                 
-                // 4. Shibboleth / SAML IdP Login (`idp.uni-kiel.de`)
-                const idpUser = document.querySelector('input#username, input[name="j_username"]');
-                const idpPass = document.querySelector('input#password, input[name="j_password"]');
-                const idpBtn = document.querySelector('button[type="submit"], input[type="submit"]');
-                if (idpUser && idpPass && idpBtn) {
-                    idpUser.value = USERNAME;
-                    idpPass.value = PASSWORD;
-                    idpBtn.click();
-                    return { action: "LOGIN_IDP", msg: "CAU-Zentral-Login..." };
+                // ==========================================
+                // 3. CONFIRMATION MODAL (Strictly excluding #o_form_dirty_message)
+                // ==========================================
+                function findConfirmationModalButton() {
+                    const modals = Array.from(document.querySelectorAll('.modal.in, .modal.show, div.modal-dialog, div.o_modal, div.modal-content'));
+                    for (const m of modals) {
+                        if (m.id === 'o_form_dirty_message' || m.closest('#o_form_dirty_message')) continue;
+                        if (m.offsetParent === null) continue;
+                        const style = window.getComputedStyle(m);
+                        if (style.display === 'none' || style.visibility === 'hidden' || style.opacity === '0') continue;
+                        
+                        const buttons = Array.from(m.querySelectorAll('button, a.btn, input[type="submit"], input[type="button"]'));
+                        for (const b of buttons) {
+                            if (b.offsetParent === null) continue;
+                            if (b.classList.contains('o_form_dirty_back') || b.classList.contains('o_form_dirty_ignore')) continue;
+                            const txt = (b.innerText || b.value || '').trim().toLowerCase();
+                            if (txt === 'abbrechen' || txt === 'nein' || txt === 'cancel' || txt === 'zurück' || txt === 'close') continue;
+                            if (b.classList.contains('btn-primary') || /(ja|einschreiben|anmelden|austragen|abmelden|bestätigen|speichern|ok|yes)/i.test(txt)) {
+                                return b;
+                            }
+                        }
+                    }
+                    return null;
                 }
                 
-                // 5. OpenOlat Tree Navigation: Find 'Einschreibung' / 'Anmeldung'
+                const modalBtn = findConfirmationModalButton();
+                if (modalBtn) {
+                    const now = Date.now();
+                    if (!window.__lastModalClick || (now - window.__lastModalClick > 1500)) {
+                        window.__lastModalClick = now;
+                        modalBtn.click();
+                    }
+                    return { action: "MODAL_CONFIRMED", msg: "Bestätige Buchungs-Dialog..." };
+                }
+                
+                // ==========================================
+                // 4. OPENOLAT TREE NAVIGATION (Find 'Einschreibung' if no table)
+                // ==========================================
                 const table = document.querySelector('table.o_table, table.table');
                 if (!table) {
-                    const nodes = Array.from(document.querySelectorAll('.o_tree a, .o_course_menu a, nav a, .o_subnav a, a.o_tree_link, #o_main_container a, .o_course_run a'));
-                    let targetNode = nodes.find(a => {
+                    const links = Array.from(document.querySelectorAll('.o_tree a, .o_course_menu a, nav a, .o_subnav a, a.o_tree_link, #o_main_container a, .o_course_run a'));
+                    let targetLink = links.find(a => {
                         const txt = (a.innerText || a.getAttribute('title') || '').trim().toLowerCase();
                         return txt === 'einschreibung' || txt === 'anmeldung zur übung' || txt === 'anmeldung' || txt === 'übungsgruppen';
                     });
-                    if (!targetNode) {
-                        targetNode = nodes.find(a => /einschreib|anmeldung|gruppenwahl|übungsgruppen/i.test((a.innerText || a.getAttribute('title') || '').trim().toLowerCase()));
+                    if (!targetLink) {
+                        targetLink = links.find(a => /einschreib|anmeldung|gruppenwahl|übungsgruppen/i.test((a.innerText || a.getAttribute('title') || '').trim().toLowerCase()));
                     }
-                    if (targetNode) {
-                        const label = (targetNode.innerText || '').trim();
-                        targetNode.click();
-                        return { action: "CLICKED_NODE", msg: "Öffne " + label + "..." };
+                    if (targetLink) {
+                        const now = Date.now();
+                        if (!window.__lastNodeClick || (now - window.__lastNodeClick > 3500)) {
+                            window.__lastNodeClick = now;
+                            const label = (targetLink.innerText || 'Einschreibung').trim();
+                            targetLink.click();
+                            return { action: "CLICKED_NODE", msg: "Öffne " + label + "..." };
+                        }
                     }
                 }
                 
-                // 6. Action in Table
+                // ==========================================
+                // 5. TABLE ACTIONS (ENROLL & UNENROLL)
+                // ==========================================
                 if (table) {
                     const rows = Array.from(table.querySelectorAll('tbody tr'));
                     
-                    // UNENROLL
+                    // UNENROLL (!IS_ENROLL)
                     if (!IS_ENROLL) {
+                        const anyCancel = table.querySelector('a[onclick*="cmd.enrolled.cancel"], a[onclick*="cmd.cancel"]');
+                        if (window.__clickedCancel && !anyCancel) {
+                            return { action: "SUCCESS", msg: "Erfolgreich ausgetragen & verifiziert!" };
+                        }
+                        
                         for (let tr of rows) {
                             const cancelBtn = tr.querySelector('a[onclick*="cmd.enrolled.cancel"], a[onclick*="cmd.cancel"], td:nth-child(6) a') ||
-                                              Array.from(tr.querySelectorAll('a, button')).find(a => /austragen|abmelden|verlassen/i.test((a.innerText || a.title || '').trim()));
-                            if (cancelBtn) {
-                                cancelBtn.click();
-                                window.__clickedCancel = true;
-                                return { action: "CLICKED_CANCEL", msg: "Klicke Austragen..." };
+                                              Array.from(tr.querySelectorAll('a, button, input[type="button"]')).find(a => /austragen|abmelden|verlassen/i.test((a.innerText || a.value || a.title || '').trim()));
+                            if (cancelBtn && cancelBtn.offsetParent !== null) {
+                                const now = Date.now();
+                                if (!window.__lastCancelClick || (now - window.__lastCancelClick > 2500)) {
+                                    window.__lastCancelClick = now;
+                                    window.__clickedCancel = true;
+                                    try { if (typeof cancelBtn.onclick === 'function') cancelBtn.onclick.call(cancelBtn); } catch(e) {}
+                                    cancelBtn.focus();
+                                    cancelBtn.click();
+                                    cancelBtn.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, view: window }));
+                                    return { action: "CLICKED_CANCEL", msg: "Klicke Austragen..." };
+                                }
                             }
                         }
                         
-                        const anyCancel = table.querySelector('a[onclick*="cmd.enrolled.cancel"], a[onclick*="cmd.cancel"]');
-                        if (!anyCancel && window.__clickedCancel) {
-                            return { action: "SUCCESS", msg: "Erfolgreich ausgetragen & verifiziert!" };
+                        if (!anyCancel && !window.__clickedCancel) {
+                            const anyEnroll = table.querySelector('a[onclick*="cmd.enrolled.add"], a[onclick*="cmd.enroll"]');
+                            if (anyEnroll) {
+                                return { action: "SUCCESS", msg: "Bereits ausgetragen (nicht belegt)!" };
+                            }
                         }
                     }
                     
-                    // ENROLL
+                    // ENROLL (IS_ENROLL)
                     if (IS_ENROLL) {
                         for (let tr of rows) {
                             const txt = (tr.innerText || '').toLowerCase();
-                            const matches = txt.includes(TARGET_NAME) || (TARGET_ID && txt.includes(TARGET_ID)) || (TARGET_DAY && txt.includes(TARGET_DAY) && TARGET_TIME && txt.includes(TARGET_TIME));
+                            const matches = (TARGET_NAME && txt.includes(TARGET_NAME)) ||
+                                            (TARGET_ID && txt.includes(TARGET_ID)) ||
+                                            (TARGET_DAY && txt.includes(TARGET_DAY) && TARGET_TIME && txt.includes(TARGET_TIME));
+                            
                             if (matches) {
-                                const cancelBtn = tr.querySelector('a[onclick*="cmd.enrolled.cancel"], a[onclick*="cmd.cancel"]') ||
+                                const cancelBtn = tr.querySelector('a[onclick*="cmd.enrolled.cancel"], a[onclick*="cmd.cancel"], td:nth-child(6) a') ||
                                                   Array.from(tr.querySelectorAll('a')).find(a => /austragen/i.test(a.innerText || ''));
-                                if (cancelBtn) {
+                                const statusCell = tr.querySelector('td:nth-child(4)');
+                                const isEnrolledStatus = statusCell && /eingeschrieben/i.test(statusCell.innerText) && !/nicht|kein/i.test(statusCell.innerText);
+                                
+                                if (cancelBtn || isEnrolledStatus) {
                                     return { action: "SUCCESS", msg: "Verbindlich im CAU-Portal eingetragen!" };
                                 }
                                 
                                 const enrollBtn = tr.querySelector('a[onclick*="cmd.enrolled.add"], a[onclick*="cmd.enroll"], td:nth-child(5) a') ||
-                                                  Array.from(tr.querySelectorAll('a, button')).find(a => /einschreiben/i.test(a.innerText || ''));
-                                if (enrollBtn) {
-                                    enrollBtn.click();
-                                    window.__clickedEnroll = true;
-                                    return { action: "CLICKED_ENROLL", msg: "Klicke Einschreiben..." };
+                                                  Array.from(tr.querySelectorAll('a, button, input[type="button"]')).find(a => /einschreiben|anmelden/i.test((a.innerText || a.value || '').trim()));
+                                if (enrollBtn && enrollBtn.offsetParent !== null) {
+                                    const now = Date.now();
+                                    if (!window.__lastEnrollClick || (now - window.__lastEnrollClick > 2500)) {
+                                        window.__lastEnrollClick = now;
+                                        window.__clickedEnroll = true;
+                                        try { if (typeof enrollBtn.onclick === 'function') enrollBtn.onclick.call(enrollBtn); } catch(e) {}
+                                        enrollBtn.focus();
+                                        enrollBtn.click();
+                                        enrollBtn.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, view: window }));
+                                        return { action: "CLICKED_ENROLL", msg: "Klicke Einschreiben..." };
+                                    }
                                 }
                             }
                         }
                         
                         if (window.__clickedEnroll) {
-                            return { action: "SUCCESS", msg: "Einschreibung verbindlich gebucht!" };
+                            for (let tr of rows) {
+                                const txt = (tr.innerText || '').toLowerCase();
+                                const matches = (TARGET_NAME && txt.includes(TARGET_NAME)) ||
+                                                (TARGET_ID && txt.includes(TARGET_ID)) ||
+                                                (TARGET_DAY && txt.includes(TARGET_DAY) && TARGET_TIME && txt.includes(TARGET_TIME));
+                                if (matches) {
+                                    const cancelBtn = tr.querySelector('a[onclick*="cmd.enrolled.cancel"], a[onclick*="cmd.cancel"], td:nth-child(6) a') ||
+                                                      Array.from(tr.querySelectorAll('a')).find(a => /austragen/i.test(a.innerText || ''));
+                                    if (cancelBtn) {
+                                        return { action: "SUCCESS", msg: "Einschreibung verbindlich gebucht!" };
+                                    }
+                                }
+                            }
                         }
                     }
                 }
                 
-                // Moodle choicegroup
+                // ==========================================
+                // 6. MOODLE CHOICEGROUP FORM
+                // ==========================================
                 const moodleRadios = Array.from(document.querySelectorAll('input[type="radio"][name="answer"]'));
                 if (moodleRadios.length > 0) {
                     if (IS_ENROLL) {
@@ -428,6 +566,8 @@ private struct LiveAutomationWebView: UIViewRepresentable {
                         self.parent.onStatusUpdate(msg, 0.35)
                     case "LOGIN_STEP2":
                         self.parent.onStatusUpdate(msg, 0.50)
+                    case "LOGIN_GENERIC":
+                        self.parent.onStatusUpdate(msg, 0.45)
                     case "CLICKED_NODE":
                         self.parent.onStatusUpdate(msg, 0.65)
                     case "CLICKED_ENROLL", "CLICKED_CANCEL":
