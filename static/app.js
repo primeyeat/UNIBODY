@@ -395,6 +395,8 @@ async function markGroupAsAlreadyEnrolled(groupId) {
     try {
       const res = await apiPost("/api/course/unenroll", {
         course_id: appState.currentCourse.course_id,
+        force: false,
+        launch_browser: true,
       });
 
       if (res && res.ok && res.unenroll_verified) {
@@ -677,11 +679,35 @@ function renderRankedGroups() {
       <div class="group-right">
         <div class="score-circle">${g.is_conflict ? "Blockiert" : `${g.display_score}% Match`}</div>
         <div class="spots-tag">${formatCapacityTag(g, appState.currentCourse)}</div>
-        <button type="button" class="btn-mark-enrolled" style="${enrollToggleBtnStyle}" title="${isEnrolled ? 'Klicke hier, um dich aus dieser Übungsgruppe auszutragen' : 'Klicke hier, um diese Übungsgruppe als gebucht einzutragen'}">
-          ${isEnrolled ? "✕ Aus Gruppe austragen" : "☑️ Schon manuell gebucht?"}
-        </button>
+        ${
+          isEnrolled
+            ? `<button type="button" class="btn-mark-enrolled" style="${enrollToggleBtnStyle}" title="Klicke hier, um dich aus dieser Übungsgruppe live im LMS auszutragen">
+                ✕ Aus Gruppe austragen
+               </button>`
+            : `<div style="display:inline-flex; gap:6px; margin-top:6px; flex-wrap:wrap; justify-content:flex-end;">
+                ${
+                  !g.is_conflict
+                    ? `<button type="button" class="btn-live-enroll-group" style="background:linear-gradient(135deg, #0ea5e9 0%, #2563eb 100%); color:#fff; border:none; font-weight:800; padding:4px 10px; border-radius:999px; font-size:0.71rem; cursor:pointer; display:inline-flex; align-items:center; gap:4px; box-shadow:0 2px 6px rgba(14,165,233,0.35);" title="Jetzt direkt im Browser einschreiben">
+                        ⚡ Live einschreiben
+                       </button>`
+                    : ""
+                }
+                <button type="button" class="btn-mark-enrolled" style="${enrollToggleBtnStyle}" title="Bereits extern manuell belegt? Hier für deinen Wochenplan vormerken">
+                  ☑️ Schon gebucht?
+                </button>
+               </div>`
+        }
       </div>
     `;
+
+    const liveEnrollBtn = card.querySelector(".btn-live-enroll-group");
+    if (liveEnrollBtn) {
+      liveEnrollBtn.addEventListener("click", async (e) => {
+        e.stopPropagation();
+        await pinGroupAsRank1(g.group_id);
+        triggerEnrollment("immediate", 0);
+      });
+    }
 
     const markBtn = card.querySelector(".btn-mark-enrolled");
     if (markBtn) {

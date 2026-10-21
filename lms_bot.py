@@ -2057,6 +2057,12 @@ setTimeout(runUnibodyAutoFill, 2200);
                 "🔍 UNIBODY Deep-Sync abgeschlossen: Keine aktiven Übungsgruppen-Buchungen auf OpenOlat / Moodle gefunden."
             )
 
+        # Close Chrome automatically after UNIBODY Deep-Sync completes
+        try:
+            self.close_browser()
+        except Exception as e:
+            self.add_log("DEBUG", f"Browser schließen nach Deep-Sync: {e}")
+
         return {
             "ok": True,
             "scanned_tabs": len(tabs),
@@ -2111,16 +2117,15 @@ setTimeout(runUnibodyAutoFill, 2200);
 
         tabs = self._get_cdp_tabs()
         if not tabs:
-            fallback_grp = priorities[0] if priorities else {"name": "Gruppe", "group_id": "GRP-1"}
-            return {
-                "ok": True,
-                "already_enrolled": False,
-                "rank_won": 1,
-                "is_waitlist": False,
-                "enrolled_group": fallback_grp,
-                "confirmation_token": f"MOB-SYNC-{job_id[:8].upper()}-{int(time.time())}",
-                "message": f"Übung '{fallback_grp.get('name', 'Gruppe')}' direkt im Wochenplan gebucht.",
-            }
+            self.add_log("INFO", f"🌐 UNIBODY: Starte Google Chrome für Live-Einschreibung auf {platform_host}...")
+            self.launch_login_browser(target_url=course_url, force_auto_login=True)
+            time.sleep(2.5)
+            tabs = self._get_cdp_tabs()
+
+        if not tabs:
+            msg = f"Konnte Google Chrome für die Einschreibung auf [{platform_host}] nicht starten."
+            self.add_log("ERROR", msg)
+            return {"ok": False, "message": msg, "enrolled_group": None}
 
         is_moodle = "elearn.informatik" in platform_host.lower() or "elearn.informatik" in course_url.lower()
 
@@ -2412,18 +2417,27 @@ setTimeout(runUnibodyAutoFill, 2200);
                 self.add_log("INFO", f"🏛️ OpenOlat Klick-Resultat: {click_res}")
                 time.sleep(1.0)
 
-                # Confirm modal if any appeared
+                # Confirm modal if any appeared (strictly excluding #o_form_dirty_message)
                 modal_js = """
                 (function() {
-                    const modal = document.querySelector('.modal-dialog, .modal-content, .o_modal');
-                    if (modal) {
-                        const btn = modal.querySelector('button.btn-primary, input[type="submit"]') ||
-                                    Array.from(modal.querySelectorAll('button, a.btn, input[type="button"]')).find(b => /(ja|einschreiben|bestätigen|speichern|ok|yes)/i.test((b.innerText || b.value || '').trim()));
-                        if (btn) {
-                            btn.click();
-                            return 'CONFIRMED_MODAL';
+                    const modals = Array.from(document.querySelectorAll('.modal.in, .modal.show, div.modal-dialog, div.o_modal, div.modal-content'));
+                    for (const m of modals) {
+                        if (m.id === 'o_form_dirty_message' || m.closest('#o_form_dirty_message')) continue;
+                        if (m.offsetParent === null) continue;
+                        const style = window.getComputedStyle(m);
+                        if (style.display === 'none' || style.visibility === 'hidden' || style.opacity === '0') continue;
+
+                        const buttons = Array.from(m.querySelectorAll('button, a.btn, input[type="submit"], input[type="button"]'));
+                        for (const b of buttons) {
+                            if (b.offsetParent === null) continue;
+                            if (b.classList.contains('o_form_dirty_back') || b.classList.contains('o_form_dirty_ignore')) continue;
+                            const txt = (b.innerText || b.value || '').trim().toLowerCase();
+                            if (txt === 'abbrechen' || txt === 'nein' || txt === 'cancel' || txt === 'zurück' || txt === 'close') continue;
+                            if (b.classList.contains('btn-primary') || /(ja|einschreiben|anmelden|bestätigen|speichern|ok|yes)/i.test(txt)) {
+                                b.click();
+                                return 'CONFIRMED_MODAL';
+                            }
                         }
-                        return 'MODAL_WITHOUT_BTN';
                     }
                     return 'NO_MODAL';
                 })()
@@ -2835,8 +2849,15 @@ setTimeout(runUnibodyAutoFill, 2200);
 
         tabs = self._get_cdp_tabs()
         if not tabs:
-            self.add_log("INFO", f"Chrome nicht aktiv. Austragung für '{course_id}' lokal bestätigt.")
-            return {"ok": True, "message": f"Kurs '{course_id}' erfolgreich im Wochenplan freigegeben."}
+            self.add_log("INFO", f"🌐 UNIBODY: Starte Google Chrome für Live-Austragung auf {platform_host}...")
+            self.launch_login_browser(target_url=course_url, force_auto_login=True)
+            time.sleep(2.5)
+            tabs = self._get_cdp_tabs()
+
+        if not tabs:
+            msg = f"Konnte Google Chrome für die Austragung auf [{platform_host}] nicht starten."
+            self.add_log("ERROR", msg)
+            return {"ok": False, "verified": False, "message": msg}
 
         is_moodle = "elearn.informatik" in platform_host.lower() or "elearn.informatik" in course_url.lower()
 
@@ -2969,11 +2990,17 @@ setTimeout(runUnibodyAutoFill, 2200);
                 for (let idx = 0; idx < rows.length; idx++) {
                     const tr = rows[idx];
                     const rowText = (tr.innerText || '').toLowerCase();
-                    const cancelA = tr.querySelector('a[onclick*="cmd.enrolled.cancel"]') ||
-                                    tr.querySelector('a[onclick*="cmd.cancel"]') ||
-                                    tr.querySelector('td:nth-child(6) a') ||
-                                    Array.from(tr.querySelectorAll('a, button, input[type="button"]')).find(a => /austragen|abmelden|verlassen/i.test((a.innerText || a.value || a.title || '').trim()));
-                    if (cancelA) {
+                    const statusCell = tr.querySelector('td:nth-child(4)');
+                    const statusText = (statusCell ? statusCell.innerText : '').toLowerCase();
+                    const isEnrolledRow = /eingeschrieben/i.test(statusText) && !/nicht|kein/i.test(statusText);
+
+                    let cancelA = tr.querySelector('a[onclick*="cmd.enrolled.cancel"]') ||
+                                  tr.querySelector('a[onclick*="cmd.cancel"]') ||
+                                  Array.from(tr.querySelectorAll('a, button, input[type="button"]')).find(a => /austragen|abmelden|verlassen/i.test((a.innerText || a.value || a.title || '').trim()));
+                    if (!cancelA && isEnrolledRow) {
+                        cancelA = tr.querySelector('td:nth-child(6) a');
+                    }
+                    if (cancelA && cancelA.offsetParent !== null) {
                         try {
                             if (typeof cancelA.onclick === 'function') cancelA.onclick.call(cancelA);
                         } catch (e) {}
@@ -2990,18 +3017,27 @@ setTimeout(runUnibodyAutoFill, 2200);
             cancel_info = json.loads(cancel_raw) if cancel_raw else {}
             self.add_log("INFO", f"🏛️ OpenOlat Austragen-Ergebnis: {cancel_raw}")
 
-            # 4. If modal confirmation appears, confirm it
+            # 4. If modal confirmation appears, confirm it (strictly excluding #o_form_dirty_message)
             modal_js = """
             (function() {
-                const modal = document.querySelector('.modal-dialog, .modal-content, .o_modal');
-                if (modal) {
-                    const btn = modal.querySelector('button.btn-primary, input[type="submit"]') ||
-                                Array.from(modal.querySelectorAll('button, a.btn, input[type="button"]')).find(b => /(ja|austragen|abmelden|bestätigen|speichern|ok|yes)/i.test((b.innerText || b.value || '').trim()));
-                    if (btn) {
-                        btn.click();
-                        return 'CONFIRMED_MODAL';
+                const modals = Array.from(document.querySelectorAll('.modal.in, .modal.show, div.modal-dialog, div.o_modal, div.modal-content'));
+                for (const m of modals) {
+                    if (m.id === 'o_form_dirty_message' || m.closest('#o_form_dirty_message')) continue;
+                    if (m.offsetParent === null) continue;
+                    const style = window.getComputedStyle(m);
+                    if (style.display === 'none' || style.visibility === 'hidden' || style.opacity === '0') continue;
+
+                    const buttons = Array.from(m.querySelectorAll('button, a.btn, input[type="submit"], input[type="button"]'));
+                    for (const b of buttons) {
+                        if (b.offsetParent === null) continue;
+                        if (b.classList.contains('o_form_dirty_back') || b.classList.contains('o_form_dirty_ignore')) continue;
+                        const txt = (b.innerText || b.value || '').trim().toLowerCase();
+                        if (txt === 'abbrechen' || txt === 'nein' || txt === 'cancel' || txt === 'zurück' || txt === 'close') continue;
+                        if (b.classList.contains('btn-primary') || /(ja|austragen|abmelden|bestätigen|speichern|ok|yes)/i.test(txt)) {
+                            b.click();
+                            return 'CONFIRMED_MODAL';
+                        }
                     }
-                    return 'MODAL_WITHOUT_BTN';
                 }
                 return 'NO_MODAL';
             })()
@@ -3149,8 +3185,8 @@ setTimeout(runUnibodyAutoFill, 2200);
             modal_js = """
             (function() {
                 const modal = document.querySelector('.modal-dialog, .moodle-dialogue-base');
-                if (modal) {
-                    const btn = Array.from(modal.querySelectorAll('button, input[type="submit"]')).find(b => /(ja|löschen|entfernen|weiter|ok|yes)/i.test((b.innerText || b.value || '').trim()));
+                if (modal && modal.offsetParent !== null) {
+                    const btn = Array.from(modal.querySelectorAll('button, input[type="submit"], a.btn')).find(b => b.offsetParent !== null && /(ja|löschen|entfernen|weiter|ok|yes)/i.test((b.innerText || b.value || '').trim()));
                     if (btn) {
                         btn.click();
                         return 'CONFIRMED_MODAL';

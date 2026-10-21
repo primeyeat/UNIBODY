@@ -749,8 +749,8 @@ class CAUBotRequestHandler(SimpleHTTPRequestHandler):
 
         if path == "/api/course/unenroll":
             course_id = (body.get("course_id") or "").strip()
-            force = bool(body.get("force", True))
-            launch_browser = bool(body.get("launch_browser", False))
+            force = bool(body.get("force", False))
+            launch_browser = bool(body.get("launch_browser", True))
             with STATE_LOCK:
                 res = lookup_course_by_identifier(course_id, APP_STATE["custom_courses"], session_mgr)
                 if not res.get("ok"):
@@ -838,8 +838,8 @@ class CAUBotRequestHandler(SimpleHTTPRequestHandler):
         if path == "/api/course/enroll":
             course_id = (body.get("course_id") or "").strip()
             group_id = (body.get("group_id") or "").strip()
-            force = bool(body.get("force", True))
-            launch_browser = bool(body.get("launch_browser", False))
+            force = bool(body.get("force", False))
+            launch_browser = bool(body.get("launch_browser", True))
             mode = body.get("mode", "sniper")
 
             with STATE_LOCK:
