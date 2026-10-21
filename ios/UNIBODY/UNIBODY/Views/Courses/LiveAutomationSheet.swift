@@ -206,11 +206,13 @@ private struct LiveAutomationWebView: UIViewRepresentable {
             parent.onStatusUpdate("Lade \(targetURL.host ?? "CAU-Portal")...", 0.20)
             wv.load(URLRequest(url: targetURL))
             
-            // Start heartbeat polling every 400ms to inspect DOM and drive actions
+            // Start heartbeat polling every 350ms in .common RunLoop mode
             pollTimer?.invalidate()
-            pollTimer = Timer.scheduledTimer(withTimeInterval: 0.45, repeats: true) { [weak self] _ in
+            let timer = Timer(timeInterval: 0.35, repeats: true) { [weak self] _ in
                 self?.runAutomationStep()
             }
+            RunLoop.main.add(timer, forMode: .common)
+            self.pollTimer = timer
         }
         
         func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
@@ -221,23 +223,30 @@ private struct LiveAutomationWebView: UIViewRepresentable {
             guard !hasSucceeded, let wv = webView else { return }
             stepCounter += 1
             
-            let escapedUser = parent.username.replacingOccurrences(of: "'", with: "\\'").trimmingCharacters(in: .whitespacesAndNewlines)
-            let escapedPass = parent.password.replacingOccurrences(of: "'", with: "\\'")
-            let isEnroll = parent.task.isEnroll ? "true" : "false"
-            let targetName = (parent.task.group?.name ?? "").replacingOccurrences(of: "'", with: "\\'")
-            let targetDay = (parent.task.group?.dayName ?? "").replacingOccurrences(of: "'", with: "\\'")
-            let targetTime = (parent.task.group?.startTime ?? "").replacingOccurrences(of: "'", with: "\\'")
-            let targetId = (parent.task.group?.groupId ?? "").replacingOccurrences(of: "'", with: "\\'")
+            let params: [String: Any] = [
+                "username": parent.username.trimmingCharacters(in: .whitespacesAndNewlines),
+                "password": parent.password,
+                "isEnroll": parent.task.isEnroll,
+                "targetName": parent.task.group?.name ?? "",
+                "targetDay": parent.task.group?.dayName ?? "",
+                "targetTime": parent.task.group?.startTime ?? "",
+                "targetId": parent.task.group?.groupId ?? "",
+                "courseId": parent.task.course.courseId
+            ]
+            
+            guard let jsonData = try? JSONSerialization.data(withJSONObject: params),
+                  let jsonString = String(data: jsonData, encoding: .utf8) else { return }
             
             let js = """
             (function() {
-                const USERNAME = '\(escapedUser)';
-                const PASSWORD = '\(escapedPass)';
-                const IS_ENROLL = \(isEnroll);
-                const TARGET_NAME = '\(targetName)'.toLowerCase();
-                const TARGET_DAY = '\(targetDay)'.toLowerCase();
-                const TARGET_TIME = '\(targetTime)'.toLowerCase();
-                const TARGET_ID = '\(targetId)'.toLowerCase();
+                const PARAMS = \(jsonString);
+                const USERNAME = PARAMS.username;
+                const PASSWORD = PARAMS.password;
+                const IS_ENROLL = PARAMS.isEnroll;
+                const TARGET_NAME = (PARAMS.targetName || "").toLowerCase();
+                const TARGET_DAY = (PARAMS.targetDay || "").toLowerCase();
+                const TARGET_TIME = (PARAMS.targetTime || "").toLowerCase();
+                const TARGET_ID = (PARAMS.targetId || "").toLowerCase();
                 
                 // 1. Check for Confirmation Modal Dialog first
                 const modal = document.querySelector('.modal-dialog, .modal-content, .o_modal');
@@ -246,7 +255,7 @@ private struct LiveAutomationWebView: UIViewRepresentable {
                                 Array.from(modal.querySelectorAll('button, a.btn, input[type="button"]')).find(b => /(ja|einschreiben|anmelden|austragen|abmelden|bestätigen|speichern|ok|yes)/i.test((b.innerText || b.value || '').trim()));
                     if (btn) {
                         btn.click();
-                        return { action: 'MODAL_CONFIRMED', msg: 'Bestätige Buchungs-Dialog...' };
+                        return { action: "MODAL_CONFIRMED", msg: "Bestätige Buchungs-Dialog..." };
                     }
                 }
                 
@@ -257,28 +266,10 @@ private struct LiveAutomationWebView: UIViewRepresentable {
                 const olatBtn = document.getElementById('o_fiooolat_login_button');
                 
                 if (olatForm && (olatNameInput || olatPassInput)) {
-                    // Step 1: Username
-                    if (olatNameInput && (!olatPassInput || olatPassInput.offsetParent === null)) {
-                        if (olatNameInput.value !== USERNAME && USERNAME.length > 0) {
-                            olatNameInput.value = USERNAME;
-                            olatNameInput.dispatchEvent(new Event('input', { bubbles: true }));
-                            olatNameInput.dispatchEvent(new Event('change', { bubbles: true }));
-                        }
-                        const du = document.getElementById('ofo_oolat_login_dispatchuri');
-                        const ev = document.getElementById('ofo_oolat_login_eventval');
-                        if (du) du.value = 'o_fiooolat_login_button';
-                        if (ev) ev.value = '2';
-                        if (typeof window.o_XHRSubmit === 'function') {
-                            window.o_XHRSubmit('ofo_oolat_login');
-                        } else if (olatBtn) {
-                            olatBtn.click();
-                        }
-                        return { action: 'LOGIN_STEP1', msg: 'Melde ' + (USERNAME || 'Benutzer') + ' an...' };
-                    }
-                    
-                    // Step 2: Password
+                    // Check Step 2: Password first
                     if (olatPassInput && olatPassInput.offsetParent !== null) {
                         if (olatPassInput.value !== PASSWORD && PASSWORD.length > 0) {
+                            olatPassInput.focus();
                             olatPassInput.value = PASSWORD;
                             olatPassInput.dispatchEvent(new Event('input', { bubbles: true }));
                             olatPassInput.dispatchEvent(new Event('change', { bubbles: true }));
@@ -292,7 +283,27 @@ private struct LiveAutomationWebView: UIViewRepresentable {
                         } else if (olatBtn) {
                             olatBtn.click();
                         }
-                        return { action: 'LOGIN_STEP2', msg: 'Übermittle CAU-Passwort...' };
+                        return { action: "LOGIN_STEP2", msg: "Übermittle CAU-Passwort..." };
+                    }
+                    
+                    // Step 1: Username
+                    if (olatNameInput && (!olatPassInput || olatPassInput.offsetParent === null)) {
+                        if (olatNameInput.value !== USERNAME && USERNAME.length > 0) {
+                            olatNameInput.focus();
+                            olatNameInput.value = USERNAME;
+                            olatNameInput.dispatchEvent(new Event('input', { bubbles: true }));
+                            olatNameInput.dispatchEvent(new Event('change', { bubbles: true }));
+                        }
+                        const du = document.getElementById('ofo_oolat_login_dispatchuri');
+                        const ev = document.getElementById('ofo_oolat_login_eventval');
+                        if (du) du.value = 'o_fiooolat_login_button';
+                        if (ev) ev.value = '2';
+                        if (typeof window.o_XHRSubmit === 'function') {
+                            window.o_XHRSubmit('ofo_oolat_login');
+                        } else if (olatBtn) {
+                            olatBtn.click();
+                        }
+                        return { action: "LOGIN_STEP1", msg: "Melde " + (USERNAME || "Benutzer") + " an..." };
                     }
                 }
                 
@@ -304,7 +315,7 @@ private struct LiveAutomationWebView: UIViewRepresentable {
                     moodleUser.value = USERNAME;
                     moodlePass.value = PASSWORD;
                     moodleBtn.click();
-                    return { action: 'LOGIN_MOODLE', msg: 'Melde bei Moodle an...' };
+                    return { action: "LOGIN_MOODLE", msg: "Melde bei Moodle an..." };
                 }
                 
                 // 4. Shibboleth / SAML IdP Login (`idp.uni-kiel.de`)
@@ -315,7 +326,7 @@ private struct LiveAutomationWebView: UIViewRepresentable {
                     idpUser.value = USERNAME;
                     idpPass.value = PASSWORD;
                     idpBtn.click();
-                    return { action: 'LOGIN_IDP', msg: 'CAU-Zentral-Login...' };
+                    return { action: "LOGIN_IDP", msg: "CAU-Zentral-Login..." };
                 }
                 
                 // 5. OpenOlat Tree Navigation: Find 'Einschreibung' / 'Anmeldung'
@@ -330,8 +341,9 @@ private struct LiveAutomationWebView: UIViewRepresentable {
                         targetNode = nodes.find(a => /einschreib|anmeldung|gruppenwahl|übungsgruppen/i.test((a.innerText || a.getAttribute('title') || '').trim().toLowerCase()));
                     }
                     if (targetNode) {
+                        const label = (targetNode.innerText || '').trim();
                         targetNode.click();
-                        return { action: 'CLICKED_NODE', msg: 'Öffne \'' + (targetNode.innerText || '').trim() + '\'...' };
+                        return { action: "CLICKED_NODE", msg: "Öffne " + label + "..." };
                     }
                 }
                 
@@ -346,14 +358,14 @@ private struct LiveAutomationWebView: UIViewRepresentable {
                                               Array.from(tr.querySelectorAll('a, button')).find(a => /austragen|abmelden|verlassen/i.test((a.innerText || a.title || '').trim()));
                             if (cancelBtn) {
                                 cancelBtn.click();
-                                return { action: 'CLICKED_CANCEL', msg: 'Klicke \'Austragen\'...' };
+                                window.__clickedCancel = true;
+                                return { action: "CLICKED_CANCEL", msg: "Klicke Austragen..." };
                             }
                         }
                         
-                        // Check if cancel button is gone
                         const anyCancel = table.querySelector('a[onclick*="cmd.enrolled.cancel"], a[onclick*="cmd.cancel"]');
                         if (!anyCancel && window.__clickedCancel) {
-                            return { action: 'SUCCESS', msg: 'Erfolgreich ausgetragen & verifiziert!' };
+                            return { action: "SUCCESS", msg: "Erfolgreich ausgetragen & verifiziert!" };
                         }
                     }
                     
@@ -366,7 +378,7 @@ private struct LiveAutomationWebView: UIViewRepresentable {
                                 const cancelBtn = tr.querySelector('a[onclick*="cmd.enrolled.cancel"], a[onclick*="cmd.cancel"]') ||
                                                   Array.from(tr.querySelectorAll('a')).find(a => /austragen/i.test(a.innerText || ''));
                                 if (cancelBtn) {
-                                    return { action: 'SUCCESS', msg: 'Verbindlich im CAU-Portal eingetragen!' };
+                                    return { action: "SUCCESS", msg: "Verbindlich im CAU-Portal eingetragen!" };
                                 }
                                 
                                 const enrollBtn = tr.querySelector('a[onclick*="cmd.enrolled.add"], a[onclick*="cmd.enroll"], td:nth-child(5) a') ||
@@ -374,13 +386,13 @@ private struct LiveAutomationWebView: UIViewRepresentable {
                                 if (enrollBtn) {
                                     enrollBtn.click();
                                     window.__clickedEnroll = true;
-                                    return { action: 'CLICKED_ENROLL', msg: 'Klicke \'Einschreiben\'...' };
+                                    return { action: "CLICKED_ENROLL", msg: "Klicke Einschreiben..." };
                                 }
                             }
                         }
                         
                         if (window.__clickedEnroll) {
-                            return { action: 'SUCCESS', msg: 'Einschreibung verbindlich gebucht!' };
+                            return { action: "SUCCESS", msg: "Einschreibung verbindlich gebucht!" };
                         }
                     }
                 }
@@ -391,18 +403,21 @@ private struct LiveAutomationWebView: UIViewRepresentable {
                     if (IS_ENROLL) {
                         moodleRadios[0].checked = true;
                         const sub = document.querySelector('form#choicegroupform input[type="submit"], input[type="submit"]');
-                        if (sub) { sub.click(); return { action: 'SUCCESS', msg: 'Moodle-Gruppe gebucht!' }; }
+                        if (sub) { sub.click(); return { action: "SUCCESS", msg: "Moodle-Gruppe gebucht!" }; }
                     } else {
                         const del = document.querySelector('input[name="deletechoice"], button[name="deletechoice"]');
-                        if (del) { del.click(); return { action: 'SUCCESS', msg: 'Moodle-Gruppe abgemeldet!' }; }
+                        if (del) { del.click(); return { action: "SUCCESS", msg: "Moodle-Gruppe abgemeldet!" }; }
                     }
                 }
                 
-                return { action: 'IDLE', msg: 'Synchronisiere mit CAU...' };
+                return { action: "IDLE", msg: "Synchronisiere mit CAU..." };
             })();
             """
             
             wv.evaluateJavaScript(js) { [weak self] result, error in
+                if let error = error {
+                    print("[UNIBODY-JS-ERROR] \(error)")
+                }
                 guard let self = self, !self.hasSucceeded else { return }
                 guard let dict = result as? [String: Any], let action = dict["action"] as? String else { return }
                 let msg = dict["msg"] as? String ?? ""
@@ -410,9 +425,9 @@ private struct LiveAutomationWebView: UIViewRepresentable {
                 DispatchQueue.main.async {
                     switch action {
                     case "LOGIN_STEP1":
-                        self.parent.onStatusUpdate("CAU-Login: " + msg, 0.35)
+                        self.parent.onStatusUpdate(msg, 0.35)
                     case "LOGIN_STEP2":
-                        self.parent.onStatusUpdate("CAU-Login: " + msg, 0.45)
+                        self.parent.onStatusUpdate(msg, 0.50)
                     case "CLICKED_NODE":
                         self.parent.onStatusUpdate(msg, 0.65)
                     case "CLICKED_ENROLL", "CLICKED_CANCEL":
@@ -424,12 +439,7 @@ private struct LiveAutomationWebView: UIViewRepresentable {
                         self.pollTimer?.invalidate()
                         self.parent.onSuccess(msg)
                     default:
-                        if self.stepCounter > 25 && !self.hasSucceeded {
-                            // After generous polling timeout, mark as verified to not strand student
-                            self.hasSucceeded = true
-                            self.pollTimer?.invalidate()
-                            self.parent.onSuccess("Vorgang auf dem Gerät abgeschlossen.")
-                        }
+                        break
                     }
                 }
             }
