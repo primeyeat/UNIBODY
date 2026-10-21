@@ -527,6 +527,13 @@ public class AppState: ObservableObject {
             return
         }
         
+        // Wipe old/faulty enrolled exercise events so only verified bookings are scheduled
+        schedule.removeAll { $0.type == "enrolled_exercise" }
+        enrolledGroups.removeAll()
+        for i in 0..<courses.count {
+            courses[i].enrolledGroupId = nil
+        }
+        
         self.showLiveDeepSyncSheet = true
     }
     

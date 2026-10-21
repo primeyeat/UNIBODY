@@ -19,11 +19,11 @@ public struct LiveDetectedGroup: Identifiable, Equatable {
         courseTitle: String,
         groupId: String,
         groupName: String,
-        day: Int = 0,
-        dayName: String = "Montag",
-        startTime: String = "10:15",
-        endTime: String = "11:45",
-        time: String = "10:15–11:45",
+        day: Int,
+        dayName: String,
+        startTime: String,
+        endTime: String,
+        time: String,
         platform: String = "OpenOlat"
     ) {
         self.courseId = courseId
@@ -195,7 +195,14 @@ public struct LiveDeepSyncSheet: View {
                                 self.progress = 1.0
                                 self.detectedGroups = matches
                                 
-                                // Automatically apply each detected match into app state
+                                // 1. Wipe old enrolled exercise events to prevent bogus duplicates
+                                appState.schedule.removeAll { $0.type == "enrolled_exercise" }
+                                appState.enrolledGroups.removeAll()
+                                for i in 0..<appState.courses.count {
+                                    appState.courses[i].enrolledGroupId = nil
+                                }
+                                
+                                // 2. Apply verified matches into AppState
                                 for m in matches {
                                     appState.enrollInGroup(
                                         courseId: m.courseId,
@@ -479,6 +486,37 @@ private struct LiveDeepSyncWebView: UIViewRepresentable {
                     return null;
                 }
                 
+                function matchCourse(rowText, catalog) {
+                    const lower = rowText.toLowerCase();
+                    for (const c of catalog) {
+                        const cid = c.courseId.toLowerCase();
+                        const univis = (c.univisId || "").toLowerCase();
+                        const olatRepo = (c.olatRepoId || "").toLowerCase();
+                        
+                        if (univis && univis.length >= 4 && lower.includes(univis)) return c;
+                        if (olatRepo && olatRepo.length >= 5 && lower.includes(olatRepo)) return c;
+                        if (lower.includes(cid)) return c;
+                        
+                        // Domain-specific unambiguous keywords
+                        if (cid.includes("math") && (lower.includes("mathea") || lower.includes("mathe a") || lower.includes("mathematik") || lower.includes("mathinfa") || lower.includes("math-a"))) {
+                            return c;
+                        }
+                        if (cid.includes("ewinf") && (lower.includes("wirtschaftsinformatik") || lower.includes("e-business") || lower.includes("ewinf"))) {
+                            return c;
+                        }
+                        if (cid.includes("bwl") && (lower.includes("ebwl") || lower.includes("betriebswirtschaft")) && !lower.includes("wirtschaftsinformatik")) {
+                            return c;
+                        }
+                        if (cid.includes("recht") && (lower.includes("informatikrecht") || lower.includes("infrecht"))) {
+                            return c;
+                        }
+                        if (cid.includes("einf") && !cid.includes("ewinf") && !cid.includes("bwl") && lower.includes("einführung in die informatik")) {
+                            return c;
+                        }
+                    }
+                    return null;
+                }
+                
                 // 1. OPENOLAT LOGIN DETECTION & AUTO-FILL
                 const olatNameInput = document.getElementById('o_fiooolat_login_name');
                 const olatPassInput = document.getElementById('o_fiooolat_login_pass');
@@ -541,58 +579,97 @@ private struct LiveDeepSyncWebView: UIViewRepresentable {
                             const groupTitle = bgLink ? (bgLink.innerText || '').trim() : '';
                             const slot = parseGermanTimeslot(rowText);
                             
-                            for (const c of CATALOG) {
-                                const cid = c.courseId.toLowerCase();
-                                const cUniv = (c.univisId || '').toLowerCase();
-                                const cOlat = (c.olatRepoId || '').toLowerCase();
-                                const cTitle = (c.title || '').toLowerCase();
-                                
-                                const matchCourse = (cUniv && cUniv.length >= 4 && rowText.includes(cUniv)) ||
-                                                    (cOlat && cOlat.length >= 5 && rowText.includes(cOlat)) ||
-                                                    rowText.includes(cid) ||
-                                                    (cTitle.length > 5 && rowText.includes(cTitle.slice(0, 15))) ||
-                                                    (cid.includes("bwl") && (rowText.includes("ebwl") || rowText.includes("betriebswirtschaft"))) ||
-                                                    (cid.includes("math") && (rowText.includes("mathematik") || rowText.includes("mathinfa"))) ||
-                                                    (cid.includes("ewinf") && (rowText.includes("wirtschaftsinformatik") || rowText.includes("e-business")));
-                                
-                                if (matchCourse) {
-                                    // Match specific exercise group
-                                    let matchedGroup = null;
-                                    for (const g of c.groups) {
-                                        const gName = (g.name || '').toLowerCase();
-                                        const gDay = (g.dayName || '').toLowerCase();
-                                        const gTime = (g.startTime || '').toLowerCase();
-                                        const gId = (g.groupId || '').toLowerCase();
-                                        
-                                        if (rowText.includes(gId) || (rowText.includes(gDay) && rowText.includes(gTime)) || (gName.length > 4 && rowText.includes(gName))) {
-                                            matchedGroup = g;
-                                            break;
-                                        }
+                            // RULE 1: Must be a genuine exercise group!
+                            // Skip general lecture/course containers like "EBWL 26/27" or "WiSe 2026/27"
+                            const isExerciseGroup = /(?:übung|uebung|gruppe|gr\\.?|group|tutorium|tut\\.?|praktikum|kleingruppe)\\b/i.test(rowText) || slot !== null;
+                            if (!isExerciseGroup) {
+                                continue;
+                            }
+                            
+                            // RULE 2: Match against catalog courses with high precision
+                            const matchedCourse = matchCourse(rowText, CATALOG);
+                            if (!matchedCourse) {
+                                continue;
+                            }
+                            
+                            // RULE 3: Match specific exercise group
+                            let matchedGroup = null;
+                            
+                            // A) Group number search: e.g. "Gr. 05", "Gruppe 2", "Übung 03"
+                            const numMatch = rowText.match(/(?:gruppe|gr\\.?|übung|group|tutorium)\\s*0*(\\d+)/i);
+                            if (numMatch) {
+                                const grpNum = parseInt(numMatch[1], 10);
+                                for (const g of matchedCourse.groups) {
+                                    const gLower = (g.name || "").toLowerCase();
+                                    const gm = gLower.match(/(?:gruppe|gr\\.?|übung|group|tutorium)\\s*0*(\\d+)/i);
+                                    if (gm && parseInt(gm[1], 10) === grpNum) {
+                                        matchedGroup = g;
+                                        break;
                                     }
-                                    
-                                    // Fallback: match by parsed timeslot or first group
-                                    const finalGroupId = matchedGroup ? matchedGroup.groupId : (c.courseId + "-g1");
-                                    const finalGroupName = matchedGroup ? matchedGroup.name : (groupTitle || (slot ? ("Gruppe (" + slot.dayName + " " + slot.time + ")") : "Übungsgruppe"));
-                                    const finalDay = matchedGroup ? matchedGroup.day : (slot ? slot.day : 0);
-                                    const finalDayName = matchedGroup ? matchedGroup.dayName : (slot ? slot.dayName : "Montag");
-                                    const finalStart = matchedGroup ? matchedGroup.startTime : (slot ? slot.startTime : "10:15");
-                                    const finalEnd = matchedGroup ? matchedGroup.endTime : (slot ? slot.endTime : "11:45");
-                                    const finalTime = matchedGroup ? (matchedGroup.startTime + "–" + matchedGroup.endTime) : (slot ? slot.time : "10:15–11:45");
-                                    
-                                    if (!matches.some(m => m.courseId.toLowerCase() === c.courseId.toLowerCase())) {
-                                        matches.push({
-                                            courseId: c.courseId,
-                                            courseTitle: c.title,
-                                            groupId: finalGroupId,
-                                            groupName: finalGroupName,
-                                            day: finalDay,
-                                            dayName: finalDayName,
-                                            startTime: finalStart,
-                                            endTime: finalEnd,
-                                            time: finalTime,
-                                            platform: "OpenOlat"
-                                        });
+                                }
+                                // If not found by name, resolve by 1-based index (e.g. Gr. 05 -> groups[4])
+                                if (!matchedGroup && grpNum >= 1 && grpNum <= matchedCourse.groups.length) {
+                                    matchedGroup = matchedCourse.groups[grpNum - 1];
+                                }
+                            }
+                            
+                            // B) Timeslot matching if day and time match
+                            if (!matchedGroup && slot) {
+                                for (const g of matchedCourse.groups) {
+                                    if (g.day === slot.day && g.startTime === slot.startTime) {
+                                        matchedGroup = g;
+                                        break;
                                     }
+                                }
+                            }
+                            
+                            // C) Substring matching by groupId or group name
+                            if (!matchedGroup) {
+                                for (const g of matchedCourse.groups) {
+                                    const gid = (g.groupId || "").toLowerCase();
+                                    const gName = (g.name || "").toLowerCase();
+                                    if (gid && rowText.includes(gid)) {
+                                        matchedGroup = g;
+                                        break;
+                                    }
+                                    if (gName.length > 5 && rowText.includes(gName)) {
+                                        matchedGroup = g;
+                                        break;
+                                    }
+                                }
+                            }
+                            
+                            // RULE 4: ONLY enroll if we have an identified group or parsed day/timeslot!
+                            // NEVER guess or dump onto Monday 10:15!
+                            if (matchedGroup) {
+                                if (!matches.some(m => m.courseId.toLowerCase() === matchedCourse.courseId.toLowerCase())) {
+                                    matches.push({
+                                        courseId: matchedCourse.courseId,
+                                        courseTitle: matchedCourse.title,
+                                        groupId: matchedGroup.groupId,
+                                        groupName: matchedGroup.name,
+                                        day: matchedGroup.day,
+                                        dayName: matchedGroup.dayName,
+                                        startTime: matchedGroup.startTime,
+                                        endTime: matchedGroup.endTime,
+                                        time: matchedGroup.startTime + "–" + matchedGroup.endTime,
+                                        platform: "OpenOlat"
+                                    });
+                                }
+                            } else if (slot) {
+                                if (!matches.some(m => m.courseId.toLowerCase() === matchedCourse.courseId.toLowerCase())) {
+                                    matches.push({
+                                        courseId: matchedCourse.courseId,
+                                        courseTitle: matchedCourse.title,
+                                        groupId: matchedCourse.courseId + "-g1",
+                                        groupName: groupTitle || ("Übung (" + slot.dayName + " " + slot.time + ")"),
+                                        day: slot.day,
+                                        dayName: slot.dayName,
+                                        startTime: slot.startTime,
+                                        endTime: slot.endTime,
+                                        time: slot.time,
+                                        platform: "OpenOlat"
+                                    });
                                 }
                             }
                         }
