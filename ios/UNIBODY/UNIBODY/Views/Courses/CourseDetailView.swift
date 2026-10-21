@@ -270,7 +270,7 @@ public struct CourseDetailView: View {
                     room: info.room,
                     platformHost: course.platformHost
                 )
-                .presentationDetents([.fraction(0.58), .medium])
+                .presentationDetents([.fraction(0.72), .large])
             }
         }
         // Enrollment Alerts & Sheets
@@ -295,7 +295,7 @@ public struct CourseDetailView: View {
                     room: info.room,
                     platformHost: course.platformHost
                 )
-                .presentationDetents([.fraction(0.60), .medium])
+                .presentationDetents([.fraction(0.72), .large])
             }
         }
         .sheet(isPresented: $showSniperSheet) {
@@ -526,102 +526,138 @@ private struct EnrollSuccessModalView: View {
             ZStack {
                 Color(red: 0.02, green: 0.07, blue: 0.14).ignoresSafeArea()
                 
-                VStack(spacing: 16) {
-                    // Header Icon
-                    ZStack {
-                        Circle()
-                            .fill(AeroTheme.emerald.opacity(0.18))
-                            .frame(width: 80, height: 80)
-                        Image(systemName: "checkmark.seal.fill")
-                            .font(.system(size: 40))
-                            .foregroundColor(AeroTheme.emerald)
-                    }
-                    .padding(.top, 10)
-                    
-                    VStack(spacing: 6) {
-                        Text("Live-Einschreibung erfolgreich!")
-                            .font(.system(.title2, design: .rounded).weight(.bold))
-                            .foregroundColor(.white)
-                        
-                        Text("Direkt im Hochschulsystem (\(platformHost)) gebucht & verifiziert")
-                            .font(.caption)
-                            .foregroundColor(AeroTheme.emerald)
-                            .multilineTextAlignment(.center)
-                            .padding(.horizontal)
-                    }
-                    
-                    // Detail Card
-                    VStack(alignment: .leading, spacing: 12) {
-                        HStack {
-                            AeroBadge("LMS-Bestätigt", color: AeroTheme.emerald)
-                            Spacer()
-                            Text(platformHost)
-                                .font(.caption2.weight(.medium))
-                                .foregroundColor(.secondary)
-                        }
-                        
-                        Text(courseTitle)
-                            .font(.system(.headline, design: .rounded).weight(.bold))
-                            .foregroundColor(.white)
-                            .lineLimit(2)
-                        
-                        Text(groupName)
-                            .font(.subheadline.weight(.semibold))
-                            .foregroundColor(AeroTheme.skyBlue)
-                        
-                        Divider().background(Color.white.opacity(0.15))
-                        
-                        VStack(spacing: 8) {
-                            HStack {
-                                Label("Gebuchter Termin:", systemImage: "calendar.badge.clock")
-                                    .font(.caption)
-                                    .foregroundColor(.secondary)
-                                Spacer()
-                                Text(timeSlot)
-                                    .font(.caption.weight(.bold))
-                                    .foregroundColor(.white)
-                            }
-                            
-                            if !room.isEmpty {
-                                HStack {
-                                    Label("Gebäude / Raum:", systemImage: "mappin.circle.fill")
-                                        .font(.caption)
-                                        .foregroundColor(.secondary)
-                                    Spacer()
-                                    Text(room)
-                                        .font(.caption.weight(.bold))
-                                        .foregroundColor(.white)
-                                }
-                            }
-                            
-                            HStack {
-                                Label("Status:", systemImage: "checkmark.circle.fill")
-                                    .font(.caption)
-                                    .foregroundColor(.secondary)
-                                Spacer()
-                                Text("Fest im Wochenplan eingetragen")
-                                    .font(.caption.weight(.bold))
+                VStack(spacing: 0) {
+                    ScrollView(showsIndicators: false) {
+                        VStack(spacing: 16) {
+                            // Header Icon
+                            ZStack {
+                                Circle()
+                                    .fill(AeroTheme.emerald.opacity(0.18))
+                                    .frame(width: 72, height: 72)
+                                Image(systemName: "checkmark.seal.fill")
+                                    .font(.system(size: 38))
                                     .foregroundColor(AeroTheme.emerald)
                             }
+                            .padding(.top, 16)
+                            
+                            VStack(spacing: 6) {
+                                Text("Live-Einschreibung erfolgreich!")
+                                    .font(.system(.title3, design: .rounded).weight(.bold))
+                                    .foregroundColor(.white)
+                                
+                                Text("Direkt im Hochschulsystem (\(platformHost)) gebucht & verifiziert")
+                                    .font(.caption)
+                                    .foregroundColor(AeroTheme.emerald)
+                                    .multilineTextAlignment(.center)
+                                    .padding(.horizontal)
+                            }
+                            
+                            // Detail Card
+                            VStack(alignment: .leading, spacing: 12) {
+                                HStack {
+                                    AeroBadge("LMS-Bestätigt", color: AeroTheme.emerald)
+                                    Spacer()
+                                    Text(platformHost)
+                                        .font(.caption2.weight(.medium))
+                                        .foregroundColor(.secondary)
+                                }
+                                
+                                Text(courseTitle)
+                                    .font(.system(.headline, design: .rounded).weight(.bold))
+                                    .foregroundColor(.white)
+                                    .lineLimit(2)
+                                
+                                Text(groupName)
+                                    .font(.subheadline.weight(.semibold))
+                                    .foregroundColor(AeroTheme.skyBlue)
+                                
+                                Divider().background(Color.white.opacity(0.15))
+                                
+                                VStack(spacing: 8) {
+                                    HStack {
+                                        Label("Gebuchter Termin:", systemImage: "calendar.badge.clock")
+                                            .font(.caption)
+                                            .foregroundColor(.secondary)
+                                        Spacer()
+                                        Text(timeSlot)
+                                            .font(.caption.weight(.bold))
+                                            .foregroundColor(.white)
+                                    }
+                                    
+                                    if !room.isEmpty {
+                                        HStack {
+                                            Label("Gebäude / Raum:", systemImage: "mappin.circle.fill")
+                                                .font(.caption)
+                                                .foregroundColor(.secondary)
+                                            Spacer()
+                                            Text(room)
+                                                .font(.caption.weight(.bold))
+                                                .foregroundColor(.white)
+                                        }
+                                    }
+                                    
+                                    HStack {
+                                        Label("Status:", systemImage: "checkmark.circle.fill")
+                                            .font(.caption)
+                                            .foregroundColor(.secondary)
+                                        Spacer()
+                                        Text("Fest im Wochenplan eingetragen")
+                                            .font(.caption.weight(.bold))
+                                            .foregroundColor(AeroTheme.emerald)
+                                    }
+                                }
+                            }
+                            .padding(16)
+                            .frutigerGlass(cornerRadius: 16)
+                            .padding(.horizontal)
                         }
+                        .padding(.bottom, 16)
                     }
-                    .padding(16)
-                    .frutigerGlass(cornerRadius: 16)
-                    .padding(.horizontal)
                     
-                    Spacer()
-                    
+                    // Fixed Bottom Action Button (proper safe inset and full tappable surface)
                     Button {
                         dismiss()
                     } label: {
-                        Text("Im Wochenplan ansehen")
-                            .font(.subheadline.weight(.bold))
-                            .frame(maxWidth: .infinity)
+                        HStack(spacing: 8) {
+                            Image(systemName: "calendar")
+                                .font(.system(size: 16, weight: .bold))
+                            Text("Im Wochenplan ansehen")
+                                .font(.system(.body, design: .rounded).weight(.bold))
+                        }
+                        .foregroundColor(.white)
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 52)
+                        .background(
+                            ZStack {
+                                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                                    .fill(AeroTheme.auroraGradient)
+                                
+                                VStack {
+                                    RoundedRectangle(cornerRadius: 14, style: .continuous)
+                                        .fill(
+                                            LinearGradient(
+                                                colors: [Color.white.opacity(0.55), Color.white.opacity(0.05)],
+                                                startPoint: .top,
+                                                endPoint: .bottom
+                                            )
+                                        )
+                                        .frame(height: 18)
+                                        .padding(.horizontal, 2)
+                                        .padding(.top, 2)
+                                    Spacer()
+                                }
+                                
+                                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                                    .strokeBorder(Color.white.opacity(0.4), lineWidth: 1)
+                            }
+                        )
+                        .contentShape(Rectangle())
+                        .shadow(color: AeroTheme.emerald.opacity(0.35), radius: 8, x: 0, y: 4)
                     }
                     .buttonStyle(.plain)
-                    .glossyButton(gradient: AeroTheme.auroraGradient, cornerRadius: 14)
-                    .padding(.horizontal)
-                    .padding(.bottom, 12)
+                    .padding(.horizontal, 20)
+                    .padding(.top, 8)
+                    .padding(.bottom, 24)
                 }
             }
             .navigationBarTitleDisplayMode(.inline)
@@ -648,101 +684,138 @@ private struct UnenrollSuccessModalView: View {
             ZStack {
                 Color(red: 0.02, green: 0.07, blue: 0.14).ignoresSafeArea()
                 
-                VStack(spacing: 16) {
-                    // Header Icon
-                    ZStack {
-                        Circle()
-                            .fill(Color.orange.opacity(0.18))
-                            .frame(width: 80, height: 80)
-                        Image(systemName: "checkmark.seal.fill")
-                            .font(.system(size: 40))
-                            .foregroundColor(AeroTheme.solarOrange)
-                    }
-                    .padding(.top, 10)
-                    
-                    VStack(spacing: 6) {
-                        Text("Erfolgreich ausgetragen")
-                            .font(.system(.title2, design: .rounded).weight(.bold))
-                            .foregroundColor(.white)
-                        
-                        Text("Die Abmeldung wurde im Hochschulsystem verifiziert.")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                            .multilineTextAlignment(.center)
-                            .padding(.horizontal)
-                    }
-                    
-                    // Detail Card
-                    VStack(alignment: .leading, spacing: 12) {
-                        HStack {
-                            AeroBadge("LMS-Freigegeben", color: AeroTheme.solarOrange)
-                            Spacer()
-                            Text(platformHost)
-                                .font(.caption2.weight(.medium))
-                                .foregroundColor(.secondary)
-                        }
-                        
-                        Text(courseTitle)
-                            .font(.system(.headline, design: .rounded).weight(.bold))
-                            .foregroundColor(.white)
-                            .lineLimit(2)
-                        
-                        Text(groupName)
-                            .font(.subheadline)
-                            .foregroundColor(AeroTheme.solarOrange)
-                        
-                        Divider().background(Color.white.opacity(0.15))
-                        
-                        VStack(spacing: 8) {
-                            HStack {
-                                Label("Freigegebener Slot:", systemImage: "calendar.badge.clock")
+                VStack(spacing: 0) {
+                    ScrollView(showsIndicators: false) {
+                        VStack(spacing: 16) {
+                            // Header Icon
+                            ZStack {
+                                Circle()
+                                    .fill(Color.orange.opacity(0.18))
+                                    .frame(width: 72, height: 72)
+                                Image(systemName: "checkmark.seal.fill")
+                                    .font(.system(size: 38))
+                                    .foregroundColor(AeroTheme.solarOrange)
+                            }
+                            .padding(.top, 16)
+                            
+                            VStack(spacing: 6) {
+                                Text("Erfolgreich ausgetragen")
+                                    .font(.system(.title3, design: .rounded).weight(.bold))
+                                    .foregroundColor(.white)
+                                
+                                Text("Die Abmeldung wurde im Hochschulsystem verifiziert.")
                                     .font(.caption)
                                     .foregroundColor(.secondary)
-                                Spacer()
-                                Text(timeSlot)
-                                    .font(.caption.weight(.bold))
-                                    .foregroundColor(.white)
+                                    .multilineTextAlignment(.center)
+                                    .padding(.horizontal)
                             }
                             
-                            if !room.isEmpty {
+                            // Detail Card
+                            VStack(alignment: .leading, spacing: 12) {
                                 HStack {
-                                    Label("Bisheriger Raum:", systemImage: "mappin.circle.fill")
-                                        .font(.caption)
-                                        .foregroundColor(.secondary)
+                                    AeroBadge("LMS-Freigegeben", color: AeroTheme.solarOrange)
                                     Spacer()
-                                    Text(room)
-                                        .font(.caption.weight(.bold))
-                                        .foregroundColor(.white)
+                                    Text(platformHost)
+                                        .font(.caption2.weight(.medium))
+                                        .foregroundColor(.secondary)
+                                }
+                                
+                                Text(courseTitle)
+                                    .font(.system(.headline, design: .rounded).weight(.bold))
+                                    .foregroundColor(.white)
+                                    .lineLimit(2)
+                                
+                                Text(groupName)
+                                    .font(.subheadline)
+                                    .foregroundColor(AeroTheme.solarOrange)
+                                
+                                Divider().background(Color.white.opacity(0.15))
+                                
+                                VStack(spacing: 8) {
+                                    HStack {
+                                        Label("Freigegebener Slot:", systemImage: "calendar.badge.clock")
+                                            .font(.caption)
+                                            .foregroundColor(.secondary)
+                                        Spacer()
+                                        Text(timeSlot)
+                                            .font(.caption.weight(.bold))
+                                            .foregroundColor(.white)
+                                    }
+                                    
+                                    if !room.isEmpty {
+                                        HStack {
+                                            Label("Bisheriger Raum:", systemImage: "mappin.circle.fill")
+                                                .font(.caption)
+                                                .foregroundColor(.secondary)
+                                            Spacer()
+                                            Text(room)
+                                                .font(.caption.weight(.bold))
+                                                .foregroundColor(.white)
+                                        }
+                                    }
+                                    
+                                    HStack {
+                                        Label("Status:", systemImage: "checkmark.circle.fill")
+                                            .font(.caption)
+                                            .foregroundColor(.secondary)
+                                        Spacer()
+                                        Text("Im Wochenplan freigegeben")
+                                            .font(.caption.weight(.bold))
+                                            .foregroundColor(AeroTheme.emerald)
+                                    }
                                 }
                             }
-                            
-                            HStack {
-                                Label("Status:", systemImage: "checkmark.circle.fill")
-                                    .font(.caption)
-                                    .foregroundColor(.secondary)
-                                Spacer()
-                                Text("Im Wochenplan freigegeben")
-                                    .font(.caption.weight(.bold))
-                                    .foregroundColor(AeroTheme.emerald)
-                            }
+                            .padding(16)
+                            .frutigerGlass(cornerRadius: 16)
+                            .padding(.horizontal)
                         }
+                        .padding(.bottom, 16)
                     }
-                    .padding(16)
-                    .frutigerGlass(cornerRadius: 16)
-                    .padding(.horizontal)
                     
-                    Spacer()
-                    
+                    // Fixed Bottom Action Button (raised above home bar, 100% tappable)
                     Button {
                         dismiss()
                     } label: {
-                        Text("Fertig")
-                            .frame(maxWidth: .infinity)
+                        HStack(spacing: 8) {
+                            Image(systemName: "checkmark.circle.fill")
+                                .font(.system(size: 16, weight: .bold))
+                            Text("Erledigt")
+                                .font(.system(.body, design: .rounded).weight(.bold))
+                        }
+                        .foregroundColor(.white)
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 52)
+                        .background(
+                            ZStack {
+                                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                                    .fill(AeroTheme.oceanGradient)
+                                
+                                VStack {
+                                    RoundedRectangle(cornerRadius: 14, style: .continuous)
+                                        .fill(
+                                            LinearGradient(
+                                                colors: [Color.white.opacity(0.55), Color.white.opacity(0.05)],
+                                                startPoint: .top,
+                                                endPoint: .bottom
+                                            )
+                                        )
+                                        .frame(height: 18)
+                                        .padding(.horizontal, 2)
+                                        .padding(.top, 2)
+                                    Spacer()
+                                }
+                                
+                                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                                    .strokeBorder(Color.white.opacity(0.4), lineWidth: 1)
+                            }
+                        )
+                        .contentShape(Rectangle())
+                        .shadow(color: AeroTheme.skyBlue.opacity(0.35), radius: 8, x: 0, y: 4)
                     }
                     .buttonStyle(.plain)
-                    .glossyButton(gradient: AeroTheme.oceanGradient, cornerRadius: 14)
-                    .padding(.horizontal)
-                    .padding(.bottom, 12)
+                    .padding(.horizontal, 20)
+                    .padding(.top, 8)
+                    .padding(.bottom, 24)
                 }
             }
             .navigationBarTitleDisplayMode(.inline)

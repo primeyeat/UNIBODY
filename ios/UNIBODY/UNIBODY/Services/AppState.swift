@@ -462,13 +462,6 @@ public class AppState: ObservableObject {
         #if canImport(UIKit)
         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
         #endif
-        
-        let server = serverURL
-        Task {
-            if let host = await SyncService.shared.discoverActiveServer(preferredURL: server) {
-                _ = await SyncService.shared.postUnenroll(serverURL: host, courseId: courseId)
-            }
-        }
     }
     
     public func toggleEvent(id: String) {

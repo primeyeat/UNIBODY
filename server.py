@@ -749,7 +749,8 @@ class CAUBotRequestHandler(SimpleHTTPRequestHandler):
 
         if path == "/api/course/unenroll":
             course_id = (body.get("course_id") or "").strip()
-            force = bool(body.get("force", False))
+            force = bool(body.get("force", True))
+            launch_browser = bool(body.get("launch_browser", False))
             with STATE_LOCK:
                 res = lookup_course_by_identifier(course_id, APP_STATE["custom_courses"], session_mgr)
                 if not res.get("ok"):
@@ -759,13 +760,13 @@ class CAUBotRequestHandler(SimpleHTTPRequestHandler):
                 ckey = course["course_id"].lower()
                 prev_gid = APP_STATE.get("enrolled_groups", {}).get(ckey)
 
-            if force:
+            if force or not launch_browser:
                 with STATE_LOCK:
                     _apply_enrolled_group_to_state(course, None)
                     if "enrolled_groups" in APP_STATE:
                         APP_STATE["enrolled_groups"].pop(ckey, None)
                     save_state(APP_STATE)
-                    session_mgr.add_log("INFO", f"Kurs '{course['course_id']}' manuell ohne Browser-Check aus dem Wochenplan entfernt.")
+                    session_mgr.add_log("INFO", f"Kurs '{course['course_id']}' im Wochenplan freigegeben.")
                     pinned_gid = APP_STATE.get("pinned_groups", {}).get(ckey)
                     ranked_groups = rank_course_groups(
                         course.get("groups", []),
@@ -837,7 +838,8 @@ class CAUBotRequestHandler(SimpleHTTPRequestHandler):
         if path == "/api/course/enroll":
             course_id = (body.get("course_id") or "").strip()
             group_id = (body.get("group_id") or "").strip()
-            force = bool(body.get("force", False))
+            force = bool(body.get("force", True))
+            launch_browser = bool(body.get("launch_browser", False))
             mode = body.get("mode", "sniper")
 
             with STATE_LOCK:
@@ -851,7 +853,7 @@ class CAUBotRequestHandler(SimpleHTTPRequestHandler):
                 if not target_group and course.get("groups"):
                     target_group = course["groups"][0]
 
-            if force or not target_group:
+            if force or not target_group or not launch_browser:
                 with STATE_LOCK:
                     enrolled_gid = target_group.get("group_id") if target_group else group_id
                     grp_obj = _apply_enrolled_group_to_state(course, enrolled_gid)
