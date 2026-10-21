@@ -222,4 +222,77 @@ public class SyncService {
         let (success, _) = await postUnenroll(serverURL: serverURL, courseId: courseId, force: false)
         return success
     }
+    
+    /// Triggers UNIBODY Deep-Sync on the Core server to crawl OpenOlat and Moodle via CDP,
+    /// detect enrolled groups, update the timetable, and terminate Chrome.
+    public func triggerServerDeepSync(serverURL: String) async -> (success: Bool, message: String, detectedCount: Int, schedule: [ScheduleEvent], enrolled: [String: String]) {
+        guard let url = URL(string: "\(serverURL)/api/course/sync-enrolled") else {
+            return (false, "Ungültige Server-URL.", 0, [], [:])
+        }
+        var req = URLRequest(url: url)
+        req.httpMethod = "POST"
+        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        req.httpBody = "{}".data(using: .utf8)
+        req.timeoutInterval = 60.0
+        
+        do {
+            let (data, response) = try await URLSession.shared.data(for: req)
+            guard (response as? HTTPURLResponse)?.statusCode == 200 else {
+                return (false, "Server antwortete mit Fehler.", 0, [], [:])
+            }
+            guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
+                  let ok = json["ok"] as? Bool, ok else {
+                let err = (try? JSONSerialization.jsonObject(with: data) as? [String: Any])?["error"] as? String ?? "Deep-Sync fehlgeschlagen."
+                return (false, err, 0, [], [:])
+            }
+            
+            let detected = (json["detected"] as? [[String: Any]]) ?? []
+            
+            var enrolledMap: [String: String] = [:]
+            if let rawEnrolled = json["enrolled_groups"] as? [String: Any] {
+                for (k, v) in rawEnrolled {
+                    enrolledMap[k.lowercased()] = String(describing: v)
+                }
+            }
+            
+            var parsedEvents: [ScheduleEvent] = []
+            if let rawSched = json["schedule"] as? [[String: Any]] {
+                for item in rawSched {
+                    let id = String(describing: item["id"] ?? UUID().uuidString)
+                    let courseId = item["course_id"] as? String
+                    let groupId = item["group_id"] as? String
+                    let title = (item["title"] as? String) ?? "Termin"
+                    let day = (item["day"] as? Int) ?? 0
+                    let dayName = (item["day_name"] as? String) ?? "Montag"
+                    let start = (item["start_time"] as? String) ?? "10:15"
+                    let end = (item["end_time"] as? String) ?? "11:45"
+                    let room = (item["room"] as? String) ?? ""
+                    let type = (item["type"] as? String) ?? "lecture"
+                    let enabled = (item["enabled"] as? Bool) ?? true
+                    let weekType = (item["week_type"] as? String) ?? "all"
+                    
+                    let ev = ScheduleEvent(
+                        id: id,
+                        courseId: courseId,
+                        groupId: groupId,
+                        title: title,
+                        day: day,
+                        dayName: dayName,
+                        startTime: start,
+                        endTime: end,
+                        room: room,
+                        type: type,
+                        enabled: enabled,
+                        weekType: weekType
+                    )
+                    parsedEvents.append(ev)
+                }
+            }
+            
+            let msg = "✅ UNIBODY Deep-Sync: \(detected.count) belegte Übung(en) auf OpenOlat & Moodle synchronisiert!"
+            return (true, msg, detected.count, parsedEvents, enrolledMap)
+        } catch {
+            return (false, "Verbindungsfehler: \(error.localizedDescription)", 0, [], [:])
+        }
+    }
 }

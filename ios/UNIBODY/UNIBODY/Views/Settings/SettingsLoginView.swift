@@ -151,7 +151,7 @@ public struct SettingsLoginView: View {
                             }
                             .tint(AeroTheme.skyBlue)
                             
-                            // Primary Internet Account Fetch Button
+                            // Primary UNIBODY Deep-Sync Button
                             Button {
                                 appState.saveCredentials(
                                     username: inputUsername,
@@ -161,23 +161,23 @@ public struct SettingsLoginView: View {
                                     autoSubmit: autoSubmit
                                 )
                                 Task {
-                                    await appState.fetchBookedExercisesFromOnlineAccounts()
+                                    await appState.performDeepSync()
                                 }
                             } label: {
                                 HStack {
-                                    if appState.isSyncing {
+                                    if appState.isDeepSyncing || appState.isSyncing {
                                         ProgressView()
                                             .tint(.white)
                                     } else {
-                                        Image(systemName: "icloud.and.arrow.down.fill")
+                                        Image(systemName: "arrow.triangle.2.circlepath")
                                     }
-                                    Text(appState.isSyncing ? "Lade aus CAU-Accounts..." : "Aus CAU-Accounts laden (OpenOlat & Moodle)")
+                                    Text(appState.isDeepSyncing ? "UNIBODY Deep-Sync läuft..." : "UNIBODY Deep-Sync (OpenOlat & Moodle)")
                                 }
                                 .frame(maxWidth: .infinity)
                                 .glossyButton(gradient: AeroTheme.oceanGradient, cornerRadius: 14)
                             }
                             .buttonStyle(.plain)
-                            .disabled(inputUsername.trimmingCharacters(in: .whitespaces).isEmpty || appState.isSyncing)
+                            .disabled(inputUsername.trimmingCharacters(in: .whitespaces).isEmpty || appState.isDeepSyncing)
                             .padding(.top, 4)
                             
                             // Save Button

@@ -32,6 +32,7 @@
 		000020000000000000000017 /* Models/CampusLocation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000010000000000000000017 /* Models/CampusLocation.swift */; };
 		000020000000000000000018 /* Services/LMSMobileEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000010000000000000000018 /* Services/LMSMobileEngine.swift */; };
 		000020000000000000000019 /* Views/Courses/LiveAutomationSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000010000000000000000019 /* Views/Courses/LiveAutomationSheet.swift */; };
+		00002000000000000000001A /* Views/Sync/LiveDeepSyncSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00001000000000000000001A /* Views/Sync/LiveDeepSyncSheet.swift */; };
 		0000200000000000000003E7 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 0000100000000000000003E7 /* Assets.xcassets */; };
 /* End PBXBuildFile section */
 
@@ -61,6 +62,7 @@
 		000010000000000000000017 /* Models/CampusLocation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Models/CampusLocation.swift; sourceTree = "<group>"; };
 		000010000000000000000018 /* Services/LMSMobileEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Services/LMSMobileEngine.swift; sourceTree = "<group>"; };
 		000010000000000000000019 /* Views/Courses/LiveAutomationSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Views/Courses/LiveAutomationSheet.swift; sourceTree = "<group>"; };
+		00001000000000000000001A /* Views/Sync/LiveDeepSyncSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Views/Sync/LiveDeepSyncSheet.swift; sourceTree = "<group>"; };
 		0000100000000000000003E6 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		0000100000000000000003E7 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		000030000000000000000001 /* UNIBODY.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = UNIBODY.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -113,6 +115,7 @@
 				000010000000000000000017 /* Models/CampusLocation.swift */,
 				000010000000000000000018 /* Services/LMSMobileEngine.swift */,
 				000010000000000000000019 /* Views/Courses/LiveAutomationSheet.swift */,
+				00001000000000000000001A /* Views/Sync/LiveDeepSyncSheet.swift */,
 				0000100000000000000003E7 /* Assets.xcassets */,
 				0000100000000000000003E6 /* Info.plist */,
 			);
@@ -220,6 +223,7 @@
 				000020000000000000000017 /* Models/CampusLocation.swift in Sources */,
 				000020000000000000000018 /* Services/LMSMobileEngine.swift in Sources */,
 				000020000000000000000019 /* Views/Courses/LiveAutomationSheet.swift in Sources */,
+				00002000000000000000001A /* Views/Sync/LiveDeepSyncSheet.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

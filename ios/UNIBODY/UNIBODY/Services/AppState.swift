@@ -11,6 +11,11 @@ public class AppState: ObservableObject {
     @Published public var isSyncing: Bool = false
     @Published public var syncMessage: String? = nil
     
+    // UNIBODY Deep-Sync Live Crawler
+    @Published public var showLiveDeepSyncSheet: Bool = false
+    @Published public var isDeepSyncing: Bool = false
+    @Published public var deepSyncMessage: String? = nil
+    
     // CAU Account Credentials Vault
     @Published public var username: String = ""
     @Published public var password: String = ""
@@ -494,28 +499,63 @@ public class AppState: ObservableObject {
         jobs.insert(job, at: 0)
     }
     
-    public func fetchBookedExercisesFromOnlineAccounts() async {
-        guard !username.isEmpty, !password.isEmpty else {
-            syncMessage = "⚠️ Bitte gib zuerst deine CAU-Kennung und dein Passwort ein."
+    /// Comprehensive UNIBODY Deep-Sync:
+    /// 1. Tries server-backed Deep-Sync (crawls OpenOlat & Moodle via CDP and closes Chrome) if core server is reachable.
+    /// 2. If server is offline or forceOnDevice is requested, launches on-device Live WebKit Deep-Sync sheet.
+    public func performDeepSync(forceOnDevice: Bool = false) async {
+        isDeepSyncing = true
+        defer { isDeepSyncing = false }
+        
+        let trimmedUser = username.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedUser.isEmpty, !password.isEmpty else {
+            deepSyncMessage = "⚠️ Bitte gib zuerst deine CAU-Kennung und dein Passwort im Tab 'Login & Tresor' ein."
+            syncMessage = deepSyncMessage
             return
         }
         
-        isSyncing = true
-        defer { isSyncing = false }
-        
-        let results = await CAUOnlineAccountFetcher.shared.fetchBookedExercises(
-            username: username,
-            password: password,
-            knownCourses: courses
-        )
-        
-        for r in results {
-            enrollInGroup(courseId: r.courseId, groupId: r.groupId)
+        if !forceOnDevice {
+            // First check if active UNIBODY server is reachable on Wi-Fi / Localhost
+            if let activeHost = await SyncService.shared.discoverActiveServer(preferredURL: serverURL) {
+                self.serverURL = activeHost
+                deepSyncMessage = "🔄 UNIBODY Deep-Sync läuft auf Server (\(activeHost))..."
+                syncMessage = deepSyncMessage
+                
+                let result = await SyncService.shared.triggerServerDeepSync(serverURL: activeHost)
+                if result.success {
+                    // Update enrolled groups map
+                    self.enrolledGroups = result.enrolled
+                    
+                    // Update schedule
+                    if !result.schedule.isEmpty {
+                        self.schedule = result.schedule
+                    }
+                    
+                    // Update courses catalog enrolled badges
+                    for i in 0..<courses.count {
+                        let cid = courses[i].courseId.lowercased()
+                        if let enrolledGid = result.enrolled[cid] {
+                            courses[i].enrolledGroupId = enrolledGid
+                        }
+                    }
+                    
+                    self.lastSyncDate = Date()
+                    self.deepSyncMessage = result.message
+                    self.syncMessage = result.message
+                    
+                    #if canImport(UIKit)
+                    UINotificationFeedbackGenerator().notificationOccurred(.success)
+                    #endif
+                    return
+                }
+            }
         }
         
-        self.lastSyncDate = Date()
-        let count = results.count
-        syncMessage = "✅ Online via CAU-Accounts geladen: \(count) belegte Übung\(count == 1 ? "" : "en") aktiv!"
+        // On-device Live WebKit Crawler Fallback
+        self.showLiveDeepSyncSheet = true
+    }
+    
+    public func fetchBookedExercisesFromOnlineAccounts() async {
+        await performDeepSync()
     }
     
     public func syncWithLocalServer(customURL: String? = nil) async {

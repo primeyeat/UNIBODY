@@ -34,5 +34,10 @@ public struct ContentView: View {
             ClaireEasterEggModalView()
                 .presentationDetents([.fraction(0.68), .large])
         }
+        .sheet(isPresented: $appState.showLiveDeepSyncSheet) {
+            LiveDeepSyncSheet()
+                .environmentObject(appState)
+                .presentationDetents([.fraction(0.88), .large])
+        }
     }
 }

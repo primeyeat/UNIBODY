@@ -10,6 +10,65 @@ public struct CoursesView: View {
                 
                 ScrollView {
                     LazyVStack(spacing: 16) {
+                        // UNIBODY Deep-Sync Hero Card
+                        Button {
+                            Task {
+                                await appState.performDeepSync()
+                            }
+                        } label: {
+                            HStack(spacing: 14) {
+                                ZStack {
+                                    Circle()
+                                        .fill(AeroTheme.oceanGradient)
+                                        .frame(width: 44, height: 44)
+                                    if appState.isDeepSyncing {
+                                        ProgressView()
+                                            .tint(.white)
+                                    } else {
+                                        Image(systemName: "arrow.triangle.2.circlepath")
+                                            .font(.system(size: 20, weight: .bold))
+                                            .foregroundColor(.white)
+                                    }
+                                }
+                                
+                                VStack(alignment: .leading, spacing: 3) {
+                                    HStack {
+                                        Text("UNIBODY Deep-Sync")
+                                            .font(.system(.subheadline, design: .rounded).weight(.bold))
+                                            .foregroundColor(.white)
+                                        Spacer()
+                                        AeroBadge("OpenOlat & Moodle", color: AeroTheme.emerald)
+                                    }
+                                    
+                                    Text(appState.isDeepSyncing ? "Synchronisiere mit CAU-Portalen..." : "Gebuchte Gruppen live abfragen & im Stundenplan blockieren")
+                                        .font(.caption2)
+                                        .foregroundColor(.white.opacity(0.8))
+                                        .lineLimit(1)
+                                }
+                            }
+                            .padding(14)
+                            .frutigerGlass(cornerRadius: 16)
+                        }
+                        .buttonStyle(.plain)
+                        .disabled(appState.isDeepSyncing)
+                        
+                        if let msg = appState.deepSyncMessage {
+                            HStack(spacing: 6) {
+                                Image(systemName: "checkmark.seal.fill")
+                                    .font(.caption2)
+                                    .foregroundColor(AeroTheme.emerald)
+                                Text(msg)
+                                    .font(.caption2)
+                                    .foregroundColor(.white.opacity(0.9))
+                                    .lineLimit(1)
+                                Spacer()
+                            }
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 6)
+                            .background(Color.white.opacity(0.06))
+                            .clipShape(Capsule())
+                        }
+                        
                         ForEach(appState.courses) { course in
                             NavigationLink {
                                 CourseDetailView(course: course)
@@ -23,6 +82,23 @@ public struct CoursesView: View {
                 }
             }
             .navigationTitle("Module & Übungen")
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button {
+                        Task {
+                            await appState.performDeepSync()
+                        }
+                    } label: {
+                        if appState.isDeepSyncing {
+                            ProgressView()
+                                .tint(AeroTheme.skyBlue)
+                        } else {
+                            Image(systemName: "arrow.triangle.2.circlepath")
+                                .foregroundColor(AeroTheme.skyBlue)
+                        }
+                    }
+                }
+            }
         }
     }
 }

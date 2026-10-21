@@ -75,9 +75,9 @@ public struct ScheduleView: View {
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
                     Button {
-                        Task { await appState.syncWithLocalServer() }
+                        Task { await appState.performDeepSync() }
                     } label: {
-                        if appState.isSyncing {
+                        if appState.isDeepSyncing || appState.isSyncing {
                             ProgressView()
                                 .tint(AeroTheme.skyBlue)
                         } else {
@@ -197,7 +197,7 @@ private struct DaySchedulePageView: View {
                     .padding(.bottom, 24)
                 }
                 .refreshable {
-                    await appState.syncWithLocalServer()
+                    await appState.performDeepSync()
                 }
             }
         }
