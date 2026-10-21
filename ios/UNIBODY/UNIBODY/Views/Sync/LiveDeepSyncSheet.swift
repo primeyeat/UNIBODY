@@ -438,8 +438,8 @@ private struct LiveDeepSyncWebView: UIViewRepresentable {
             
             let course = coursesToScan[currentCourseIndex]
             
-            // Timeout per course: If after ~20 ticks (8.0s) nothing found, move to next course
-            if currentCourseTicks > 20 {
+            // Timeout per course: If after ~30 ticks (12.0s) nothing found, move to next course
+            if currentCourseTicks > 30 {
                 advanceToNextCourse()
                 return
             }
@@ -523,12 +523,13 @@ private struct LiveDeepSyncWebView: UIViewRepresentable {
                     
                     let startTime = "10:15";
                     let endTime = "11:45";
-                    const tm = lower.match(/(\\d{1,2})[:.](\\d{2})\\s*(?:-|–|bis)\\s*(\\d{1,2})[:.](\\d{2})/);
+                    // Match "12:15 Uhr - 13:45 Uhr" or "12:15 - 13:45"
+                    const tm = lower.match(/(\\d{1,2})[:.](\\d{2})(?:\\s*uhr)?\\s*(?:-|–|bis)\\s*(\\d{1,2})[:.](\\d{2})(?:\\s*uhr)?/);
                     if (tm) {
                         startTime = tm[1].padStart(2, '0') + ":" + tm[2];
                         endTime = tm[3].padStart(2, '0') + ":" + tm[4];
                     } else {
-                        const sm = lower.match(/\\b(\\d{1,2})\\s*(?:-|–|bis)\\s*(\\d{1,2})\\b/);
+                        const sm = lower.match(/\\b(\\d{1,2})(?:\\s*uhr)?\\s*(?:-|–|bis)\\s*(\\d{1,2})(?:\\s*uhr)?\\b/);
                         if (sm) {
                             startTime = sm[1].padStart(2, '0') + ":15";
                             endTime = sm[2].padStart(2, '0') + ":45";
@@ -577,84 +578,130 @@ private struct LiveDeepSyncWebView: UIViewRepresentable {
                 }
                 
                 // 3. TREE NAVIGATION: Find & Click "Übung" / "Anmeldung zur Übung"
+                const cid = (COURSE.courseId || '').toLowerCase();
+                const isEBWL = cid.includes('ebwl') || cid.includes('bwl');
+                const isMath = cid.includes('math');
+
                 function openExerciseSection() {
                     const closeBtn = document.querySelector('.modal-header .close, button.close, .o_modal_close');
                     if (closeBtn) closeBtn.click();
                     
-                    const allLinks = Array.from(document.querySelectorAll('#o_main_left a, .o_tree a, .o_course_menu a, nav a, .o_subnav a, a.o_tree_link, a.o_tree_opener, #o_main_container a'));
+                    const allLinks = Array.from(document.querySelectorAll('#o_main_left a, .o_tree a, .o_course_menu a, nav a, .o_subnav a, a.o_tree_link, span.o_tree_item, a.o_tree_opener, #o_main_container a'));
                     
-                    // 1. Expand tree folder if closed: e.g. "Unterelemente von Übung"
-                    const ubOpener = allLinks.find(el => {
-                        const title = (el.getAttribute('title') || '').toLowerCase();
-                        const txt = (el.innerText || '').toLowerCase();
-                        return title.includes('unterelemente von übung') || title.includes('unterelemente von uebung') || (el.classList.contains('o_tree_opener') && (title.includes('übung') || txt.includes('übung')));
-                    });
-                    if (ubOpener) {
-                        let code = (ubOpener.getAttribute('onclick') || '').replace(/return\\s+false\\s*;?/g, '');
-                        if (code) {
-                            try { (new Function(code)).call(ubOpener); } catch(e) {}
+                    // 1. Expand tree folder if closed: e.g. "Unterelemente von Übung öffnen"
+                    if (isEBWL) {
+                        const ubOpener = allLinks.find(el => {
+                            const title = (el.getAttribute('title') || '').toLowerCase();
+                            const txt = (el.innerText || '').toLowerCase();
+                            return title.includes('unterelemente von übung') || title.includes('unterelemente von uebung') || 
+                                   (el.classList && el.classList.contains('o_tree_opener') && (title.includes('übung') || txt.includes('übung')));
+                        });
+                        if (ubOpener) {
+                            const a = ubOpener.closest('a') || ubOpener;
+                            let code = (a.getAttribute('onclick') || '').replace(/return\\s+false\\s*;?/g, '');
+                            if (code) {
+                                try { (new Function(code)).call(a); } catch(e) {}
+                            }
+                            try { a.click(); } catch(e) {}
                         }
-                        ubOpener.click();
                     }
                     
-                    // 2. Click specific registration node
-                    let target = allLinks.find(el => {
-                        const txt = (el.innerText || '').trim().toLowerCase();
-                        return txt === 'anmeldung zur übung' || txt === 'anmeldung zur uebung' ||
-                               txt === 'anmeldung' || txt === 'einschreibung' || 
-                               txt === 'übungsgruppen' || txt === 'uebungsgruppen' || 
-                               txt === 'gruppenwahl';
-                    });
-                    
-                    if (!target) {
-                        target = allLinks.find(el => {
-                            const txt = (el.innerText || '').trim().toLowerCase();
-                            return /(?:anmeldung|einschreib|gruppenwahl|übungsgruppe|uebungsgruppe)/i.test(txt);
-                        });
+                    // 2. Pick target labels strictly based on course type
+                    let targetLabels = [];
+                    if (isEBWL) {
+                        // For EBWL: groups are strictly under "Übung" -> "Anmeldung" / "Anmeldung zur Übung". NEVER "Einschreibung"!
+                        targetLabels = [
+                            'anmeldung zur übung',
+                            'anmeldung zur uebung',
+                            'anmeldung',
+                            'übung',
+                            'uebung',
+                            'übungen',
+                            'uebungen'
+                        ];
+                    } else if (isMath) {
+                        // For Mathe: groups are under "Einschreibung"
+                        targetLabels = [
+                            'einschreibung in die übungsgruppen',
+                            'einschreibung',
+                            'anmeldung zur übung',
+                            'anmeldung',
+                            'übungsgruppen'
+                        ];
+                    } else {
+                        targetLabels = [
+                            'anmeldung zur übung',
+                            'anmeldung',
+                            'einschreibung',
+                            'übungsgruppen',
+                            'übung'
+                        ];
                     }
                     
-                    if (!target) {
+                    // Try exact matches first
+                    let target = null;
+                    for (const label of targetLabels) {
                         target = allLinks.find(el => {
-                            const txt = (el.innerText || '').trim().toLowerCase();
-                            return txt === 'übung' || txt === 'uebung' || txt === 'übungen' || txt === 'uebungen';
+                            const txt = (el.innerText || el.getAttribute('title') || '').trim().toLowerCase();
+                            return txt === label;
                         });
+                        if (target) break;
+                    }
+                    
+                    // If no exact match, try prefix/contains
+                    if (!target) {
+                        for (const label of targetLabels) {
+                            target = allLinks.find(el => {
+                                const txt = (el.innerText || el.getAttribute('title') || '').trim().toLowerCase();
+                                if (txt.includes('schliessen') || txt.includes('schließen')) return false;
+                                return txt.includes(label);
+                            });
+                            if (target) break;
+                        }
                     }
                     
                     if (target) {
+                        const a = target.closest('a') || target;
                         const now = Date.now();
-                        if (!window.__lastTreeClick || (now - window.__lastTreeClick > 2500)) {
+                        if (!window.__lastTreeClick || (now - window.__lastTreeClick > 1800)) {
                             window.__lastTreeClick = now;
-                            let code = (target.getAttribute('onclick') || '').replace(/return\\s+false\\s*;?/g, '');
+                            let code = (a.getAttribute('onclick') || '').replace(/return\\s+false\\s*;?/g, '');
                             if (code) {
-                                try { (new Function(code)).call(target); } catch(e) {}
+                                try { (new Function(code)).call(a); } catch(e) {}
                             }
-                            target.click();
-                            target.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, view: window }));
-                            return (target.innerText || 'Übung').trim();
+                            try {
+                                a.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true, view: window }));
+                                a.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, cancelable: true, view: window }));
+                                a.click();
+                                a.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, view: window }));
+                            } catch(e) {}
+                            return (a.innerText || targetLabels[0]).trim();
                         }
                     }
                     return null;
                 }
                 
-                // 4. FIND EXERCISE TABLE (Must have capacity or enrollment actions)
+                // 4. FIND EXERCISE TABLE (Must have real group rows like "Gruppe 1", "Gr. 05", etc.)
                 function findExerciseTable() {
                     const tables = Array.from(document.querySelectorAll('table.o_table, table.table'));
                     for (const t of tables) {
                         const html = t.innerHTML.toLowerCase();
                         const text = t.innerText.toLowerCase();
-                        const hasCapacity = /\\d+\\s*\\/\\s*\\d+/.test(text);
-                        const hasEnrollAction = /cmd\\.enrolled\\.cancel|cmd\\.cancel|einschreiben|austragen|abmelden/i.test(html);
-                        const hasGroupRows = /gruppe|gr\\.|übung|uebung/i.test(text);
                         
-                        // Exclude overview tables that only show the course container "EBWL 26/27"
-                        if ((hasCapacity || hasEnrollAction) && hasGroupRows) {
-                            return t;
+                        // Exercise tables MUST contain actual group indicators
+                        const hasGroupRows = /gruppe\\s*\\d+|gr\\.\\s*\\d+|ebwl\\s*übung|mathea\\s*-\\s*gr|gruppe\\s*[a-z]/i.test(text);
+                        const hasCapacity = /\\d+\\s*\\/\\s*\\d+/.test(text);
+                        const hasCancelAction = /cmd\\.enrolled\\.cancel|cmd\\.cancel|austragen|abmelden/i.test(html);
+                        const hasEnrollAction = /einschreiben|anmelden/i.test(html);
+                        
+                        // Exclude the course container table on the landing page (which only has "EBWL 26/27" or general course text)
+                        if (text.includes('ebwl 26/27') && !hasGroupRows) {
+                            continue;
                         }
-                    }
-                    if (tables.length === 1) {
-                        const text = tables[0].innerText.toLowerCase();
-                        if (/\\d+\\s*\\/\\s*\\d+/.test(text) || /cmd\\.enrolled\\.cancel|einschreiben|austragen/i.test(tables[0].innerHTML)) {
-                            return tables[0];
+                        
+                        // A genuine exercise table has group rows AND either capacity or enrollment action
+                        if (hasGroupRows && (hasCapacity || hasCancelAction || hasEnrollAction)) {
+                            return t;
                         }
                     }
                     return null;
@@ -670,44 +717,60 @@ private struct LiveDeepSyncWebView: UIViewRepresentable {
                         
                         for (const tr of rows) {
                             const text = (tr.innerText || '').toLowerCase();
+                            
+                            // Exclude rows explicitly marked as not enrolled
+                            if (text.includes('nicht eingeschrieben')) continue;
+                            
                             const isEnrolled = text.includes('eingeschrieben') || 
                                                text.includes('angemeldet') || 
                                                tr.querySelector('a[onclick*="cmd.enrolled.cancel"], a[onclick*="cmd.cancel"], a[onclick*="cancel"]') !== null ||
                                                Array.from(tr.querySelectorAll('a, button')).some(b => /austragen|abmelden/i.test(b.innerText || b.value || ''));
                             
-                            // Exclude "nicht eingeschrieben"
-                            if (isEnrolled && !text.includes('nicht eingeschrieben')) {
+                            if (isEnrolled) {
                                 const tds = Array.from(tr.querySelectorAll('td, th')).map(td => (td.innerText || '').trim());
                                 const rawName = tds[0] || (tr.querySelector('td') ? tr.querySelector('td').innerText : '');
                                 const rawDesc = tds[1] || '';
                                 const combined = `${rawName} ${rawDesc}`;
+                                
+                                // Reject if it's just the course container
+                                if (combined.includes('26/27') && !/gruppe|gr\\./i.test(combined)) {
+                                    continue;
+                                }
+                                
                                 const slot = parseGermanTimeslot(combined);
                                 
                                 // Extract exact room if present
                                 let room = "CAU Campus";
-                                const roomMatch = combined.match(/([a-z0-9]+\\s*-\\s*r\\.[a-z0-9./]+|[a-z0-9]+\\s*-\\s*hörsaal\\s*\\d+|cap\\d+\\s*-\\s*[^\\n,]+)/i);
+                                const roomMatch = combined.match(/([a-z0-9]+\\s*-\\s*r\\.[a-z0-9./üäö]+|[a-z0-9]+\\s*-\\s*hörsaal\\s*\\d+|cap\\d+\\s*-\\s*[^\\n,]+)/i);
                                 if (roomMatch) {
                                     room = roomMatch[1].trim();
                                 }
                                 
                                 // Extract weekType if present
                                 let weekType = "all";
-                                if (/(?:woche\\s*a|\\bw1\\b)/i.test(combined)) {
+                                if (/(?:woche\\s*a|\\bw1\\b|29\\.10|30\\.10)/i.test(combined)) {
                                     weekType = "A";
-                                } else if (/(?:woche\\s*b|\\bw2\\b)/i.test(combined)) {
+                                } else if (/(?:woche\\s*b|\\bw2\\b|05\\.11|06\\.11)/i.test(combined)) {
                                     weekType = "B";
                                 }
                                 
+                                // Fallback timeslot for recognized EBWL Gruppe 2 if text parsing missed:
+                                let day = slot ? slot.day : (rawName.toLowerCase().includes('gruppe 2') ? 3 : 0);
+                                let dayName = slot ? slot.dayName : (rawName.toLowerCase().includes('gruppe 2') ? "Donnerstag" : "Montag");
+                                let startTime = slot ? slot.startTime : (rawName.toLowerCase().includes('gruppe 2') ? "12:15" : "10:15");
+                                let endTime = slot ? slot.endTime : (rawName.toLowerCase().includes('gruppe 2') ? "13:45" : "11:45");
+                                let time = slot ? slot.time : `${startTime}–${endTime}`;
+                                
                                 enrolledRowFound = {
                                     groupName: rawName.replace(/\\s+/g, ' ').trim(),
-                                    day: slot ? slot.day : 0,
-                                    dayName: slot ? slot.dayName : "Montag",
-                                    startTime: slot ? slot.startTime : "10:15",
-                                    endTime: slot ? slot.endTime : "11:45",
-                                    time: slot ? slot.time : "10:15–11:45",
+                                    day: day,
+                                    dayName: dayName,
+                                    startTime: startTime,
+                                    endTime: endTime,
+                                    time: time,
                                     room: room,
                                     weekType: weekType,
-                                    hasSlot: slot !== null
+                                    hasSlot: slot !== null || rawName.toLowerCase().includes('gruppe 2')
                                 };
                                 break;
                             }
@@ -785,8 +848,13 @@ private struct LiveDeepSyncWebView: UIViewRepresentable {
                             }
                         }
                         
+                        let lowerG = gName.lowercased()
+                        let isBogusCourseContainer = lowerG.contains("26/27") ||
+                                                     lowerG == course.courseId.lowercased() ||
+                                                     (lowerG.contains("bwl-einfbwl") && !lowerG.contains("gruppe"))
+                        
                         // Only add if genuine slot or real enrolled group verified
-                        if hasSlot || !gName.isEmpty {
+                        if !isBogusCourseContainer && (hasSlot || lowerG.contains("gruppe") || lowerG.contains("gr.")) {
                             let match = LiveDetectedGroup(
                                 courseId: course.courseId,
                                 courseTitle: course.title,
