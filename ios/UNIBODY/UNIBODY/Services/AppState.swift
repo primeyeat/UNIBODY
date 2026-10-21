@@ -273,7 +273,7 @@ public class AppState: ObservableObject {
                 platformId: "openolat",
                 platformHost: "lms.uni-kiel.de",
                 platformBadge: "🏛️ lms.uni-kiel.de",
-                url: "https://lms.uni-kiel.de",
+                url: "https://lms.uni-kiel.de/url/RepositoryEntry/5804556477",
                 enrollmentMode: "priority",
                 enrollmentOpensAt: "2026-10-19T09:00:00",
                 groups: [

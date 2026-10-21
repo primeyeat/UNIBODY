@@ -12,6 +12,7 @@ public struct CourseDetailView: View {
     @State private var unenrolledInfo: (course: String, group: String, time: String, room: String)? = nil
     
     // Live Enrollment state
+    @State private var activeAutomationTask: AutomationTask? = nil
     @State private var enrollingGroupId: String? = nil
     @State private var showEnrollSheet = false
     @State private var showEnrollError = false
@@ -24,50 +25,11 @@ public struct CourseDetailView: View {
     }
     
     private func triggerEnroll(grp: ExerciseGroup) {
-        guard enrollingGroupId == nil else { return }
-        enrollingGroupId = grp.groupId
-        let title = course.title
-        let gName = grp.name
-        let time = "\(grp.dayName), \(grp.startTime)–\(grp.endTime) Uhr"
-        let room = grp.room
-        
-        Task {
-            let result = await appState.enrollInGroupAsync(courseId: course.courseId, groupId: grp.groupId)
-            await MainActor.run {
-                enrollingGroupId = nil
-                if result.success {
-                    enrolledInfo = (course: title, group: gName, time: time, room: room)
-                    showEnrollSheet = true
-                } else {
-                    enrollErrorMessage = result.message
-                    pendingEnrollGroup = grp
-                    showEnrollError = true
-                }
-            }
-        }
+        activeAutomationTask = AutomationTask(course: course, group: grp, isEnroll: true)
     }
     
     private func triggerUnenroll(grp: ExerciseGroup) {
-        guard !isUnenrolling else { return }
-        isUnenrolling = true
-        let title = course.title
-        let gName = grp.name
-        let time = "\(grp.dayName), \(grp.startTime)–\(grp.endTime) Uhr"
-        let room = grp.room
-        
-        Task {
-            let result = await appState.clearEnrollmentAsync(courseId: course.courseId)
-            await MainActor.run {
-                isUnenrolling = false
-                if result.success {
-                    unenrolledInfo = (course: title, group: gName, time: time, room: room)
-                    showUnenrollSheet = true
-                } else {
-                    unenrollErrorMessage = result.message
-                    showUnenrollError = true
-                }
-            }
-        }
+        activeAutomationTask = AutomationTask(course: course, group: grp, isEnroll: false)
     }
     
     public var body: some View {
@@ -302,6 +264,10 @@ public struct CourseDetailView: View {
             SniperConfigSheet(course: course, onDirectEnroll: { grp in
                 triggerEnroll(grp: grp)
             })
+        }
+        .sheet(item: $activeAutomationTask) { task in
+            LiveAutomationSheet(task: task)
+                .presentationDetents([.fraction(0.88), .large])
         }
     }
 }

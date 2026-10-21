@@ -20,6 +20,19 @@ public struct Course: Identifiable, Codable, Hashable {
         groups.isEmpty || enrollmentMode == "lecture_only" || enrollmentMode == "none"
     }
     
+    public var targetEnrollmentURL: URL {
+        if !url.isEmpty && !url.hasSuffix("lms.uni-kiel.de") && !url.hasSuffix("lms.uni-kiel.de/") && !url.hasSuffix("elearn.informatik.uni-kiel.de") && !url.hasSuffix("elearn.informatik.uni-kiel.de/") {
+            if let u = URL(string: url) { return u }
+        }
+        if !olatRepoId.isEmpty && !olatRepoId.contains("moodle") {
+            if let u = URL(string: "https://lms.uni-kiel.de/url/RepositoryEntry/\(olatRepoId)") { return u }
+        }
+        if platformId.contains("moodle") {
+            if let u = URL(string: "https://elearn.informatik.uni-kiel.de/course/view.php?name=\(courseId)") { return u }
+        }
+        return URL(string: "https://lms.uni-kiel.de/dmz/")!
+    }
+    
     public enum CodingKeys: String, CodingKey {
         case courseId = "course_id"
         case univisId = "univis_id"
