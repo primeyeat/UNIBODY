@@ -336,7 +336,16 @@ public class AppState: ObservableObject {
         ]
     }
     
-    public func enrollInGroup(courseId: String, groupId: String) {
+    public func enrollInGroup(
+        courseId: String,
+        groupId: String,
+        customName: String? = nil,
+        day: Int? = nil,
+        dayName: String? = nil,
+        startTime: String? = nil,
+        endTime: String? = nil,
+        room: String? = nil
+    ) {
         let cidKey = courseId.lowercased()
         enrolledGroups[courseId] = groupId
         enrolledGroups[cidKey] = groupId
@@ -353,23 +362,31 @@ public class AppState: ObservableObject {
             }
         }
         
-        guard let course = courses.first(where: { $0.courseId.lowercased() == cidKey || $0.courseId == courseId }),
-              let group = course.groups.first(where: { $0.groupId == groupId }) else { return }
+        let course = courses.first(where: { $0.courseId.lowercased() == cidKey || $0.courseId == courseId })
+        let group = course?.groups.first(where: { $0.groupId == groupId })
+        
+        let resolvedDay = group?.day ?? day ?? 0
+        let resolvedDayName = group?.dayName ?? dayName ?? "Montag"
+        let resolvedStart = group?.startTime ?? startTime ?? "10:15"
+        let resolvedEnd = group?.endTime ?? endTime ?? "11:45"
+        let resolvedRoom = group?.room ?? room ?? "CAU Campus"
+        let resolvedName = group?.name ?? customName ?? "Übungsgruppe"
+        let courseTitle = course?.courseId ?? courseId
         
         // Add newly enrolled exercise to schedule
         let newEvent = ScheduleEvent(
-            id: "enrolled-\(course.courseId)",
-            courseId: course.courseId,
+            id: "enrolled-\(courseTitle)",
+            courseId: courseTitle,
             groupId: groupId,
-            title: "✅ \(course.courseId): \(group.name)",
-            day: group.day,
-            dayName: group.dayName,
-            startTime: group.startTime,
-            endTime: group.endTime,
-            room: group.room,
+            title: "✅ \(courseTitle): \(resolvedName)",
+            day: resolvedDay,
+            dayName: resolvedDayName,
+            startTime: resolvedStart,
+            endTime: resolvedEnd,
+            room: resolvedRoom,
             type: "enrolled_exercise",
             enabled: true,
-            weekType: group.weekType
+            weekType: group?.weekType ?? "all"
         )
         schedule.append(newEvent)
         
@@ -499,63 +516,22 @@ public class AppState: ObservableObject {
         jobs.insert(job, at: 0)
     }
     
-    /// Comprehensive UNIBODY Deep-Sync:
-    /// 1. Tries server-backed Deep-Sync (crawls OpenOlat & Moodle via CDP and closes Chrome) if core server is reachable.
-    /// 2. If server is offline or forceOnDevice is requested, launches on-device Live WebKit Deep-Sync sheet.
-    public func performDeepSync(forceOnDevice: Bool = false) async {
-        isDeepSyncing = true
-        defer { isDeepSyncing = false }
-        
+    /// Triggers the interactive On-Device UNIBODY Deep-Sync Sheet.
+    /// Opens a mini browser window on the iPhone that navigates through OpenOlat ("Meine Gruppen")
+    /// and Moodle, live-scrapes all booked exercise groups, and imports them directly into the weekly timetable.
+    public func performDeepSync(forceOnDevice: Bool = true) {
         let trimmedUser = username.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmedUser.isEmpty, !password.isEmpty else {
-            deepSyncMessage = "⚠️ Bitte gib zuerst deine CAU-Kennung und dein Passwort im Tab 'Login & Tresor' ein."
+            deepSyncMessage = "⚠️ Bitte trage zuerst deine CAU-Kennung und dein Passwort im Tab 'Login & Tresor' ein."
             syncMessage = deepSyncMessage
             return
         }
         
-        if !forceOnDevice {
-            // First check if active UNIBODY server is reachable on Wi-Fi / Localhost
-            if let activeHost = await SyncService.shared.discoverActiveServer(preferredURL: serverURL) {
-                self.serverURL = activeHost
-                deepSyncMessage = "🔄 UNIBODY Deep-Sync läuft auf Server (\(activeHost))..."
-                syncMessage = deepSyncMessage
-                
-                let result = await SyncService.shared.triggerServerDeepSync(serverURL: activeHost)
-                if result.success {
-                    // Update enrolled groups map
-                    self.enrolledGroups = result.enrolled
-                    
-                    // Update schedule
-                    if !result.schedule.isEmpty {
-                        self.schedule = result.schedule
-                    }
-                    
-                    // Update courses catalog enrolled badges
-                    for i in 0..<courses.count {
-                        let cid = courses[i].courseId.lowercased()
-                        if let enrolledGid = result.enrolled[cid] {
-                            courses[i].enrolledGroupId = enrolledGid
-                        }
-                    }
-                    
-                    self.lastSyncDate = Date()
-                    self.deepSyncMessage = result.message
-                    self.syncMessage = result.message
-                    
-                    #if canImport(UIKit)
-                    UINotificationFeedbackGenerator().notificationOccurred(.success)
-                    #endif
-                    return
-                }
-            }
-        }
-        
-        // On-device Live WebKit Crawler Fallback
         self.showLiveDeepSyncSheet = true
     }
     
     public func fetchBookedExercisesFromOnlineAccounts() async {
-        await performDeepSync()
+        performDeepSync()
     }
     
     public func syncWithLocalServer(customURL: String? = nil) async {

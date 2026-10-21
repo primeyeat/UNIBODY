@@ -7,9 +7,36 @@ public struct LiveDetectedGroup: Identifiable, Equatable {
     public let courseTitle: String
     public let groupId: String
     public let groupName: String
+    public let day: Int
     public let dayName: String
+    public let startTime: String
+    public let endTime: String
     public let time: String
     public let platform: String
+    
+    public init(
+        courseId: String,
+        courseTitle: String,
+        groupId: String,
+        groupName: String,
+        day: Int = 0,
+        dayName: String = "Montag",
+        startTime: String = "10:15",
+        endTime: String = "11:45",
+        time: String = "10:15–11:45",
+        platform: String = "OpenOlat"
+    ) {
+        self.courseId = courseId
+        self.courseTitle = courseTitle
+        self.groupId = groupId
+        self.groupName = groupName
+        self.day = day
+        self.dayName = dayName
+        self.startTime = startTime
+        self.endTime = endTime
+        self.time = time
+        self.platform = platform
+    }
 }
 
 public struct LiveDeepSyncSheet: View {
@@ -53,7 +80,7 @@ public struct LiveDeepSyncSheet: View {
                                     .font(.system(.headline, design: .rounded).weight(.bold))
                                     .foregroundColor(.white)
                                 
-                                Text("Liest gebuchte Übungen aus OpenOlat & Moodle aus")
+                                Text("Liest gebuchte Übungen live aus OpenOlat & Moodle aus")
                                     .font(.caption2)
                                     .foregroundColor(.white.opacity(0.75))
                             }
@@ -111,11 +138,17 @@ public struct LiveDeepSyncSheet: View {
                     // Detected Groups List if any found
                     if !detectedGroups.isEmpty {
                         VStack(alignment: .leading, spacing: 8) {
-                            Text("✅ Im Wochenplan gebuchte Übungen:")
-                                .font(.caption.weight(.bold))
-                                .foregroundColor(AeroTheme.emerald)
-                                .padding(.horizontal, 16)
-                                .padding(.top, 10)
+                            HStack {
+                                Text("✅ Im Wochenplan gebuchte Übungen:")
+                                    .font(.caption.weight(.bold))
+                                    .foregroundColor(AeroTheme.emerald)
+                                Spacer()
+                                Text("\(detectedGroups.count) synchronisiert")
+                                    .font(.caption2)
+                                    .foregroundColor(.white.opacity(0.7))
+                            }
+                            .padding(.horizontal, 16)
+                            .padding(.top, 10)
                             
                             ScrollView(.horizontal, showsIndicators: false) {
                                 HStack(spacing: 10) {
@@ -147,63 +180,85 @@ public struct LiveDeepSyncSheet: View {
                         }
                     }
                     
-                    // Live WebKit View
-                    LiveDeepSyncWebView(
-                        username: appState.username,
-                        password: appState.password,
-                        courses: appState.courses,
-                        onStatusUpdate: { status, prog in
-                            self.currentStatus = status
-                            self.progress = prog
-                        },
-                        onSuccess: { matches in
-                            self.isSuccess = true
-                            self.progress = 1.0
-                            self.detectedGroups = matches
-                            
-                            // Automatically apply each detected match into app state
-                            for m in matches {
-                                appState.enrollInGroup(courseId: m.courseId, groupId: m.groupId)
+                    // Live WebKit View with Frutiger Aero Glass Window Frame
+                    ZStack {
+                        LiveDeepSyncWebView(
+                            username: appState.username,
+                            password: appState.password,
+                            courses: appState.courses,
+                            onStatusUpdate: { status, prog in
+                                self.currentStatus = status
+                                self.progress = prog
+                            },
+                            onSuccess: { matches in
+                                self.isSuccess = true
+                                self.progress = 1.0
+                                self.detectedGroups = matches
+                                
+                                // Automatically apply each detected match into app state
+                                for m in matches {
+                                    appState.enrollInGroup(
+                                        courseId: m.courseId,
+                                        groupId: m.groupId,
+                                        customName: m.groupName,
+                                        day: m.day,
+                                        dayName: m.dayName,
+                                        startTime: m.startTime,
+                                        endTime: m.endTime
+                                    )
+                                }
+                                
+                                let count = matches.count
+                                let summary = count > 0
+                                    ? "✅ Deep-Sync erfolgreich: \(count) belegte Übung\(count == 1 ? "" : "en") synchronisiert!"
+                                    : "🔍 Keine aktiven Übungs-Buchungen auf OpenOlat oder Moodle gefunden."
+                                self.currentStatus = summary
+                                appState.syncMessage = summary
+                                appState.deepSyncMessage = summary
+                                appState.lastSyncDate = Date()
+                                
+                                #if canImport(UIKit)
+                                UINotificationFeedbackGenerator().notificationOccurred(.success)
+                                #endif
+                                
+                                DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) {
+                                    dismiss()
+                                }
+                            },
+                            onError: { err in
+                                self.errorMessage = err
+                                self.currentStatus = err
+                                #if canImport(UIKit)
+                                UINotificationFeedbackGenerator().notificationOccurred(.warning)
+                                #endif
                             }
-                            
-                            let count = matches.count
-                            let summary = count > 0
-                                ? "✅ Deep-Sync erfolgreich: \(count) belegte Übung\(count == 1 ? "" : "en") synchronisiert!"
-                                : "🔍 Keine aktiven Übungs-Buchungen auf OpenOlat oder Moodle gefunden."
-                            self.currentStatus = summary
-                            appState.syncMessage = summary
-                            appState.deepSyncMessage = summary
-                            appState.lastSyncDate = Date()
-                            
-                            #if canImport(UIKit)
-                            UINotificationFeedbackGenerator().notificationOccurred(.success)
-                            #endif
-                            
-                            DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) {
-                                dismiss()
-                            }
-                        },
-                        onError: { err in
-                            self.errorMessage = err
-                            self.currentStatus = err
-                            #if canImport(UIKit)
-                            UINotificationFeedbackGenerator().notificationOccurred(.warning)
-                            #endif
-                        }
-                    )
-                    .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-                    .padding(.horizontal, 10)
+                        )
+                        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                        
+                        // Glass Border Overlay
+                        RoundedRectangle(cornerRadius: 14, style: .continuous)
+                            .strokeBorder(
+                                LinearGradient(
+                                    colors: [Color.white.opacity(0.35), Color.white.opacity(0.08)],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                ),
+                                lineWidth: 1
+                            )
+                            .allowsHitTesting(false)
+                    }
+                    .padding(.horizontal, 12)
                     .padding(.top, 8)
                     .padding(.bottom, 6)
                     
-                    // Bottom Done Button
+                    // Bottom Done / Close Button
                     Button {
                         dismiss()
                     } label: {
                         HStack(spacing: 8) {
                             Image(systemName: isSuccess ? "checkmark.circle.fill" : "xmark.circle")
                                 .font(.system(size: 16, weight: .bold))
-                            Text(isSuccess ? "Fertig" : "Schließen")
+                            Text(isSuccess ? "Fertig (\(detectedGroups.count) synchronisiert)" : "Schließen")
                                 .font(.system(.body, design: .rounded).weight(.bold))
                         }
                         .foregroundColor(.white)
@@ -226,6 +281,14 @@ public struct LiveDeepSyncSheet: View {
                 }
             }
             .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button(isSuccess ? "Erledigt" : "Schließen") {
+                        dismiss()
+                    }
+                    .foregroundColor(AeroTheme.skyBlue)
+                }
+            }
         }
     }
 }
@@ -245,12 +308,13 @@ private struct LiveDeepSyncWebView: UIViewRepresentable {
     func makeUIView(context: Context) -> WKWebView {
         let config = WKWebViewConfiguration()
         config.websiteDataStore = WKWebsiteDataStore.default()
+        config.preferences.javaScriptEnabled = true
         
         let wv = WKWebView(frame: .zero, configuration: config)
-        wv.navigationDelegate = context.coordinator
         wv.customUserAgent = "Mozilla/5.0 (iPhone; CPU iPhone OS 27_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1 UNIBODY-iOS"
         wv.isOpaque = false
         wv.backgroundColor = .clear
+        wv.navigationDelegate = context.coordinator
         
         context.coordinator.webView = wv
         context.coordinator.startDeepSync()
@@ -268,6 +332,8 @@ private struct LiveDeepSyncWebView: UIViewRepresentable {
         private var scannedOpenOlat = false
         private var scannedMoodle = false
         private var detectedMatches: [LiveDetectedGroup] = []
+        private var openOlatAttemptCount = 0
+        private var moodleAttemptCount = 0
         
         init(parent: LiveDeepSyncWebView) {
             self.parent = parent
@@ -285,7 +351,7 @@ private struct LiveDeepSyncWebView: UIViewRepresentable {
             wv.load(URLRequest(url: url))
             
             pollTimer?.invalidate()
-            let timer = Timer(timeInterval: 0.45, repeats: true) { [weak self] _ in
+            let timer = Timer(timeInterval: 0.40, repeats: true) { [weak self] _ in
                 self?.runDeepSyncStep()
             }
             RunLoop.main.add(timer, forMode: .common)
@@ -338,7 +404,8 @@ private struct LiveDeepSyncWebView: UIViewRepresentable {
             let params: [String: Any] = [
                 "username": effectiveUser,
                 "password": effectivePass,
-                "catalog": catalogList
+                "catalog": catalogList,
+                "scannedOpenOlat": scannedOpenOlat
             ]
             
             guard let jsonData = try? JSONSerialization.data(withJSONObject: params),
@@ -350,6 +417,7 @@ private struct LiveDeepSyncWebView: UIViewRepresentable {
                 const USERNAME = PARAMS.username;
                 const PASSWORD = PARAMS.password;
                 const CATALOG = PARAMS.catalog;
+                const SCANNED_OPENOLAT = PARAMS.scannedOpenOlat;
                 
                 function setVal(el, val) {
                     if (!el || val === undefined || val === null) return false;
@@ -381,7 +449,37 @@ private struct LiveDeepSyncWebView: UIViewRepresentable {
                     }
                 }
                 
-                // 1. OPENOLAT LOGIN
+                function parseGermanTimeslot(text) {
+                    if (!text) return null;
+                    const lower = text.toLowerCase();
+                    let day = -1;
+                    let dayName = "Montag";
+                    if (lower.includes("montag") || /\\bmo\\b/.test(lower)) { day = 0; dayName = "Montag"; }
+                    else if (lower.includes("dienstag") || /\\bdi\\b/.test(lower)) { day = 1; dayName = "Dienstag"; }
+                    else if (lower.includes("mittwoch") || /\\bmi\\b/.test(lower)) { day = 2; dayName = "Mittwoch"; }
+                    else if (lower.includes("donnerstag") || /\\bdo\\b/.test(lower)) { day = 3; dayName = "Donnerstag"; }
+                    else if (lower.includes("freitag") || /\\bfr\\b/.test(lower)) { day = 4; dayName = "Freitag"; }
+                    
+                    let startTime = "10:15";
+                    let endTime = "11:45";
+                    const tm = lower.match(/(\\d{1,2})[:.](\\d{2})\\s*(?:-|–|bis)\\s*(\\d{1,2})[:.](\\d{2})/);
+                    if (tm) {
+                        startTime = tm[1].padStart(2, '0') + ":" + tm[2];
+                        endTime = tm[3].padStart(2, '0') + ":" + tm[4];
+                    } else {
+                        const sm = lower.match(/\\b(\\d{1,2})\\s*(?:-|–|bis)\\s*(\\d{1,2})\\b/);
+                        if (sm) {
+                            startTime = sm[1].padStart(2, '0') + ":15";
+                            endTime = sm[2].padStart(2, '0') + ":45";
+                        }
+                    }
+                    if (day !== -1) {
+                        return { day, dayName, startTime, endTime, time: startTime + "–" + endTime };
+                    }
+                    return null;
+                }
+                
+                // 1. OPENOLAT LOGIN DETECTION & AUTO-FILL
                 const olatNameInput = document.getElementById('o_fiooolat_login_name');
                 const olatPassInput = document.getElementById('o_fiooolat_login_pass');
                 if (olatPassInput && olatPassInput.offsetParent !== null) {
@@ -394,7 +492,7 @@ private struct LiveDeepSyncWebView: UIViewRepresentable {
                         window.__lastStep2Ts = now;
                         setTimeout(triggerOlatSubmit, 100);
                     }
-                    return { action: "LOGIN_STEP2", msg: "Übermittle CAU-Passwort..." };
+                    return { action: "LOGIN_STEP2", msg: "Übermittle CAU-Passwort an OpenOlat..." };
                 }
                 if (olatNameInput && olatNameInput.offsetParent !== null) {
                     setVal(olatNameInput, USERNAME);
@@ -403,42 +501,62 @@ private struct LiveDeepSyncWebView: UIViewRepresentable {
                         window.__lastStep1Ts = now;
                         setTimeout(triggerOlatSubmit, 100);
                     }
-                    return { action: "LOGIN_STEP1", msg: "Melde " + USERNAME + " an..." };
+                    return { action: "LOGIN_STEP1", msg: "Melde " + USERNAME + " bei OpenOlat an..." };
                 }
                 
-                // 2. MOODLE LOGIN
-                const moodleUser = document.querySelector('form#login input#username, input[name="username"]');
-                const moodlePass = document.querySelector('form#login input#password, input[name="password"]');
-                const moodleBtn = document.querySelector('form#login button#loginbtn, button[type="submit"]');
-                if (moodleUser && moodlePass && moodleBtn && moodleUser.offsetParent !== null) {
-                    setVal(moodleUser, USERNAME);
-                    setVal(moodlePass, PASSWORD);
-                    setTimeout(() => { moodleBtn.click(); }, 120);
-                    return { action: "LOGIN_GENERIC", msg: "CAU-Zentral-Login..." };
+                // 2. OPENOLAT LOGGED-IN REDIRECT TO "MEINE GRUPPEN" (url/GroupsSite/0)
+                if (location.hostname.includes('lms.uni-kiel.de') && !SCANNED_OPENOLAT) {
+                    if (!location.href.includes('GroupsSite')) {
+                        const hasLoginForm = !!(document.getElementById('o_fiooolat_login_name') || document.getElementById('o_fiooolat_login_pass'));
+                        if (!hasLoginForm) {
+                            const now = Date.now();
+                            if (!window.__lastGroupsNav || (now - window.__lastGroupsNav > 3000)) {
+                                window.__lastGroupsNav = now;
+                                window.location.href = "https://lms.uni-kiel.de/url/GroupsSite/0";
+                            }
+                            return { action: "NAV_GROUPS", msg: "Öffne OpenOlat 'Meine Gruppen'..." };
+                        }
+                    }
                 }
                 
                 // 3. SCAN OPENOLAT 'MEINE GRUPPEN' (url/GroupsSite/0)
                 if (location.href.includes('GroupsSite') || location.href.includes('groups')) {
-                    const table = document.querySelector('table.o_table, table.table');
+                    const table = document.querySelector('table.o_table, table.table, .o_table_wrapper table');
+                    const emptyState = document.querySelector('.o_empty_state, .o_table_empty');
+                    
+                    if (emptyState && !table) {
+                        return { action: "SCANNED_OPENOLAT", matches: [], rowCount: 0 };
+                    }
+                    
                     if (table) {
                         const rows = Array.from(table.querySelectorAll('tbody tr'));
-                        const matches = [];
+                        if (rows.length === 0 && !emptyState) {
+                            return { action: "WAITING", msg: "Lade Gruppen-Tabelle..." };
+                        }
                         
+                        const matches = [];
                         for (const tr of rows) {
                             const rowText = (tr.innerText || '').toLowerCase();
+                            const bgLink = tr.querySelector('a[href*="BusinessGroup/"]');
+                            const groupTitle = bgLink ? (bgLink.innerText || '').trim() : '';
+                            const slot = parseGermanTimeslot(rowText);
+                            
                             for (const c of CATALOG) {
                                 const cid = c.courseId.toLowerCase();
                                 const cUniv = (c.univisId || '').toLowerCase();
                                 const cOlat = (c.olatRepoId || '').toLowerCase();
                                 const cTitle = (c.title || '').toLowerCase();
                                 
-                                const matchCourse = (cUniv && rowText.includes(cUniv)) ||
-                                                    (cOlat && rowText.includes(cOlat)) ||
+                                const matchCourse = (cUniv && cUniv.length >= 4 && rowText.includes(cUniv)) ||
+                                                    (cOlat && cOlat.length >= 5 && rowText.includes(cOlat)) ||
                                                     rowText.includes(cid) ||
-                                                    (cTitle.length > 5 && rowText.includes(cTitle.slice(0, 15)));
+                                                    (cTitle.length > 5 && rowText.includes(cTitle.slice(0, 15))) ||
+                                                    (cid.includes("bwl") && (rowText.includes("ebwl") || rowText.includes("betriebswirtschaft"))) ||
+                                                    (cid.includes("math") && (rowText.includes("mathematik") || rowText.includes("mathinfa"))) ||
+                                                    (cid.includes("ewinf") && (rowText.includes("wirtschaftsinformatik") || rowText.includes("e-business")));
                                 
                                 if (matchCourse) {
-                                    // Match specific group
+                                    // Match specific exercise group
                                     let matchedGroup = null;
                                     for (const g of c.groups) {
                                         const gName = (g.name || '').toLowerCase();
@@ -451,17 +569,27 @@ private struct LiveDeepSyncWebView: UIViewRepresentable {
                                             break;
                                         }
                                     }
-                                    if (!matchedGroup && c.groups.length > 0) {
-                                        matchedGroup = c.groups[0];
-                                    }
-                                    if (matchedGroup) {
+                                    
+                                    // Fallback: match by parsed timeslot or first group
+                                    const finalGroupId = matchedGroup ? matchedGroup.groupId : (c.courseId + "-g1");
+                                    const finalGroupName = matchedGroup ? matchedGroup.name : (groupTitle || (slot ? ("Gruppe (" + slot.dayName + " " + slot.time + ")") : "Übungsgruppe"));
+                                    const finalDay = matchedGroup ? matchedGroup.day : (slot ? slot.day : 0);
+                                    const finalDayName = matchedGroup ? matchedGroup.dayName : (slot ? slot.dayName : "Montag");
+                                    const finalStart = matchedGroup ? matchedGroup.startTime : (slot ? slot.startTime : "10:15");
+                                    const finalEnd = matchedGroup ? matchedGroup.endTime : (slot ? slot.endTime : "11:45");
+                                    const finalTime = matchedGroup ? (matchedGroup.startTime + "–" + matchedGroup.endTime) : (slot ? slot.time : "10:15–11:45");
+                                    
+                                    if (!matches.some(m => m.courseId.toLowerCase() === c.courseId.toLowerCase())) {
                                         matches.push({
                                             courseId: c.courseId,
                                             courseTitle: c.title,
-                                            groupId: matchedGroup.groupId,
-                                            groupName: matchedGroup.name,
-                                            dayName: matchedGroup.dayName,
-                                            time: matchedGroup.startTime + "–" + matchedGroup.endTime,
+                                            groupId: finalGroupId,
+                                            groupName: finalGroupName,
+                                            day: finalDay,
+                                            dayName: finalDayName,
+                                            startTime: finalStart,
+                                            endTime: finalEnd,
+                                            time: finalTime,
                                             platform: "OpenOlat"
                                         });
                                     }
@@ -472,28 +600,45 @@ private struct LiveDeepSyncWebView: UIViewRepresentable {
                     }
                 }
                 
-                // 4. SCAN MOODLE DASHBOARD / CHOICEGROUPS
-                if (location.href.includes('elearn.informatik')) {
+                // 4. MOODLE LOGIN DETECTION & AUTO-FILL
+                const moodleUser = document.querySelector('form#login input#username, input[name="username"]');
+                const moodlePass = document.querySelector('form#login input#password, input[name="password"]');
+                const moodleBtn = document.querySelector('form#login button#loginbtn, button[type="submit"], input[type="submit"]');
+                if (moodleUser && moodlePass && moodleBtn && moodleUser.offsetParent !== null) {
+                    setVal(moodleUser, USERNAME);
+                    setVal(moodlePass, PASSWORD);
+                    setTimeout(() => { moodleBtn.click(); }, 120);
+                    return { action: "LOGIN_GENERIC", msg: "Melde bei Informatik-Moodle an..." };
+                }
+                
+                // 5. SCAN MOODLE DASHBOARD / CHOICEGROUPS
+                if (location.hostname.includes('elearn.informatik')) {
                     const checkedRadios = Array.from(document.querySelectorAll('input[type="radio"]:checked'));
                     const choiceRows = Array.from(document.querySelectorAll('.results tr, .choicegroup tr, .table tr'));
                     const matches = [];
                     
                     for (const c of CATALOG) {
-                        if (c.platformId === 'moodle_info' || c.platformHost.includes('elearn.informatik')) {
+                        if (c.platformId === 'moodle_info' || (c.platformHost && c.platformHost.includes('elearn.informatik'))) {
                             for (const g of c.groups) {
                                 const gName = (g.name || '').toLowerCase();
+                                const gId = (g.groupId || '').toLowerCase();
                                 for (const r of checkedRadios) {
                                     const parentText = (r.closest('tr, label, div') || document.body).innerText.toLowerCase();
-                                    if (parentText.includes(gName) || parentText.includes(g.groupId.toLowerCase())) {
-                                        matches.push({
-                                            courseId: c.courseId,
-                                            courseTitle: c.title,
-                                            groupId: g.groupId,
-                                            groupName: g.name,
-                                            dayName: g.dayName,
-                                            time: g.startTime + "–" + g.endTime,
-                                            platform: "Moodle"
-                                        });
+                                    if (parentText.includes(gName) || parentText.includes(gId)) {
+                                        if (!matches.some(m => m.courseId.toLowerCase() === c.courseId.toLowerCase())) {
+                                            matches.push({
+                                                courseId: c.courseId,
+                                                courseTitle: c.title,
+                                                groupId: g.groupId,
+                                                groupName: g.name,
+                                                day: g.day,
+                                                dayName: g.dayName,
+                                                startTime: g.startTime,
+                                                endTime: g.endTime,
+                                                time: g.startTime + "–" + g.endTime,
+                                                platform: "Moodle"
+                                            });
+                                        }
                                     }
                                 }
                             }
@@ -516,76 +661,97 @@ private struct LiveDeepSyncWebView: UIViewRepresentable {
                     self.parent.onStatusUpdate(msg, 0.35)
                 case "LOGIN_STEP2":
                     self.parent.onStatusUpdate(msg, 0.50)
+                case "NAV_GROUPS":
+                    self.parent.onStatusUpdate(msg, 0.60)
                 case "LOGIN_GENERIC":
-                    self.parent.onStatusUpdate(msg, 0.45)
+                    self.parent.onStatusUpdate(msg, 0.70)
                 case "SCANNED_OPENOLAT":
                     if !self.scannedOpenOlat {
-                        self.scannedOpenOlat = true
-                        self.parent.onStatusUpdate("OpenOlat Gruppen analysiert...", 0.75)
-                        
-                        var newMatches: [LiveDetectedGroup] = []
-                        if let rawMatches = dict["matches"] as? [[String: Any]] {
-                            for rm in rawMatches {
-                                let cId = (rm["courseId"] as? String) ?? ""
-                                let cTitle = (rm["courseTitle"] as? String) ?? ""
-                                let gId = (rm["groupId"] as? String) ?? ""
-                                let gName = (rm["groupName"] as? String) ?? ""
-                                let day = (rm["dayName"] as? String) ?? ""
-                                let time = (rm["time"] as? String) ?? ""
-                                let platform = (rm["platform"] as? String) ?? "OpenOlat"
-                                
-                                if !cId.isEmpty && !gId.isEmpty {
-                                    newMatches.append(LiveDetectedGroup(
-                                        courseId: cId,
-                                        courseTitle: cTitle,
-                                        groupId: gId,
-                                        groupName: gName,
-                                        dayName: day,
-                                        time: time,
-                                        platform: platform
-                                    ))
+                        self.openOlatAttemptCount += 1
+                        // Allow 2 polling cycles so table stabilizes
+                        if self.openOlatAttemptCount >= 2 {
+                            self.scannedOpenOlat = true
+                            self.parent.onStatusUpdate("OpenOlat Gruppen analysiert...", 0.80)
+                            
+                            var newMatches: [LiveDetectedGroup] = []
+                            if let rawMatches = dict["matches"] as? [[String: Any]] {
+                                for rm in rawMatches {
+                                    let cId = (rm["courseId"] as? String) ?? ""
+                                    let cTitle = (rm["courseTitle"] as? String) ?? ""
+                                    let gId = (rm["groupId"] as? String) ?? ""
+                                    let gName = (rm["groupName"] as? String) ?? ""
+                                    let day = (rm["day"] as? Int) ?? 0
+                                    let dayName = (rm["dayName"] as? String) ?? "Montag"
+                                    let start = (rm["startTime"] as? String) ?? "10:15"
+                                    let end = (rm["endTime"] as? String) ?? "11:45"
+                                    let time = (rm["time"] as? String) ?? "\(start)–\(end)"
+                                    let platform = (rm["platform"] as? String) ?? "OpenOlat"
+                                    
+                                    if !cId.isEmpty && !gId.isEmpty {
+                                        newMatches.append(LiveDetectedGroup(
+                                            courseId: cId,
+                                            courseTitle: cTitle,
+                                            groupId: gId,
+                                            groupName: gName,
+                                            day: day,
+                                            dayName: dayName,
+                                            startTime: start,
+                                            endTime: end,
+                                            time: time,
+                                            platform: platform
+                                        ))
+                                    }
                                 }
                             }
-                        }
-                        self.detectedMatches.append(contentsOf: newMatches)
-                        
-                        // Check if we need to scan Moodle next
-                        let hasMoodleCourses = self.parent.courses.contains { $0.platformId.contains("moodle") || $0.platformHost.contains("elearn") }
-                        if hasMoodleCourses && !self.scannedMoodle {
-                            self.parent.onStatusUpdate("Öffne Informatik-Moodle...", 0.85)
-                            wv.load(URLRequest(url: URL(string: "https://elearn.informatik.uni-kiel.de/my/")!))
-                        } else {
-                            self.finishSuccess()
+                            self.detectedMatches.append(contentsOf: newMatches)
+                            
+                            // Check if we need to scan Moodle next
+                            let hasMoodleCourses = self.parent.courses.contains { $0.platformId.contains("moodle") || $0.platformHost.contains("elearn") }
+                            if hasMoodleCourses && !self.scannedMoodle {
+                                self.parent.onStatusUpdate("Öffne Informatik-Moodle...", 0.88)
+                                wv.load(URLRequest(url: URL(string: "https://elearn.informatik.uni-kiel.de/my/")!))
+                            } else {
+                                self.finishSuccess()
+                            }
                         }
                     }
                 case "SCANNED_MOODLE":
                     if !self.scannedMoodle {
-                        self.scannedMoodle = true
-                        self.parent.onStatusUpdate("Moodle Gruppen synchronisiert...", 0.95)
-                        if let rawMatches = dict["matches"] as? [[String: Any]] {
-                            for rm in rawMatches {
-                                let cId = (rm["courseId"] as? String) ?? ""
-                                let cTitle = (rm["courseTitle"] as? String) ?? ""
-                                let gId = (rm["groupId"] as? String) ?? ""
-                                let gName = (rm["groupName"] as? String) ?? ""
-                                let day = (rm["dayName"] as? String) ?? ""
-                                let time = (rm["time"] as? String) ?? ""
-                                let platform = (rm["platform"] as? String) ?? "Moodle"
-                                
-                                if !cId.isEmpty && !gId.isEmpty && !self.detectedMatches.contains(where: { $0.courseId.lowercased() == cId.lowercased() }) {
-                                    self.detectedMatches.append(LiveDetectedGroup(
-                                        courseId: cId,
-                                        courseTitle: cTitle,
-                                        groupId: gId,
-                                        groupName: gName,
-                                        dayName: day,
-                                        time: time,
-                                        platform: platform
-                                    ))
+                        self.moodleAttemptCount += 1
+                        if self.moodleAttemptCount >= 2 {
+                            self.scannedMoodle = true
+                            self.parent.onStatusUpdate("Moodle Gruppen synchronisiert...", 0.96)
+                            if let rawMatches = dict["matches"] as? [[String: Any]] {
+                                for rm in rawMatches {
+                                    let cId = (rm["courseId"] as? String) ?? ""
+                                    let cTitle = (rm["courseTitle"] as? String) ?? ""
+                                    let gId = (rm["groupId"] as? String) ?? ""
+                                    let gName = (rm["groupName"] as? String) ?? ""
+                                    let day = (rm["day"] as? Int) ?? 0
+                                    let dayName = (rm["dayName"] as? String) ?? "Montag"
+                                    let start = (rm["startTime"] as? String) ?? "10:15"
+                                    let end = (rm["endTime"] as? String) ?? "11:45"
+                                    let time = (rm["time"] as? String) ?? "\(start)–\(end)"
+                                    let platform = (rm["platform"] as? String) ?? "Moodle"
+                                    
+                                    if !cId.isEmpty && !gId.isEmpty && !self.detectedMatches.contains(where: { $0.courseId.lowercased() == cId.lowercased() }) {
+                                        self.detectedMatches.append(LiveDetectedGroup(
+                                            courseId: cId,
+                                            courseTitle: cTitle,
+                                            groupId: gId,
+                                            groupName: gName,
+                                            day: day,
+                                            dayName: dayName,
+                                            startTime: start,
+                                            endTime: end,
+                                            time: time,
+                                            platform: platform
+                                        ))
+                                    }
                                 }
                             }
+                            self.finishSuccess()
                         }
-                        self.finishSuccess()
                     }
                 default:
                     break
