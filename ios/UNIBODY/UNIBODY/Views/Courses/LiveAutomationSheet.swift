@@ -254,8 +254,13 @@ private struct LiveAutomationWebView: UIViewRepresentable {
             guard !hasSucceeded, let wv = webView else { return }
             stepCounter += 1
             
-            let effectiveUser = parent.username.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "" : parent.username.trimmingCharacters(in: .whitespacesAndNewlines)
-            let effectivePass = parent.password.isEmpty ? "" : parent.password
+            let effectiveUser = parent.username.trimmingCharacters(in: .whitespacesAndNewlines)
+            let effectivePass = parent.password
+            
+            guard !effectiveUser.isEmpty, !effectivePass.isEmpty else {
+                parent.onError("⚠️ Keine Zugangsdaten hinterlegt. Bitte trage deine stu-Kennung & Passwort im Tab 'Login & Tresor' ein.")
+                return
+            }
             
             let params: [String: Any] = [
                 "username": effectiveUser,
@@ -274,8 +279,8 @@ private struct LiveAutomationWebView: UIViewRepresentable {
             let js = """
             (function() {
                 const PARAMS = \(jsonString);
-                const USERNAME = PARAMS.username || "";
-                const PASSWORD = PARAMS.password || "";
+                const USERNAME = PARAMS.username;
+                const PASSWORD = PARAMS.password;
                 const IS_ENROLL = PARAMS.isEnroll;
                 const TARGET_NAME = (PARAMS.targetName || "").toLowerCase();
                 const TARGET_DAY = (PARAMS.targetDay || "").toLowerCase();
