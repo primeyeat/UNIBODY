@@ -482,52 +482,115 @@ private struct LiveAutomationWebView: UIViewRepresentable {
                     
                     // ENROLL (IS_ENROLL)
                     if (IS_ENROLL) {
-                        for (let tr of rows) {
-                            const txt = (tr.innerText || '').toLowerCase();
-                            const matches = (TARGET_NAME && txt.includes(TARGET_NAME)) ||
-                                            (TARGET_ID && txt.includes(TARGET_ID)) ||
-                                            (TARGET_DAY && txt.includes(TARGET_DAY) && TARGET_TIME && txt.includes(TARGET_TIME));
+                        // Check if an alert banner indicates success
+                        const successAlert = document.querySelector('.alert.alert-success, .o_info, .alert-info');
+                        if (successAlert && /eingeschrieben|erfolgreich|angemeldet/i.test(successAlert.innerText || '')) {
+                            return { action: "SUCCESS", msg: "Verbindlich im CAU-Portal eingetragen!" };
+                        }
+                        
+                        // Extract target group number from TARGET_NAME, TARGET_ID, etc.
+                        let targetNum = null;
+                        const numMatch = (TARGET_NAME + " " + TARGET_ID).match(/(?:gruppe|gr\\.?|übung|tutorium|group)\\s*0*(\\d+)/i);
+                        if (numMatch) {
+                            targetNum = parseInt(numMatch[1], 10);
+                        } else {
+                            const anyNum = TARGET_NAME.match(/\\b0*(\\d+)\\b/);
+                            if (anyNum) targetNum = parseInt(anyNum[1], 10);
+                        }
+                        
+                        // Find best matching row
+                        let bestRow = null;
+                        let bestScore = -1;
+                        
+                        for (let idx = 0; idx < rows.length; idx++) {
+                            const tr = rows[idx];
+                            const tds = Array.from(tr.querySelectorAll('td')).map(td => (td.innerText || '').toLowerCase().trim());
+                            const combined = tds.join(' ');
+                            let score = 0;
                             
-                            if (matches) {
-                                const cancelBtn = tr.querySelector('a[onclick*="cmd.enrolled.cancel"], a[onclick*="cmd.cancel"], td:nth-child(6) a') ||
-                                                  Array.from(tr.querySelectorAll('a')).find(a => /austragen/i.test(a.innerText || ''));
-                                const statusCell = tr.querySelector('td:nth-child(4)');
-                                const isEnrolledStatus = statusCell && /eingeschrieben/i.test(statusCell.innerText) && !/nicht|kein/i.test(statusCell.innerText);
-                                
-                                if (cancelBtn || isEnrolledStatus) {
-                                    return { action: "SUCCESS", msg: "Verbindlich im CAU-Portal eingetragen!" };
+                            if (targetNum !== null) {
+                                const rowNumMatch = combined.match(/(?:gruppe|gr\\.?|übung|tutorium|group)\\s*0*(\\d+)/i);
+                                if (rowNumMatch && parseInt(rowNumMatch[1], 10) === targetNum) {
+                                    score += 70;
+                                } else if (idx === targetNum - 1) {
+                                    score += 35;
                                 }
-                                
-                                const enrollBtn = tr.querySelector('a[onclick*="cmd.enrolled.add"], a[onclick*="cmd.enroll"], td:nth-child(5) a') ||
-                                                  Array.from(tr.querySelectorAll('a, button, input[type="button"]')).find(a => /einschreiben|anmelden/i.test((a.innerText || a.value || '').trim()));
-                                if (enrollBtn && enrollBtn.offsetParent !== null) {
-                                    const now = Date.now();
-                                    if (!window.__lastEnrollClick || (now - window.__lastEnrollClick > 2500)) {
-                                        window.__lastEnrollClick = now;
-                                        window.__clickedEnroll = true;
-                                        try { if (typeof enrollBtn.onclick === 'function') enrollBtn.onclick.call(enrollBtn); } catch(e) {}
-                                        enrollBtn.focus();
-                                        enrollBtn.click();
-                                        enrollBtn.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, view: window }));
-                                        return { action: "CLICKED_ENROLL", msg: "Klicke Einschreiben..." };
-                                    }
+                            }
+                            
+                            if (TARGET_TIME && TARGET_TIME.length >= 3 && combined.includes(TARGET_TIME)) {
+                                score += 45;
+                            }
+                            
+                            if (TARGET_DAY && TARGET_DAY.length >= 2) {
+                                const shortDay = TARGET_DAY.slice(0, 2);
+                                if (combined.includes(TARGET_DAY) || combined.includes(shortDay)) {
+                                    score += 25;
+                                }
+                            }
+                            
+                            if (TARGET_NAME && combined.includes(TARGET_NAME)) score += 50;
+                            if (TARGET_ID && combined.includes(TARGET_ID)) score += 50;
+                            if (rows.length === 1) score += 30;
+                            
+                            if (score > bestScore) {
+                                bestScore = score;
+                                bestRow = tr;
+                            }
+                        }
+                        
+                        // Fallback row if score didn't reach threshold
+                        if (!bestRow || bestScore < 20) {
+                            if (targetNum !== null && (targetNum - 1) >= 0 && (targetNum - 1) < rows.length) {
+                                bestRow = rows[targetNum - 1];
+                            } else {
+                                bestRow = rows.find(r => {
+                                    const btn = r.querySelector('td:nth-child(5) a, a[onclick*="cmd.enrolled.add"], a[onclick*="cmd.enroll"]');
+                                    return btn && btn.offsetParent !== null;
+                                }) || rows[0];
+                            }
+                        }
+                        
+                        if (bestRow) {
+                            // Check if already enrolled in this row
+                            const cancelBtn = bestRow.querySelector('td:nth-child(6) a, a[onclick*="cmd.enrolled.cancel"], a[onclick*="cmd.cancel"]') ||
+                                              Array.from(bestRow.querySelectorAll('a, button')).find(a => /austragen|abmelden/i.test(a.innerText || ''));
+                            const statusCell = bestRow.querySelector('td:nth-child(4)');
+                            const isEnrolledStatus = statusCell && /eingeschrieben/i.test(statusCell.innerText) && !/nicht|kein/i.test(statusCell.innerText);
+                            
+                            if (cancelBtn || isEnrolledStatus) {
+                                return { action: "SUCCESS", msg: "Verbindlich im CAU-Portal eingetragen!" };
+                            }
+                            
+                            // Check if already clicked enroll and any cancel button is now visible
+                            if (window.__clickedEnroll) {
+                                const anyCancel = table.querySelector('a[onclick*="cmd.enrolled.cancel"], a[onclick*="cmd.cancel"]');
+                                if (anyCancel) {
+                                    return { action: "SUCCESS", msg: "Einschreibung verbindlich gebucht!" };
+                                }
+                            }
+                            
+                            // Look for enroll button
+                            const enrollBtn = bestRow.querySelector('td:nth-child(5) a, a[onclick*="cmd.enrolled.add"], a[onclick*="cmd.enroll"]') ||
+                                              Array.from(bestRow.querySelectorAll('a, button, input[type="button"]')).find(a => /einschreiben|anmelden|buchen/i.test((a.innerText || a.value || a.title || '').trim()));
+                            
+                            if (enrollBtn && enrollBtn.offsetParent !== null) {
+                                const now = Date.now();
+                                if (!window.__lastEnrollClick || (now - window.__lastEnrollClick > 2500)) {
+                                    window.__lastEnrollClick = now;
+                                    window.__clickedEnroll = true;
+                                    try { if (typeof enrollBtn.onclick === 'function') enrollBtn.onclick.call(enrollBtn); } catch(e) {}
+                                    enrollBtn.focus();
+                                    enrollBtn.click();
+                                    enrollBtn.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, view: window }));
+                                    return { action: "CLICKED_ENROLL", msg: "Klicke Einschreiben..." };
                                 }
                             }
                         }
                         
                         if (window.__clickedEnroll) {
-                            for (let tr of rows) {
-                                const txt = (tr.innerText || '').toLowerCase();
-                                const matches = (TARGET_NAME && txt.includes(TARGET_NAME)) ||
-                                                (TARGET_ID && txt.includes(TARGET_ID)) ||
-                                                (TARGET_DAY && txt.includes(TARGET_DAY) && TARGET_TIME && txt.includes(TARGET_TIME));
-                                if (matches) {
-                                    const cancelBtn = tr.querySelector('a[onclick*="cmd.enrolled.cancel"], a[onclick*="cmd.cancel"], td:nth-child(6) a') ||
-                                                      Array.from(tr.querySelectorAll('a')).find(a => /austragen/i.test(a.innerText || ''));
-                                    if (cancelBtn) {
-                                        return { action: "SUCCESS", msg: "Einschreibung verbindlich gebucht!" };
-                                    }
-                                }
+                            const anyCancel = table.querySelector('a[onclick*="cmd.enrolled.cancel"], a[onclick*="cmd.cancel"]');
+                            if (anyCancel) {
+                                return { action: "SUCCESS", msg: "Einschreibung verbindlich gebucht!" };
                             }
                         }
                     }
