@@ -344,7 +344,8 @@ public class AppState: ObservableObject {
         dayName: String? = nil,
         startTime: String? = nil,
         endTime: String? = nil,
-        room: String? = nil
+        room: String? = nil,
+        weekType: String? = nil
     ) {
         let cidKey = courseId.lowercased()
         enrolledGroups[courseId] = groupId
@@ -371,6 +372,7 @@ public class AppState: ObservableObject {
         let resolvedEnd = group?.endTime ?? endTime ?? "11:45"
         let resolvedRoom = group?.room ?? room ?? "CAU Campus"
         let resolvedName = group?.name ?? customName ?? "Übungsgruppe"
+        let resolvedWeek = group?.weekType ?? weekType ?? "all"
         let courseTitle = course?.courseId ?? courseId
         
         // Add newly enrolled exercise to schedule
@@ -386,7 +388,7 @@ public class AppState: ObservableObject {
             room: resolvedRoom,
             type: "enrolled_exercise",
             enabled: true,
-            weekType: group?.weekType ?? "all"
+            weekType: resolvedWeek
         )
         schedule.append(newEvent)
         
