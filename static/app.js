@@ -769,9 +769,12 @@ function renderTimetable() {
 
   // 5 Day Columns (Mo - Fr)
   const dayCols = [];
+  const now = new Date();
+  const todayWeekday = (now.getDay() + 6) % 7; // 0=Mo, 1=Di, 2=Mi, 3=Do, 4=Fr, 5=Sa, 6=So
   for (let d = 0; d < 5; d++) {
+    const isToday = (d === todayWeekday);
     const col = document.createElement("div");
-    col.className = `tt-day-col ${freeSet.has(d) ? "free-day-highlight" : ""}`;
+    col.className = `tt-day-col ${freeSet.has(d) ? "free-day-highlight" : ""} ${isToday ? "tt-is-today-col" : ""}`;
     grid.appendChild(col);
     dayCols.push(col);
   }
@@ -1081,6 +1084,10 @@ function renderTimetable() {
     });
   });
 
+  if (typeof updateTimetableTimeIndicator === "function") {
+    updateTimetableTimeIndicator();
+  }
+
   if (typeof renderFutureCalendar === "function") {
     renderFutureCalendar();
   }
@@ -1098,6 +1105,10 @@ const DAY_NAMES_FULL_DE = [
   "Montag", "Dienstag", "Mittwoch", "Donnerstag", "Freitag"
 ];
 const DAY_NAMES_SHORT_DE = ["MO", "DI", "MI", "DO", "FR"];
+
+const FUTURE_CAL_START_HOUR = 6;
+const FUTURE_CAL_END_HOUR = 22; // 06:00 to 22:00 (16 Stunden)
+const FUTURE_CAL_PX_PER_HOUR = 60; // 60px pro Stunde = 1px pro Minute
 
 const futureCalState = {
   currentWeekOffset: 0, // 0 to 7
@@ -1268,9 +1279,9 @@ function renderFutureCalWeek(currentWeek) {
     headersEl.appendChild(cell);
   });
 
-  // Time Gutter (08:00 to 18:00)
+  // Time Gutter (06:00 to 22:00)
   gutterEl.innerHTML = "";
-  for (let hr = 8; hr <= 18; hr++) {
+  for (let hr = FUTURE_CAL_START_HOUR; hr <= FUTURE_CAL_END_HOUR; hr++) {
     const slot = document.createElement("div");
     slot.className = "future-cal-time-cell";
     slot.textContent = `${String(hr).padStart(2, "0")}:00`;
@@ -1280,30 +1291,14 @@ function renderFutureCalWeek(currentWeek) {
   // 5 Day Columns
   colsContainer.innerHTML = "";
   const dayColEls = [];
+  const totalGridHeight = (FUTURE_CAL_END_HOUR - FUTURE_CAL_START_HOUR) * FUTURE_CAL_PX_PER_HOUR;
   currentWeek.days.forEach((d) => {
     const col = document.createElement("div");
     col.className = `future-cal-col ${d.isToday ? "is-today-col" : ""}`;
+    col.style.height = `${totalGridHeight}px`;
+    col.dataset.dayIndex = d.dayIndex;
     colsContainer.appendChild(col);
     dayColEls.push(col);
-
-    // If today is in this column, render current time red indicator line
-    if (d.isToday) {
-      const now = new Date();
-      let curHour = now.getHours();
-      let curMins = now.getMinutes();
-      if (curHour < 8 || curHour >= 18) {
-        curHour = 10;
-        curMins = 30; // standard indicator placement during off-hours demo
-      }
-      const nowTop = ((curHour * 60 + curMins - 8 * 60) / 60) * 60;
-      if (nowTop >= 0 && nowTop <= 600) {
-        const line = document.createElement("div");
-        line.className = "future-cal-now-line";
-        line.style.top = `${nowTop}px`;
-        line.title = `Aktuelle Uhrzeit: ${String(curHour).padStart(2, "0")}:${String(curMins).padStart(2, "0")} Uhr`;
-        col.appendChild(line);
-      }
-    }
   });
 
   // Filter events that happen in this week (respecting weekType A/B and enabled state)
@@ -1329,8 +1324,8 @@ function renderFutureCalWeek(currentWeek) {
       const dayObj = currentWeek.days[dIdx];
       const startMins = timeToMinutes(ev.start_time);
       const endMins = timeToMinutes(ev.end_time);
-      const topPx = ((startMins - 8 * 60) / 60) * 60;
-      const heightPx = Math.max(34, ((endMins - startMins) / 60) * 60);
+      const topPx = ((startMins - FUTURE_CAL_START_HOUR * 60) / 60) * FUTURE_CAL_PX_PER_HOUR;
+      const heightPx = Math.max(34, ((endMins - startMins) / 60) * FUTURE_CAL_PX_PER_HOUR);
 
       const card = document.createElement("div");
       const themeClass = getCourseEventTheme(ev);
@@ -1372,6 +1367,126 @@ function renderFutureCalWeek(currentWeek) {
       targetCol.appendChild(card);
     });
   });
+
+  // Render / Update the live time indicator line on today's column (Apple Calendar style)
+  updateFutureCalTimeIndicator();
+}
+
+/**
+ * LIVE TIME INDICATOR UPDATER (Apple Calendar Style)
+ * Calculates the exact pixel position based on the real computer clock (new Date()).
+ * Moves down continuously as minutes and seconds tick by.
+ */
+function updateFutureCalTimeIndicator() {
+  const container = document.getElementById("futureCalWeekContainer");
+  if (!container || container.classList.contains("hidden")) return;
+
+  const todayCol = container.querySelector(".future-cal-col.is-today-col");
+  if (!todayCol) {
+    const existing = container.querySelector(".future-cal-now-line");
+    if (existing) existing.remove();
+    return;
+  }
+
+  const now = new Date();
+  const curHour = now.getHours();
+  const curMins = now.getMinutes();
+  const curSecs = now.getSeconds();
+
+  const totalMins = curHour * 60 + curMins + curSecs / 60;
+  const startMins = FUTURE_CAL_START_HOUR * 60; // 06:00 = 360 Min
+  const totalGridHeight = (FUTURE_CAL_END_HOUR - FUTURE_CAL_START_HOUR) * FUTURE_CAL_PX_PER_HOUR;
+
+  const topPx = ((totalMins - startMins) / 60) * FUTURE_CAL_PX_PER_HOUR;
+
+  let line = todayCol.querySelector(".future-cal-now-line");
+
+  // If outside visible hours (e.g. before 06:00 or after 22:00)
+  if (topPx < 0 || topPx > totalGridHeight) {
+    if (line) line.style.display = "none";
+    return;
+  }
+
+  if (!line) {
+    line = document.createElement("div");
+    line.className = "future-cal-now-line";
+    line.innerHTML = `
+      <div class="future-cal-now-dot"></div>
+      <div class="future-cal-now-time-tag"></div>
+    `;
+    todayCol.appendChild(line);
+  }
+
+  line.style.display = "block";
+  line.style.top = `${topPx}px`;
+
+  const timeStr = `${String(curHour).padStart(2, "0")}:${String(curMins).padStart(2, "0")}`;
+  const tag = line.querySelector(".future-cal-now-time-tag");
+  if (tag) tag.textContent = timeStr;
+  line.title = `Aktuelle Uhrzeit: ${timeStr}:${String(curSecs).padStart(2, "0")} Uhr (Live synchronisiert)`;
+}
+
+/**
+ * LIVE TIME INDICATOR FOR TIMETABLE (Stundenplan & Kurse)
+ */
+function updateTimetableTimeIndicator() {
+  const container = document.getElementById("timetableContainer");
+  if (!container) return;
+
+  const todayCol = container.querySelector(".tt-day-col.tt-is-today-col");
+  if (!todayCol) {
+    const existing = container.querySelector(".tt-now-line");
+    if (existing) existing.remove();
+    return;
+  }
+
+  const now = new Date();
+  const curHour = now.getHours();
+  const curMins = now.getMinutes();
+  const curSecs = now.getSeconds();
+
+  const totalMins = curHour * 60 + curMins + curSecs / 60;
+  const startMins = START_HOUR * 60; // 8 * 60 = 480
+  const totalGridHeight = (END_HOUR - START_HOUR) * PX_PER_HOUR; // (19 - 8) * 44 = 484px
+
+  const topPx = ((totalMins - startMins) / 60) * PX_PER_HOUR;
+
+  let line = todayCol.querySelector(".tt-now-line");
+
+  if (topPx < 0 || topPx > totalGridHeight) {
+    if (line) line.style.display = "none";
+    return;
+  }
+
+  if (!line) {
+    line = document.createElement("div");
+    line.className = "tt-now-line";
+    line.innerHTML = `
+      <div class="tt-now-dot"></div>
+      <div class="tt-now-time-tag"></div>
+    `;
+    todayCol.appendChild(line);
+  }
+
+  line.style.display = "block";
+  line.style.top = `${topPx}px`;
+
+  const timeStr = `${String(curHour).padStart(2, "0")}:${String(curMins).padStart(2, "0")}`;
+  const tag = line.querySelector(".tt-now-time-tag");
+  if (tag) tag.textContent = timeStr;
+  line.title = `Aktuelle Uhrzeit: ${timeStr} Uhr (Live synchronisiert)`;
+}
+
+/**
+ * Smoothly scrolls calendar into view when user opens week view or clicks "Heute"
+ */
+function scrollFutureCalToCurrentTime(smooth = false) {
+  setTimeout(() => {
+    const line = document.querySelector(".future-cal-now-line");
+    if (line && line.style.display !== "none") {
+      line.scrollIntoView({ behavior: smooth ? "smooth" : "auto", block: "center" });
+    }
+  }, 100);
 }
 
 function renderFutureCalAgenda(weeks) {
@@ -1515,6 +1630,7 @@ function initFutureCalEvents() {
   document.getElementById("btnCalToday")?.addEventListener("click", () => {
     futureCalState.currentWeekOffset = 0;
     renderFutureCalendar();
+    scrollFutureCalToCurrentTime(true);
   });
 
   document.getElementById("btnCalNextWeek")?.addEventListener("click", () => {
@@ -1525,6 +1641,7 @@ function initFutureCalEvents() {
   document.getElementById("btnViewWeek")?.addEventListener("click", () => {
     futureCalState.viewMode = "week";
     renderFutureCalendar();
+    scrollFutureCalToCurrentTime(false);
   });
 
   document.getElementById("btnViewAgenda")?.addEventListener("click", () => {
@@ -1549,6 +1666,18 @@ function initFutureCalEvents() {
       }
     });
   }
+
+  // Live Clock-Sync Ticker for Red Time Indicator (Apple Calendar Style)
+  if (!window._realtimeIndicatorsTimer) {
+    window._realtimeIndicatorsTimer = setInterval(() => {
+      updateFutureCalTimeIndicator();
+      updateTimetableTimeIndicator();
+    }, 5000); // Live-Sync alle 5 Sekunden
+  }
+  window.addEventListener("focus", () => {
+    updateFutureCalTimeIndicator();
+    updateTimetableTimeIndicator();
+  });
 }
 
 /* ==========================================================================
@@ -1742,6 +1871,8 @@ function switchAppPage(pageName, updateHash = true) {
       window.location.hash = "calendar";
     }
     renderFutureCalendar();
+    updateFutureCalTimeIndicator();
+    scrollFutureCalToCurrentTime(false);
     window.scrollTo({ top: 0, behavior: "smooth" });
   } else {
     // Default: "timetable" (Stundenplan & Kurse)
@@ -1752,6 +1883,7 @@ function switchAppPage(pageName, updateHash = true) {
       window.location.hash = "timetable";
     }
     renderTimetable();
+    updateTimetableTimeIndicator();
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
 }
