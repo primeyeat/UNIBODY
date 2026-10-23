@@ -263,11 +263,11 @@ public enum CampusLocationEngine {
         code: "OS 75",
         name: "Hörsaalgebäude OS 75",
         address: "Olshausenstraße 75, 24118 Kiel",
-        coordinate: CLLocationCoordinate2D(latitude: 54.343602, longitude: 10.117215),
-        area: "Campus Nord",
-        busStops: ["Botanischer Garten", "Universitäts-Sportforum"],
-        walkingMinutes: 6,
-        description: "Großes Hörsaalgebäude an der Olshausenstraße 75.",
+        coordinate: CLLocationCoordinate2D(latitude: 54.345406, longitude: 10.105659),
+        area: "Campus Nord (Bremerskamp)",
+        busStops: ["Bremerskamp", "Botanischer Garten"],
+        walkingMinutes: 5,
+        description: "Großes Hörsaalgebäude an der Olshausenstraße 75 (Hörsaal 1, 2 und Hans-Heinrich-Driftmann-Hörsaal / HS 3).",
         entranceTip: "Haupteingang an der Olshausenstraße 75.",
         iconName: "building.columns.fill"
     )

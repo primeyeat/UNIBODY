@@ -1574,9 +1574,9 @@ const CAU_CAMPUS_LOCATIONS = [
     code: "OS 75",
     name: "Hörsaalgebäude OS 75",
     address: "Olshausenstraße 75, 24118 Kiel",
-    area: "Campus Nord",
-    lat: 54.343602,
-    lon: 10.117215,
+    area: "Campus Nord (Bremerskamp)",
+    lat: 54.345406,
+    lon: 10.105659,
   },
   {
     id: "CAP3",
