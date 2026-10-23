@@ -10,7 +10,7 @@
   <link rel="icon" type="image/png" sizes="192x192" href="/favicon-192.png" />
   <link rel="icon" type="image/x-icon" href="/favicon.ico" />
   <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
-  <link rel="stylesheet" href="/styles.css?v=2" />
+  <link rel="stylesheet" href="/styles.css?v=3" />
 </head>
 <body>
   <!-- TOP HEADER -->
@@ -161,11 +161,11 @@
       </div>
 
       <!-- 2. OPTIMIZER WEIGHTS & PREFERENCES CARD -->
-      <div class="card">
+      <div class="card" id="settingsPreferencesCard">
         <div class="card-header">
           <div>
             <span class="step-pill">SCHRITT 2</span>
-            <h2>Optimierungs-Gewichtung (Dein perfekter Stundenplan)</h2>
+            <h2>Optimierungs-Gewichtung &amp; Einstellungen</h2>
           </div>
           <span class="live-recalc-tag">⚡ Live-Berechnung aktiv</span>
         </div>
@@ -267,7 +267,7 @@
     <!-- RIGHT COLUMN: INTERACTIVE WEEKLY SCHEDULE + UNIVIS ICS CLEANER + LIVE LOG -->
     <section class="right-panel">
       <!-- WEEKLY TIMETABLE CARD -->
-      <div class="card calendar-card">
+      <div class="card calendar-card" id="calendarCard">
         <div class="card-header">
           <div>
             <h2>📅 UNIBODY Wochen-Stundenplan (Frutiger Aero Glass)</h2>
@@ -682,17 +682,13 @@
       <div class="drawer-section">
         <div class="drawer-section-title">Navigation</div>
         <nav class="drawer-nav">
-          <button type="button" class="drawer-item" id="drawerBtnSchedule">
+          <button type="button" class="drawer-item" id="drawerBtnSettings">
+            <span class="drawer-icon">⚙️</span>
+            <span>Einstellungen</span>
+          </button>
+          <button type="button" class="drawer-item" id="drawerBtnCalendar">
             <span class="drawer-icon">📅</span>
-            <span>Wochen-Stundenplan</span>
-          </button>
-          <button type="button" class="drawer-item" id="drawerBtnCourses">
-            <span class="drawer-icon">📚</span>
-            <span>Kurse &amp; Übungsgruppen</span>
-          </button>
-          <button type="button" class="drawer-item" id="drawerBtnAccount">
-            <span class="drawer-icon">🔐</span>
-            <span>CAU Login &amp; Tresor</span>
+            <span>Kalender</span>
           </button>
         </nav>
       </div>
@@ -703,6 +699,6 @@
     </div>
   </aside>
 
-  <script src="/app.js?v=2"></script>
+  <script src="/app.js?v=3"></script>
 </body>
 </html>

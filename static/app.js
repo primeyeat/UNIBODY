@@ -1122,31 +1122,26 @@ function initDrawerMenu() {
     }
   });
 
-  // Nav item handlers
-  document.getElementById("drawerBtnSchedule")?.addEventListener("click", () => {
+  // Nav item handlers: Einstellungen & Kalender
+  document.getElementById("drawerBtnSettings")?.addEventListener("click", () => {
     closeDrawer();
-    document.querySelector(".calendar-card")?.scrollIntoView({ behavior: "smooth" });
-  });
-
-  document.getElementById("drawerBtnCourses")?.addEventListener("click", () => {
-    closeDrawer();
-    const courseInput = document.getElementById("courseQueryInput");
-    if (courseInput) {
-      courseInput.scrollIntoView({ behavior: "smooth", block: "center" });
-      courseInput.focus();
+    const target = document.getElementById("settingsPreferencesCard") || document.getElementById("accountVaultCard");
+    if (target) {
+      target.scrollIntoView({ behavior: "smooth", block: "start" });
+      target.classList.remove("card-target-highlight");
+      void target.offsetWidth;
+      target.classList.add("card-target-highlight");
     }
   });
 
-  document.getElementById("drawerBtnAccount")?.addEventListener("click", () => {
+  document.getElementById("drawerBtnCalendar")?.addEventListener("click", () => {
     closeDrawer();
-    const vault = document.getElementById("accountVaultCard");
-    if (vault) {
-      vault.scrollIntoView({ behavior: "smooth" });
-      const form = document.getElementById("formCredentials");
-      if (form && form.classList.contains("collapsed")) {
-        form.classList.remove("collapsed");
-      }
-      document.getElementById("credUsername")?.focus();
+    const target = document.getElementById("calendarCard") || document.querySelector(".calendar-card");
+    if (target) {
+      target.scrollIntoView({ behavior: "smooth", block: "start" });
+      target.classList.remove("card-target-highlight");
+      void target.offsetWidth;
+      target.classList.add("card-target-highlight");
     }
   });
 }
