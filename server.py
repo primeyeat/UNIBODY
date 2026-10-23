@@ -1160,23 +1160,15 @@ class CAUBotRequestHandler(SimpleHTTPRequestHandler):
                     "course_title": course["title"],
                     "mode": mode,
                     "trigger_type": trigger_type,
-                    "status": "armed" if countdown_seconds > 0 else "starting",
+                    "status": "starting",
                     "created_at": datetime.now().strftime("%H:%M:%S"),
                     "priorities": valid_priorities[:3],
-                    "result_message": (
-                        f"Sniper scharfgeschaltet ({countdown_seconds}s Countdown) auf {course.get('platform_host', 'LMS')}..."
-                        if countdown_seconds > 0
-                        else f"UNIBODY Einschreibung läuft auf {course.get('platform_host', 'LMS')}..."
-                    ),
+                    "result_message": f"UNIBODY Einschreibung läuft auf {course.get('platform_host', 'LMS')}...",
                 }
                 APP_STATE["jobs"].insert(0, job_entry)
                 save_state(APP_STATE)
 
             def _delayed_runner():
-                if countdown_seconds > 0:
-                    for rem in range(countdown_seconds, 0, -1):
-                        session_mgr.add_log("SNIPER", f"⏱️ Countdown für '{course['course_id']}': T-{rem}s bis Freischaltung...")
-                        time.sleep(1.0)
                 execute_enrollment_job(job_id, simulate_first_choice_full=simulate_full)
 
             t = threading.Thread(target=_delayed_runner, daemon=True)

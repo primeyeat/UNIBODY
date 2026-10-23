@@ -17,11 +17,6 @@ public struct ContentView: View {
                     Label("Module", systemImage: "books.vertical.fill")
                 }
             
-            SniperDashboardView()
-                .tabItem {
-                    Label("Sniper", systemImage: "cross.circle.fill")
-                }
-            
             SettingsLoginView()
                 .tabItem {
                     Label("Login & Tresor", systemImage: "key.fill")

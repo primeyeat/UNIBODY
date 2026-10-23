@@ -4,7 +4,6 @@ public struct CourseDetailView: View {
     @EnvironmentObject var appState: AppState
     public let course: Course
     
-    @State private var showSniperSheet = false
     @State private var showUnenrollSheet = false
     @State private var isUnenrolling = false
     @State private var showUnenrollError = false
@@ -45,7 +44,7 @@ public struct CourseDetailView: View {
                             if course.isLectureOnly {
                                 AeroBadge("Reine Vorlesung", color: AeroTheme.skyBlue)
                             } else {
-                                AeroBadge(course.enrollmentMode == "sniper" ? "Sniper FCFS" : "Prioritäten", color: AeroTheme.solarOrange)
+                                AeroBadge("Direkt", color: AeroTheme.emerald)
                             }
                         }
                         
@@ -86,29 +85,6 @@ public struct CourseDetailView: View {
                         .frame(maxWidth: .infinity)
                         .frutigerGlass(cornerRadius: 16)
                     } else {
-                        // Sniper Shortcut
-                        Button {
-                            showSniperSheet = true
-                        } label: {
-                            HStack {
-                                Image(systemName: "cross.circle.fill")
-                                    .font(.title3)
-                                VStack(alignment: .leading, spacing: 2) {
-                                    Text("Sniper / Prioritäten scharfstellen")
-                                        .font(.system(.subheadline, design: .rounded).weight(.bold))
-                                    Text("Automatische Anmeldung sekundengenau bei Freischaltung")
-                                        .font(.caption2)
-                                        .foregroundColor(.white.opacity(0.8))
-                                }
-                                Spacer()
-                                Image(systemName: "arrow.right.circle.fill")
-                                    .font(.title3)
-                            }
-                            .padding(14)
-                            .glossyButton(gradient: AeroTheme.auroraGradient, cornerRadius: 16)
-                        }
-                        .buttonStyle(.plain)
-                        
                         // Group List Header
                         Text("Verfügbare Übungsgruppen (\(course.groups.count))")
                             .font(.system(.headline, design: .rounded).weight(.bold))
@@ -260,11 +236,6 @@ public struct CourseDetailView: View {
                 .presentationDetents([.fraction(0.72), .large])
             }
         }
-        .sheet(isPresented: $showSniperSheet) {
-            SniperConfigSheet(course: course, onDirectEnroll: { grp in
-                triggerEnroll(grp: grp)
-            })
-        }
         .sheet(item: $activeAutomationTask) { task in
             LiveAutomationSheet(task: task)
                 .presentationDetents([.fraction(0.88), .large])
@@ -397,84 +368,6 @@ private struct GroupDetailCard: View {
             RoundedRectangle(cornerRadius: 16)
                 .strokeBorder(isEnrolled ? AeroTheme.emerald.opacity(0.8) : Color.clear, lineWidth: 1.5)
         )
-    }
-}
-
-private struct SniperConfigSheet: View {
-    @Environment(\.dismiss) var dismiss
-    @EnvironmentObject var appState: AppState
-    let course: Course
-    var onDirectEnroll: ((ExerciseGroup) -> Void)? = nil
-    
-    @State private var prioritizedGroups: [ExerciseGroup] = []
-    
-    var body: some View {
-        NavigationStack {
-            List {
-                Section(header: Text("Sniper-Rangfolge festlegen")) {
-                    Text("Ziehe deine bevorzugten Übungsgruppen an die Spitze. Ist Rang 1 voll, bucht der UNIBODY-Sniper blitzschnell Rang 2.")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                    
-                    ForEach(prioritizedGroups) { grp in
-                        HStack {
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(grp.name)
-                                    .font(.subheadline.weight(.semibold))
-                                Text("\(grp.dayName) \(grp.startTime)–\(grp.endTime) · \(grp.spotsFree)/\(grp.spotsTotal) frei")
-                                    .font(.caption)
-                                    .foregroundColor(.secondary)
-                            }
-                            Spacer()
-                        }
-                    }
-                    .onMove { indices, newOffset in
-                        prioritizedGroups.move(fromOffsets: indices, toOffset: newOffset)
-                    }
-                }
-                
-                if let topGrp = prioritizedGroups.first {
-                    Section {
-                        Button {
-                            dismiss()
-                            onDirectEnroll?(topGrp)
-                        } label: {
-                            HStack {
-                                Image(systemName: "bolt.fill")
-                                    .foregroundColor(AeroTheme.emerald)
-                                Text("⚡️ Jetzt sofort live buchen (Rang 1)")
-                                    .font(.subheadline.weight(.bold))
-                                    .foregroundColor(.white)
-                                Spacer()
-                                Image(systemName: "arrow.right")
-                                    .font(.caption)
-                                    .foregroundColor(.secondary)
-                            }
-                        }
-                    } footer: {
-                        Text("Trägt dich sekundengenau live über den Browser in deine Wunsch-Übung ein.")
-                            .font(.caption2)
-                            .foregroundColor(.secondary)
-                    }
-                }
-            }
-            .navigationTitle("Sniper: \(course.courseId)")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Abbrechen") { dismiss() }
-                }
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Scharfstellen") {
-                        appState.armSniperJob(course: course, priorities: prioritizedGroups)
-                        dismiss()
-                    }
-                }
-            }
-            .onAppear {
-                prioritizedGroups = course.groups
-            }
-        }
     }
 }
 

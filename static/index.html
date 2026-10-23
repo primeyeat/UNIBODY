@@ -232,12 +232,12 @@
         </div>
       </div>
 
-      <!-- 3. RANKED EXERCISE GROUPS & SNIPER ACTION CARD -->
+      <!-- 3. RANKED EXERCISE GROUPS & DIRECT ENROLLMENT ACTION CARD -->
       <div class="card">
         <div class="card-header">
           <div>
             <span class="step-pill">SCHRITT 3</span>
-            <h2>Berechnetes Übungsgruppen-Ranking &amp; Auto-Einschreibung</h2>
+            <h2>Berechnetes Übungsgruppen-Ranking &amp; Direkteinschreibung</h2>
           </div>
           <div class="mode-switch" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
             <button type="button" id="btnSyncEnrolledGroups" class="btn btn-xs btn-primary" title="Öffnet in Chrome automatisch deine Gruppen-Übersicht auf lms.uni-kiel.de (OpenOlat) und elearn.informatik.uni-kiel.de (Moodle), liest alle bereits gebuchten Übungsgruppen samt Uhrzeit & Raum aus und trägt sie in deinen Stundenplan ein!">
@@ -247,7 +247,7 @@
               ✏️ Gruppenzeiten anpassen
             </button>
             <select id="enrollModeSelect">
-              <option value="sniper">🎯 First-Come-First-Served Sniper (Platz 1 + Auto-Fallback)</option>
+              <option value="direct">⚡ Sofort-Einschreibung (Bestplatz #1)</option>
               <option value="priority">📊 Verteilungsverfahren (Prioritäten 1–3 eintragen)</option>
             </select>
           </div>
@@ -256,19 +256,10 @@
         <!-- Already Enrolled Status Banner (shown when user already has a group in this course) -->
         <div id="currentCourseEnrolledBanner" class="verification-banner verified hidden" style="margin-bottom:10px;"></div>
 
-        <!-- Action Bar for Sniper / Priority Execution -->
+        <!-- Action Bar for Direct Live Enrollment -->
         <div class="sniper-action-bar">
-          <div class="sniper-options">
-            <label class="checkbox-label" title="Simuliert, dass Wunsch #1 in derselben Sekunde voll wird, sodass der Bot automatisch in Millisekunden Wunsch #2 bucht">
-              <input type="checkbox" id="chkSimulateFallback" />
-              <span>Fallback-Test (Simuliere: Platz #1 ist voll &rarr; buche sofort #2)</span>
-            </label>
-          </div>
-          <div class="sniper-buttons">
-            <button id="btnArmCountdown" class="btn btn-secondary">
-              ⏱️ 5s Countdown-Sniper starten
-            </button>
-            <button id="btnExecuteNow" class="btn btn-accent">
+          <div class="sniper-buttons" style="width:100%;">
+            <button id="btnExecuteNow" class="btn btn-accent" style="width:100%;font-size:1.05rem;padding:12px 20px;">
               ⚡ Jetzt sofort einschreiben (Bestplatz sichern)
             </button>
           </div>
@@ -439,7 +430,7 @@
           <div class="form-group">
             <label>Anmelde-Modus</label>
             <select id="custMode">
-              <option value="sniper">First-Come-First-Served Sniper</option>
+              <option value="direct">Direkt-Einschreibung (FCFS)</option>
               <option value="priority">Verteilungsverfahren (Prio 1-3)</option>
             </select>
           </div>

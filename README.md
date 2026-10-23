@@ -29,7 +29,7 @@ An der **Christian-Albrechts-Universität zu Kiel (CAU)** sind Kurse und Übungs
 **UNIBODY** vereint beide Welten in einer einzigen, reaktionsschnellen Web-App im **Frutiger Aero Glass-Design** (inkl. *Deep Ocean Aurora Dark Mode*):
 - 🔑 **1-Klick CAU Auto-Login:** Hinterlege deine CAU-Kennung (`stu...`) einmalig im Tresor. UNIBODY meldet dich auf beiden Plattformen automatisch per Shibboleth SSO an.
 - 🎯 **Intelligentes Routing:** UNIBODY erkennt bei jeder Kurs-ID oder UnivIS-Nummer von selbst, ob der Kurs in OpenOlat oder im Informatik-Moodle liegt.
-- ⚡ **Millisekunden-Sniper & Auto-Fallback:** Buche deine Wunschgruppe per Sofortklick oder mit Countdown-Timer. Ist Platz #1 zeitgleich belegt, greift binnen 12 ms automatisch der Fallback auf Platz #2!
+- ⚡ **1-Klick Direkteinschreibung & Kollisionsschutz:** Buche deine Wunschgruppe per Sofortklick. UNIBODY navigiert automatisch im Portal, bestätigt deine Einschreibung und trägt den Termin im Wochenplan ein.
 - 🔒 **Sperrfrist-Erkennung:** Sind Gruppen von Dozenten noch gesperrt (z. B. bis zum *23. Oktober*), erkennt UNIBODY das Datum live, informiert dich per Popup und beendet Chrome sicher.
 - 🛑 **Automatischer Chrome-Shutdown:** Nach Abschluss des Auftrags beendet UNIBODY den Google Chrome Browser automatisch und gibt RAM und CPU wieder frei.
 - 🪟 **Interaktive Popups & Audio-Feedback:** Detaillierte Erfolgs- und Sperr-Benachrichtigungen mit Bestätigungstoken, Raum, Uhrzeit und sanften Sound-Chimes.
@@ -108,10 +108,9 @@ Rufe die Web-Oberfläche in Safari, Chrome oder Firefox auf:
   - 🟥 **Rot:** Zeitkonflikt mit einer bestehenden Vorlesung oder Übung
 - **Wunsch ändern:** Gefällt dir eine andere Zeit besser? **Klicke einfach auf den entsprechenden Kasten im Kalender!** Er wird sofort als dein **📌 Wunsch #1** fixiert.
 
-### 4️⃣ Live-Einschreibung & Sniper (Schritt 3)
-- **`⚡ Jetzt sofort einschreiben`**: Schreibt dich direkt in Millisekunden in deine Wunschgruppe ein.
-- **`⏱️ 5s Countdown-Sniper starten`**: Für den Ernstfall, wenn eine Einschreibung pünktlich freigeschaltet wird.
-- **Automatischer Fallback-Schutz:** Ist dein Wunsch #1 in derselben Sekunde voll, bucht UNIBODY sofort automatisch **Wunsch #2**!
+### 4️⃣ Live-Einschreibung & Austragung (Schritt 3)
+- **`⚡ Jetzt sofort einschreiben (Bestplatz sichern)`**: Schreibt dich direkt in deine Wunschgruppe ein.
+- **`✕ Aus Kurs austragen`**: Trägt dich mit einem Klick live aus dem Kurs bzw. der Gruppe aus und entfernt den Termin aus dem Stundenplan.
 
 ### 5️⃣ Intelligente Benachrichtigungen & Auto-Shutdown
 - **🎉 Erfolgs-Popup (`#modalEnrollmentSuccess`):**  
@@ -153,7 +152,7 @@ Für das mobile Erlebnis auf iPhone und iPad existiert eine native iOS 27 App un
 - 🫧 **Frutiger Aero Liquid Glass Design:** Native SwiftUI-Komponenten mit `.ultraThinMaterial`, dynamischen Lichtreflexionen, animierten Aurora-Backdrops und taktilem iOS-Feedback.
 - 📅 **Interaktiver Wochenplan:** Tages-Umschaltung (Mo–Fr), automatische Berücksichtigung alternierender Wochen (Woche A & Woche B) und Terminkollisionsprüfung.
 - ⚡ **Dual-Platform Kurs-Katalog:** Detaillierte Ansicht für alle CAU-Module (`lms.uni-kiel.de` & `elearn.informatik.uni-kiel.de`) mit Echtzeit-Platzanzeige (`spots_free / spots_total`) und 1-Tap-Einschreibung.
-- 🎯 **Mobile Sniper-Dashboard:** Sekundengenauer Countdown und konfigurierbare Prioritätenliste mit Fallback-Automatik.
+- 🔄 **Live UNIBODY Deep-Sync:** Vollautomatisches Auslesen und Synchronisieren aller gebuchten Übungen direkt auf dem Gerät.
 - 📅 **UnivIS .ics Import:** Direktes Einlesen von UnivIS-Kalenderdaten via iCalendar-Parser.
 
 ### iOS App bauen & starten:
@@ -179,7 +178,7 @@ UNIBODY speichert Passwörter im lokalen macOS Schlüsselbund bzw. in der lokale
 </details>
 
 <details>
-<summary><strong>Warum schließt sich Google Chrome nach dem Sniper automatisch?</strong></summary>
+<summary><strong>Warum schließt sich Google Chrome nach der Einschreibung automatisch?</strong></summary>
 Das ist ein gewünschtes Sicherheits- und Performance-Feature! Sobald UNIBODY deinen Platz gebucht hat (oder festgestellt hat, dass die Übungsgruppen von den Dozenten noch gesperrt sind), wird Chrome sauber geschlossen, um RAM und CPU freizugeben.
 </details>
 

@@ -123,10 +123,8 @@ private struct CourseCard: View {
                         
                         if course.isLectureOnly {
                             AeroBadge("Reine Vorlesung", color: AeroTheme.skyBlue)
-                        } else if course.enrollmentMode == "sniper" {
-                            AeroBadge("Sniper FCFS", color: AeroTheme.solarOrange)
                         } else {
-                            AeroBadge("Prioritäten", color: Color.purple)
+                            AeroBadge("Direkt", color: AeroTheme.emerald)
                         }
                     }
                     

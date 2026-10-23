@@ -328,7 +328,7 @@ async function verifyAndRankCourse(queryId) {
     else delete appState.enrolledGroups[ck];
   }
   appState.rankedGroups = res.ranked_groups || [];
-  document.getElementById("enrollModeSelect").value = res.course.enrollment_mode || "sniper";
+  document.getElementById("enrollModeSelect").value = res.course.enrollment_mode === "priority" ? "priority" : "direct";
 
   const isElearnInf = res.course.platform_id === "elearn_inf";
   const unibodyPillStyle = isElearnInf
@@ -589,7 +589,7 @@ function renderRankedGroups() {
           ${isLectureOnly ? "Reine Vorlesung (Keine Übungsgruppen)" : "Keine Übungsgruppen vorhanden"}
         </div>
         <div style="font-size:0.85rem;color:var(--aero-ink-muted);max-width:440px;margin:0 auto;line-height:1.45;">
-          ${isLectureOnly ? "Dieses Modul (z. B. Informatikrecht) besteht ausschließlich aus einer Vorlesung. Eine Einschreibung oder ein Sniper ist nicht erforderlich – die Belegung ist frei." : "Zu diesem Modul wurden im UnivIS keine Übungsgruppen gefunden."}
+          ${isLectureOnly ? "Dieses Modul (z. B. Informatikrecht) besteht ausschließlich aus einer Vorlesung. Eine gesonderte Übungs-Einschreibung ist nicht erforderlich – die Belegung ist frei." : "Zu diesem Modul wurden im UnivIS keine Übungsgruppen gefunden."}
         </div>
       </div>
     `;
@@ -613,7 +613,7 @@ function renderRankedGroups() {
             ${
               isAlreadyOptimal
                 ? "🎉 <strong>Perfekt!</strong> Deine bereits gebuchte Gruppe ist gleichzeitig Platz #1 im Optimizer. Der Termin ist fest im Wochenplan für alle anderen Kurse reserviert."
-                : `💡 <strong>Upgrade möglich:</strong> <strong>${rank1Grp ? rank1Grp.name : "Eine andere Gruppe"}</strong> hätte einen höheren Score (${rank1Grp ? rank1Grp.display_score : ""}% statt ${enrolledGrp.display_score}%). Du kannst per Sniper automatisch auf die bessere Gruppe wechseln!`
+                : `💡 <strong>Upgrade möglich:</strong> <strong>${rank1Grp ? rank1Grp.name : "Eine andere Gruppe"}</strong> hätte einen höheren Score (${rank1Grp ? rank1Grp.display_score : ""}% statt ${enrolledGrp.display_score}%). Du kannst dich per Klick direkt in die bessere Gruppe umtragen!`
             }
           </div>
         </div>
@@ -1022,7 +1022,7 @@ function renderTimetable() {
         : g.is_conflict
         ? "Zeitkonflikt mit deinem Stundenplan"
         : isFull
-        ? `Gruppe ist voll belegt (${total}/${total} Plätze belegt). Klick zum Priorisieren als Wunsch #1 (für Sniper bei Nachrücker-Plätzen)!`
+        ? `Gruppe ist voll belegt (${total}/${total} Plätze belegt). Klick zum Priorisieren als Wunsch #1!`
         : isRank1
         ? `Aktuell als Wunsch #1 (${g.name}) ausgewählt! (Klicke erneut zum Aufheben)`
         : `Klicke auf diesen Kasten, um '${g.name}' sofort als Wunsch #1 (Grün) für Schritt 3 auszuwählen!`;
@@ -1232,15 +1232,13 @@ function bindUIEvents() {
     });
   }
 
-  // Execute Immediate Sniper / Priority Enrollment
-  document.getElementById("btnExecuteNow").addEventListener("click", () => {
-    triggerEnrollment("immediate", 0);
-  });
-
-  // Execute 5s Countdown Sniper
-  document.getElementById("btnArmCountdown").addEventListener("click", () => {
-    triggerEnrollment("countdown", 5);
-  });
+  // Execute Direct Live Enrollment
+  const btnExecuteNow = document.getElementById("btnExecuteNow");
+  if (btnExecuteNow) {
+    btnExecuteNow.addEventListener("click", () => {
+      triggerEnrollment();
+    });
+  }
 
   // Modals open/close
   document.getElementById("btnOpenAddEventModal").addEventListener("click", () => {
@@ -1473,24 +1471,25 @@ async function savePreferencesAndRecalc() {
   }
 }
 
-async function triggerEnrollment(triggerType, countdownSeconds) {
+async function triggerEnrollment() {
   if (!appState.currentCourse) {
     alert("Bitte zuerst eine Kurs-ID in Schritt 1 verifizieren!");
     return;
   }
   const mode = document.getElementById("enrollModeSelect").value;
-  const simulateFallback = document.getElementById("chkSimulateFallback").checked;
+  const chkFallback = document.getElementById("chkSimulateFallback");
+  const simulateFallback = chkFallback ? chkFallback.checked : false;
 
   const badge = document.getElementById("jobStatusBadge");
   badge.className = "status-pill";
-  badge.textContent = countdownSeconds > 0 ? `Sniper Countdown (${countdownSeconds}s)...` : "Einschreibung läuft...";
+  badge.textContent = "Einschreibung läuft...";
 
   await apiPost("/api/enroll/execute", {
     course_id: appState.currentCourse.course_id,
     mode,
     simulate_first_choice_full: simulateFallback,
-    trigger_type: triggerType,
-    countdown_seconds: countdownSeconds,
+    trigger_type: "immediate",
+    countdown_seconds: 0,
   });
 
   setTimeout(pollTelemetry, 300);
