@@ -1060,8 +1060,101 @@ function renderTimetable() {
   });
 }
 
+/* SLIDE-IN HAMBURGER MENU DRAWER */
+function initDrawerMenu() {
+  const hamburgerBtn = document.getElementById("btnHamburgerMenu");
+  const logoBtn = document.getElementById("logoClickable");
+  const titleBtn = document.getElementById("titleClickable");
+  const backdrop = document.getElementById("drawerMenuBackdrop");
+  const drawer = document.getElementById("drawerMenu");
+  const closeBtn = document.getElementById("btnCloseDrawer");
+
+  if (!drawer || !backdrop) return;
+
+  function openDrawer() {
+    backdrop.style.display = "block";
+    drawer.style.display = "flex";
+    void drawer.offsetWidth; // Reflow for transition
+    backdrop.classList.add("open");
+    drawer.classList.add("open");
+    document.body.style.overflow = "hidden";
+  }
+
+  function closeDrawer() {
+    backdrop.classList.remove("open");
+    drawer.classList.remove("open");
+    document.body.style.overflow = "";
+    setTimeout(() => {
+      if (!drawer.classList.contains("open")) {
+        backdrop.style.display = "none";
+        drawer.style.display = "none";
+      }
+    }, 360);
+  }
+
+  // Both hamburger button, logo, and title open the drawer
+  if (hamburgerBtn) hamburgerBtn.addEventListener("click", openDrawer);
+  if (logoBtn) {
+    logoBtn.addEventListener("click", openDrawer);
+    logoBtn.addEventListener("keydown", (e) => {
+      if (e.key === "Enter" || e.key === " ") {
+        e.preventDefault();
+        openDrawer();
+      }
+    });
+  }
+  if (titleBtn) {
+    titleBtn.addEventListener("click", openDrawer);
+    titleBtn.addEventListener("keydown", (e) => {
+      if (e.key === "Enter" || e.key === " ") {
+        e.preventDefault();
+        openDrawer();
+      }
+    });
+  }
+
+  if (closeBtn) closeBtn.addEventListener("click", closeDrawer);
+  backdrop.addEventListener("click", closeDrawer);
+
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && drawer.classList.contains("open")) {
+      closeDrawer();
+    }
+  });
+
+  // Nav item handlers
+  document.getElementById("drawerBtnSchedule")?.addEventListener("click", () => {
+    closeDrawer();
+    document.querySelector(".calendar-card")?.scrollIntoView({ behavior: "smooth" });
+  });
+
+  document.getElementById("drawerBtnCourses")?.addEventListener("click", () => {
+    closeDrawer();
+    const courseInput = document.getElementById("courseQueryInput");
+    if (courseInput) {
+      courseInput.scrollIntoView({ behavior: "smooth", block: "center" });
+      courseInput.focus();
+    }
+  });
+
+  document.getElementById("drawerBtnAccount")?.addEventListener("click", () => {
+    closeDrawer();
+    const vault = document.getElementById("accountVaultCard");
+    if (vault) {
+      vault.scrollIntoView({ behavior: "smooth" });
+      const form = document.getElementById("formCredentials");
+      if (form && form.classList.contains("collapsed")) {
+        form.classList.remove("collapsed");
+      }
+      document.getElementById("credUsername")?.focus();
+    }
+  });
+}
+
 /* EVENT BINDINGS */
 function bindUIEvents() {
+  initDrawerMenu();
+
   // Sync already enrolled groups from open browser tabs
   const syncEnrolledBtn = document.getElementById("btnSyncEnrolledGroups");
   if (syncEnrolledBtn) {

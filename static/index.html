@@ -10,16 +10,21 @@
   <link rel="icon" type="image/png" sizes="192x192" href="/favicon-192.png" />
   <link rel="icon" type="image/x-icon" href="/favicon.ico" />
   <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
-  <link rel="stylesheet" href="/styles.css" />
+  <link rel="stylesheet" href="/styles.css?v=2" />
 </head>
 <body>
   <!-- TOP HEADER -->
   <header class="topbar">
     <div class="brand">
-      <div class="cau-crest">
+      <button type="button" id="btnHamburgerMenu" class="hamburger-btn" title="Menü öffnen (3-Balken)" aria-label="Menü öffnen">
+        <span class="hamburger-bar"></span>
+        <span class="hamburger-bar"></span>
+        <span class="hamburger-bar"></span>
+      </button>
+      <div class="cau-crest" id="logoClickable" role="button" tabindex="0" title="Menü öffnen">
         <img src="/unibody-logo.png" alt="UNIBODY Logo" class="unibody-logo-img" />
       </div>
-      <div>
+      <div class="brand-title" id="titleClickable" role="button" tabindex="0" title="Menü öffnen">
         <h1>UNIBODY</h1>
       </div>
     </div>
@@ -657,6 +662,47 @@
     </div>
   </div>
 
-  <script src="/app.js"></script>
+  <!-- SLIDE-IN HAMBURGER MENU DRAWER (LEFT-TO-RIGHT) -->
+  <div id="drawerMenuBackdrop" class="drawer-backdrop" style="display:none;"></div>
+  <aside id="drawerMenu" class="drawer-menu" style="display:none;" aria-label="UNIBODY Menü" role="dialog" aria-modal="true">
+    <div class="drawer-header">
+      <div class="drawer-brand">
+        <div class="drawer-hamburger-icon">
+          <span></span><span></span><span></span>
+        </div>
+        <div class="drawer-brand-text">
+          <h3>UNIBODY</h3>
+          <span class="drawer-subtitle">Menü &amp; System</span>
+        </div>
+      </div>
+      <button type="button" id="btnCloseDrawer" class="btn-close drawer-btn-close" aria-label="Menü schließen">&times;</button>
+    </div>
+
+    <div class="drawer-body">
+      <div class="drawer-section">
+        <div class="drawer-section-title">Navigation</div>
+        <nav class="drawer-nav">
+          <button type="button" class="drawer-item" id="drawerBtnSchedule">
+            <span class="drawer-icon">📅</span>
+            <span>Wochen-Stundenplan</span>
+          </button>
+          <button type="button" class="drawer-item" id="drawerBtnCourses">
+            <span class="drawer-icon">📚</span>
+            <span>Kurse &amp; Übungsgruppen</span>
+          </button>
+          <button type="button" class="drawer-item" id="drawerBtnAccount">
+            <span class="drawer-icon">🔐</span>
+            <span>CAU Login &amp; Tresor</span>
+          </button>
+        </nav>
+      </div>
+
+      <div class="drawer-footer-info">
+        <span>UNIBODY · CAU Kiel</span>
+      </div>
+    </div>
+  </aside>
+
+  <script src="/app.js?v=2"></script>
 </body>
 </html>

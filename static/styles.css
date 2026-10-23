@@ -95,21 +95,71 @@ code {
   z-index: 50;
 }
 
+/* Hamburger 3-Balken Menu Button in Topbar */
+.hamburger-btn {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: 4px;
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.95) 0%, rgba(224, 244, 255, 0.85) 100%);
+  border: 1px solid rgba(0, 140, 230, 0.35);
+  box-shadow: 0 2px 6px rgba(0, 95, 175, 0.12), inset 0 1px 0 #ffffff;
+  cursor: pointer;
+  padding: 0;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  flex-shrink: 0;
+}
+
+.hamburger-btn:hover {
+  background: linear-gradient(180deg, #ffffff 0%, #e0f2fe 100%);
+  border-color: rgba(0, 160, 255, 0.65);
+  transform: scale(1.06);
+  box-shadow: 0 4px 12px rgba(0, 120, 220, 0.25), inset 0 1px 0 #ffffff;
+}
+
+.hamburger-btn:active {
+  transform: scale(0.96);
+}
+
+.hamburger-bar {
+  display: block;
+  width: 18px;
+  height: 2.2px;
+  border-radius: 2px;
+  background: #034b82;
+  transition: all 0.2s ease;
+}
+
 .brand {
   display: flex;
   align-items: center;
-  gap: 15px;
+  gap: 12px;
 }
 
 /* UNIBODY Frutiger Aero Globe Logo */
 .cau-crest {
-  width: 58px;
-  height: 58px;
+  width: 54px;
+  height: 54px;
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
+  cursor: pointer;
   position: relative;
+  transition: transform 0.2s ease;
+}
+
+.cau-crest:hover {
+  transform: scale(1.06);
+}
+
+.brand-title {
+  cursor: pointer;
+  user-select: none;
 }
 
 .unibody-logo-img {
@@ -1389,6 +1439,272 @@ body.dark-mode .tt-event.candidate-enrolled {
   color: #451a03;
   padding: 3px 9px;
   border-radius: 99px;
+}
+
+/* ==========================================================================
+   SLIDE-IN HAMBURGER MENU DRAWER (LEFT-TO-RIGHT)
+   ========================================================================== */
+.drawer-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(3, 22, 45, 0.48);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  z-index: 200;
+  opacity: 0;
+  transition: opacity 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.drawer-backdrop.open {
+  opacity: 1;
+}
+
+.drawer-menu {
+  position: fixed;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  width: 360px;
+  max-width: 86vw;
+  height: 100vh;
+  z-index: 201;
+  display: flex;
+  flex-direction: column;
+  background: linear-gradient(
+    175deg,
+    rgba(255, 255, 255, 0.97) 0%,
+    rgba(235, 248, 255, 0.94) 50%,
+    rgba(215, 242, 255, 0.96) 100%
+  );
+  backdrop-filter: blur(24px) saturate(190%);
+  -webkit-backdrop-filter: blur(24px) saturate(190%);
+  border-right: 1.5px solid rgba(255, 255, 255, 0.95);
+  box-shadow:
+    12px 0 45px rgba(0, 75, 150, 0.25),
+    inset -1px 0 0 rgba(0, 132, 214, 0.25),
+    inset 0 1px 0 #ffffff;
+  transform: translateX(-100%);
+  transition: transform 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+  overflow-y: auto;
+}
+
+.drawer-menu.open {
+  transform: translateX(0);
+}
+
+.drawer-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 20px;
+  background: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.98) 0%,
+    rgba(224, 243, 255, 0.88) 50%,
+    rgba(203, 233, 255, 0.9) 51%,
+    rgba(230, 246, 255, 0.95) 100%
+  );
+  border-bottom: 1.5px solid rgba(0, 132, 214, 0.3);
+  box-shadow: 0 4px 14px rgba(0, 95, 175, 0.1);
+}
+
+.drawer-brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.drawer-hamburger-icon {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 3.5px;
+  width: 22px;
+  height: 22px;
+}
+
+.drawer-hamburger-icon span {
+  display: block;
+  width: 100%;
+  height: 2.2px;
+  border-radius: 2px;
+  background: #034b82;
+}
+
+.drawer-brand-text h3 {
+  font-size: 1.25rem;
+  font-weight: 900;
+  letter-spacing: 0.12em;
+  color: #032b4e;
+  margin: 0;
+  text-shadow: 0 1px 0 #ffffff, 0 2px 8px rgba(0, 168, 255, 0.25);
+}
+
+.drawer-subtitle {
+  font-size: 0.74rem;
+  font-weight: 700;
+  color: var(--aero-ink-muted);
+}
+
+.drawer-btn-close {
+  background: none;
+  border: none;
+  color: var(--aero-ink-muted);
+  font-size: 1.7rem;
+  line-height: 1;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: var(--radius-sm);
+  transition: all 0.15s ease;
+}
+
+.drawer-btn-close:hover {
+  color: #032b4e;
+  background: rgba(0, 132, 214, 0.15);
+  transform: scale(1.1);
+}
+
+.drawer-body {
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  flex: 1;
+}
+
+.drawer-section-title {
+  font-size: 0.76rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--aero-ink-muted);
+  margin-bottom: 10px;
+}
+
+.drawer-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.drawer-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  border-radius: var(--radius-md);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.85) 0%, rgba(240, 249, 255, 0.75) 100%);
+  border: 1px solid rgba(0, 140, 230, 0.25);
+  box-shadow: 0 2px 6px rgba(0, 80, 160, 0.08), inset 0 1px 0 #ffffff;
+  color: #043259;
+  font-size: 0.92rem;
+  font-weight: 700;
+  cursor: pointer;
+  text-align: left;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.drawer-item:hover {
+  background: linear-gradient(180deg, #ffffff 0%, #e0f2fe 100%);
+  border-color: rgba(0, 160, 255, 0.6);
+  transform: translateX(4px);
+  box-shadow: 0 4px 14px rgba(0, 120, 220, 0.2), inset 0 1px 0 #ffffff;
+}
+
+.drawer-icon {
+  font-size: 1.15rem;
+}
+
+.drawer-footer-info {
+  margin-top: auto;
+  padding-top: 16px;
+  border-top: 1px solid rgba(0, 132, 214, 0.2);
+  font-size: 0.75rem;
+  color: var(--aero-ink-muted);
+  font-weight: 600;
+  text-align: center;
+}
+
+/* Dark Mode Drawer Styles */
+body.dark-mode .hamburger-btn {
+  background: linear-gradient(180deg, rgba(16, 44, 78, 0.85) 0%, rgba(9, 27, 49, 0.85) 100%);
+  border-color: rgba(0, 217, 255, 0.35);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+}
+
+body.dark-mode .hamburger-btn:hover {
+  background: linear-gradient(180deg, rgba(24, 66, 114, 0.95) 0%, rgba(14, 42, 76, 0.95) 100%);
+  border-color: rgba(0, 217, 255, 0.7);
+  box-shadow: 0 4px 16px rgba(0, 217, 255, 0.3);
+}
+
+body.dark-mode .hamburger-bar {
+  background: #7dd3fc;
+  box-shadow: 0 0 6px rgba(0, 217, 255, 0.5);
+}
+
+body.dark-mode .drawer-backdrop {
+  background: rgba(1, 10, 22, 0.68);
+}
+
+body.dark-mode .drawer-menu {
+  background: linear-gradient(
+    175deg,
+    rgba(8, 26, 50, 0.98) 0%,
+    rgba(3, 14, 30, 0.96) 100%
+  );
+  border-right: 1.5px solid rgba(0, 217, 255, 0.3);
+  box-shadow: 14px 0 50px rgba(0, 0, 0, 0.7), inset -1px 0 0 rgba(0, 217, 255, 0.18);
+}
+
+body.dark-mode .drawer-header {
+  background: linear-gradient(
+    180deg,
+    rgba(14, 40, 72, 0.95) 0%,
+    rgba(7, 24, 46, 0.9) 100%
+  );
+  border-bottom: 1.5px solid rgba(0, 217, 255, 0.3);
+}
+
+body.dark-mode .drawer-hamburger-icon span {
+  background: #7dd3fc;
+  box-shadow: 0 0 6px rgba(0, 217, 255, 0.5);
+}
+
+body.dark-mode .drawer-brand-text h3 {
+  color: #e0f2fe;
+  text-shadow: 0 0 12px rgba(0, 217, 255, 0.6);
+}
+
+body.dark-mode .drawer-subtitle {
+  color: #7dd3fc;
+}
+
+body.dark-mode .drawer-btn-close {
+  color: #7dd3fc;
+}
+
+body.dark-mode .drawer-btn-close:hover {
+  color: #ffffff;
+  background: rgba(0, 217, 255, 0.2);
+}
+
+body.dark-mode .drawer-item {
+  background: linear-gradient(180deg, rgba(16, 44, 78, 0.8) 0%, rgba(9, 27, 49, 0.8) 100%);
+  border: 1px solid rgba(0, 217, 255, 0.25);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  color: #f0f9ff;
+}
+
+body.dark-mode .drawer-item:hover {
+  background: linear-gradient(180deg, rgba(24, 66, 114, 0.9) 0%, rgba(14, 42, 76, 0.9) 100%);
+  border-color: rgba(0, 217, 255, 0.6);
+  box-shadow: 0 4px 16px rgba(0, 217, 255, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.15);
+}
+
+body.dark-mode .drawer-footer-info {
+  border-top-color: rgba(0, 217, 255, 0.2);
+  color: #7dd3fc;
 }
 
 /* ==========================================================================
