@@ -10,7 +10,7 @@
   <link rel="icon" type="image/png" sizes="192x192" href="/favicon-192.png" />
   <link rel="icon" type="image/x-icon" href="/favicon.ico" />
   <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
-  <link rel="stylesheet" href="/styles.css?v=3" />
+  <link rel="stylesheet" href="/styles.css?v=4" />
 </head>
 <body>
   <!-- TOP HEADER -->
@@ -36,11 +36,134 @@
     </div>
   </header>
 
-  <!-- MAIN WORKSPACE GRID -->
-  <main class="workspace">
-    <!-- LEFT COLUMN: COURSE ID SNIPER + PREFERENCES + RANKED GROUPS -->
+  <!-- MAIN WORKSPACE GRID (KALENDER & KURSE) -->
+  <main class="workspace" id="pageCalendar">
+    <!-- LEFT COLUMN: COURSE ID SNIPER + RANKED GROUPS -->
     <section class="left-panel">
-      <!-- 0. CAU ACCOUNT & AUTO-LOGIN VAULT CARD -->
+      <!-- 1. STRICT COURSE ID LOOKUP CARD -->
+      <div class="card highlight-card">
+        <div class="card-header">
+          <div>
+            <span class="step-pill">SCHRITT 1</span>
+            <h2>Kurs-ID / UnivIS-Kennung / LMS-Code eingeben</h2>
+          </div>
+          <button id="btnOpenCustomCourseModal" class="btn btn-xs btn-ghost">+ Eigenen LMS-Kurs anlegen</button>
+        </div>
+
+        <p class="helper-text">
+          Gib den <strong>Wirtschaftsinformatik-Modulcode</strong> (z.&nbsp;B. <code>infEWInf-01a</code>, <code>infEInf-02a</code>, <code>Inf-Math-A</code>, <code>BWL-EinfBWL</code>), die exakte <strong>UnivIS-Kennung (2026w)</strong> (z.&nbsp;B. <code>080038</code>, <code>080042</code>, <code>080058</code>, <code>080056</code>, <code>060107</code>, <code>030225</code>, <code>080103</code>) oder eine beliebige andere 6-stellige UnivIS-Nummer für den <strong>Live-XML-Abruf</strong> ein.
+        </p>
+
+        <div class="search-bar">
+          <input
+            type="text"
+            id="courseQueryInput"
+            placeholder="z. B. 080038, 080058, 060107, 030225, infEWInf-01a, infEInf-02a..."
+            value="infEWInf-01a"
+            autocomplete="off"
+          />
+          <button id="btnVerifyCourse" class="btn btn-primary">
+            🔍 Kurs verifizieren &amp; berechnen
+          </button>
+        </div>
+
+        <!-- Quick-Select Verified CAU Courses -->
+        <div class="quick-chips" id="catalogChips"></div>
+
+        <!-- Verification Banner -->
+        <div id="verificationBanner" class="verification-banner hidden"></div>
+      </div>
+
+      <!-- 2. RANKED EXERCISE GROUPS & DIRECT ENROLLMENT ACTION CARD -->
+      <div class="card">
+        <div class="card-header">
+          <div>
+            <span class="step-pill">SCHRITT 2</span>
+            <h2>Berechnetes Übungsgruppen-Ranking &amp; Direkteinschreibung</h2>
+          </div>
+          <div class="mode-switch" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+            <button type="button" id="btnSyncEnrolledGroups" class="btn btn-xs btn-primary" title="Öffnet in Chrome automatisch deine Gruppen-Übersicht auf lms.uni-kiel.de (OpenOlat) und elearn.informatik.uni-kiel.de (Moodle), liest alle bereits gebuchten Übungsgruppen samt Uhrzeit & Raum aus und trägt sie in deinen Stundenplan ein!">
+              🔄 UNIBODY Deep-Sync (Gebuchte Übungen holen)
+            </button>
+            <button type="button" id="btnEditCurrentGroups" class="btn btn-xs btn-outline" title="Übungsgruppen dieses Kurses direkt aus OpenOlat / Moodle / UnivIS einfügen oder anpassen">
+              ✏️ Gruppenzeiten anpassen
+            </button>
+            <select id="enrollModeSelect">
+              <option value="direct">⚡ Sofort-Einschreibung (Bestplatz #1)</option>
+              <option value="priority">📊 Verteilungsverfahren (Prioritäten 1–3 eintragen)</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Already Enrolled Status Banner (shown when user already has a group in this course) -->
+        <div id="currentCourseEnrolledBanner" class="verification-banner verified hidden" style="margin-bottom:10px;"></div>
+
+        <!-- Action Bar for Direct Live Enrollment -->
+        <div class="sniper-action-bar">
+          <div class="sniper-buttons" style="width:100%;">
+            <button id="btnExecuteNow" class="btn btn-accent" style="width:100%;font-size:1.05rem;padding:12px 20px;">
+              ⚡ Jetzt sofort einschreiben (Bestplatz sichern)
+            </button>
+          </div>
+        </div>
+
+        <!-- Ranked Groups List -->
+        <div id="rankedGroupsContainer" class="ranked-groups-list"></div>
+      </div>
+    </section>
+
+    <!-- RIGHT COLUMN: INTERACTIVE WEEKLY SCHEDULE + UNIVIS ICS CLEANER + LIVE LOG -->
+    <section class="right-panel">
+      <!-- WEEKLY TIMETABLE CARD -->
+      <div class="card calendar-card" id="calendarCard">
+        <div class="card-header">
+          <div>
+            <h2>📅 UNIBODY Wochen-Stundenplan (Frutiger Aero Glass)</h2>
+            <p class="helper-text">
+              <strong>🟦 Klick auf blauen Vorlesungs-Block</strong> = Kurs in Schritt 1 auswählen · <strong>🟧 Klick auf gestrichelten Übungs-Block</strong> = Übung als Wunsch #1 in Schritt 3 priorisieren!
+            </p>
+          </div>
+          <div class="calendar-actions">
+            <button id="btnOpenIcsModal" class="btn btn-xs btn-outline">
+              🧹 UnivIS .ics Import &amp; Bereiniger
+            </button>
+            <button id="btnOpenAddEventModal" class="btn btn-xs btn-primary">
+              + Eigener Termin
+            </button>
+          </div>
+        </div>
+
+        <!-- Legend -->
+        <div class="calendar-legend">
+          <span class="legend-item"><i class="swatch lecture"></i> Feste Vorlesung / Termin</span>
+          <span class="legend-item"><i class="swatch enrolled"></i> Bereits eingeschriebene Übung</span>
+          <span class="legend-item"><i class="swatch candidate-best"></i> Top-Empfehlung (#1)</span>
+          <span class="legend-item"><i class="swatch candidate-alt"></i> Alternative (#2 / #3)</span>
+          <span class="legend-item"><i class="swatch candidate-conflict"></i> Zeitkonflikt (Blockiert)</span>
+        </div>
+
+        <!-- Timetable Grid (Mo - Fr, 08:00 - 18:00) -->
+        <div class="timetable-wrapper">
+          <div class="timetable" id="timetableGrid"></div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- DEDICATED SETTINGS PAGE (OPENED FROM HAMBURGER MENU) -->
+  <main class="settings-page" id="pageSettings" style="display: none;">
+    <div class="settings-container">
+      <div class="settings-nav-bar">
+        <button type="button" id="btnBackToCalendar" class="btn btn-outline">
+          ← Zurück zum Kalender
+        </button>
+        <div class="settings-title-wrap">
+          <h2>⚙️ Einstellungen</h2>
+          <span class="settings-subtitle">CAU Account, Optimierungs-Präferenzen &amp; Telemetrie</span>
+        </div>
+      </div>
+
+      <!-- 1. CAU ACCOUNT & AUTO-LOGIN VAULT CARD -->
       <div class="card account-vault-card" id="accountVaultCard">
         <div class="card-header">
           <div>
@@ -126,46 +249,12 @@
         </form>
       </div>
 
-      <!-- 1. STRICT COURSE ID LOOKUP CARD -->
-      <div class="card highlight-card">
-        <div class="card-header">
-          <div>
-            <span class="step-pill">SCHRITT 1</span>
-            <h2>Kurs-ID / UnivIS-Kennung / LMS-Code eingeben</h2>
-          </div>
-          <button id="btnOpenCustomCourseModal" class="btn btn-xs btn-ghost">+ Eigenen LMS-Kurs anlegen</button>
-        </div>
-
-        <p class="helper-text">
-          Gib den <strong>Wirtschaftsinformatik-Modulcode</strong> (z.&nbsp;B. <code>infEWInf-01a</code>, <code>infEInf-02a</code>, <code>Inf-Math-A</code>, <code>BWL-EinfBWL</code>), die exakte <strong>UnivIS-Kennung (2026w)</strong> (z.&nbsp;B. <code>080038</code>, <code>080042</code>, <code>080058</code>, <code>080056</code>, <code>060107</code>, <code>030225</code>, <code>080103</code>) oder eine beliebige andere 6-stellige UnivIS-Nummer für den <strong>Live-XML-Abruf</strong> ein.
-        </p>
-
-        <div class="search-bar">
-          <input
-            type="text"
-            id="courseQueryInput"
-            placeholder="z. B. 080038, 080058, 060107, 030225, infEWInf-01a, infEInf-02a..."
-            value="infEWInf-01a"
-            autocomplete="off"
-          />
-          <button id="btnVerifyCourse" class="btn btn-primary">
-            🔍 Kurs verifizieren &amp; berechnen
-          </button>
-        </div>
-
-        <!-- Quick-Select Verified CAU Courses -->
-        <div class="quick-chips" id="catalogChips"></div>
-
-        <!-- Verification Banner -->
-        <div id="verificationBanner" class="verification-banner hidden"></div>
-      </div>
-
       <!-- 2. OPTIMIZER WEIGHTS & PREFERENCES CARD -->
       <div class="card" id="settingsPreferencesCard">
         <div class="card-header">
           <div>
-            <span class="step-pill">SCHRITT 2</span>
-            <h2>Optimierungs-Gewichtung &amp; Einstellungen</h2>
+            <span class="step-pill">OPTIMIERUNG</span>
+            <h2>🎛️ Optimierungs-Gewichtung &amp; Stundenplan-Präferenzen</h2>
           </div>
           <span class="live-recalc-tag">⚡ Live-Berechnung aktiv</span>
         </div>
@@ -226,80 +315,23 @@
         </div>
       </div>
 
-      <!-- 3. RANKED EXERCISE GROUPS & DIRECT ENROLLMENT ACTION CARD -->
-      <div class="card">
+      <!-- 3. TELEMETRIE & ROUTING-PROTOKOLL CARD -->
+      <div class="card terminal-card" id="settingsTelemetryCard">
         <div class="card-header">
           <div>
-            <span class="step-pill">SCHRITT 3</span>
-            <h2>Berechnetes Übungsgruppen-Ranking &amp; Direkteinschreibung</h2>
+            <h2>🛡️ UNIBODY Telemetrie &amp; Routing-Protokoll</h2>
           </div>
-          <div class="mode-switch" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
-            <button type="button" id="btnSyncEnrolledGroups" class="btn btn-xs btn-primary" title="Öffnet in Chrome automatisch deine Gruppen-Übersicht auf lms.uni-kiel.de (OpenOlat) und elearn.informatik.uni-kiel.de (Moodle), liest alle bereits gebuchten Übungsgruppen samt Uhrzeit & Raum aus und trägt sie in deinen Stundenplan ein!">
-              🔄 UNIBODY Deep-Sync (Gebuchte Übungen holen)
-            </button>
-            <button type="button" id="btnEditCurrentGroups" class="btn btn-xs btn-outline" title="Übungsgruppen dieses Kurses direkt aus OpenOlat / Moodle / UnivIS einfügen oder anpassen">
-              ✏️ Gruppenzeiten anpassen
-            </button>
-            <select id="enrollModeSelect">
-              <option value="direct">⚡ Sofort-Einschreibung (Bestplatz #1)</option>
-              <option value="priority">📊 Verteilungsverfahren (Prioritäten 1–3 eintragen)</option>
-            </select>
-          </div>
+          <span id="jobStatusBadge" class="status-pill idle">Bereit</span>
         </div>
-
-        <!-- Already Enrolled Status Banner (shown when user already has a group in this course) -->
-        <div id="currentCourseEnrolledBanner" class="verification-banner verified hidden" style="margin-bottom:10px;"></div>
-
-        <!-- Action Bar for Direct Live Enrollment -->
-        <div class="sniper-action-bar">
-          <div class="sniper-buttons" style="width:100%;">
-            <button id="btnExecuteNow" class="btn btn-accent" style="width:100%;font-size:1.05rem;padding:12px 20px;">
-              ⚡ Jetzt sofort einschreiben (Bestplatz sichern)
-            </button>
-          </div>
-        </div>
-
-        <!-- Ranked Groups List -->
-        <div id="rankedGroupsContainer" class="ranked-groups-list"></div>
+        <div id="terminalLogs" class="terminal-logs"></div>
       </div>
-    </section>
 
-    <!-- RIGHT COLUMN: INTERACTIVE WEEKLY SCHEDULE + UNIVIS ICS CLEANER + LIVE LOG -->
-    <section class="right-panel">
-      <!-- WEEKLY TIMETABLE CARD -->
-      <div class="card calendar-card" id="calendarCard">
-        <div class="card-header">
-          <div>
-            <h2>📅 UNIBODY Wochen-Stundenplan (Frutiger Aero Glass)</h2>
-            <p class="helper-text">
-              <strong>🟦 Klick auf blauen Vorlesungs-Block</strong> = Kurs in Schritt 1 auswählen · <strong>🟧 Klick auf gestrichelten Übungs-Block</strong> = Übung als Wunsch #1 in Schritt 3 priorisieren!
-            </p>
-          </div>
-          <div class="calendar-actions">
-            <button id="btnOpenIcsModal" class="btn btn-xs btn-outline">
-              🧹 UnivIS .ics Import &amp; Bereiniger
-            </button>
-            <button id="btnOpenAddEventModal" class="btn btn-xs btn-primary">
-              + Eigener Termin
-            </button>
-          </div>
-        </div>
-
-        <!-- Legend -->
-        <div class="calendar-legend">
-          <span class="legend-item"><i class="swatch lecture"></i> Feste Vorlesung / Termin</span>
-          <span class="legend-item"><i class="swatch enrolled"></i> Bereits eingeschriebene Übung</span>
-          <span class="legend-item"><i class="swatch candidate-best"></i> Top-Empfehlung (#1)</span>
-          <span class="legend-item"><i class="swatch candidate-alt"></i> Alternative (#2 / #3)</span>
-          <span class="legend-item"><i class="swatch candidate-conflict"></i> Zeitkonflikt (Blockiert)</span>
-        </div>
-
-        <!-- Timetable Grid (Mo - Fr, 08:00 - 18:00) -->
-        <div class="timetable-wrapper">
-          <div class="timetable" id="timetableGrid"></div>
-        </div>
+      <div class="settings-footer-actions">
+        <button type="button" id="btnBackToCalendarBottom" class="btn btn-primary">
+          ✓ Zurück zum Kalender
+        </button>
       </div>
-    </section>
+    </div>
   </main>
 
   <!-- MODAL 1: ADD MANUAL SCHEDULE BLOCK -->
@@ -699,6 +731,6 @@
     </div>
   </aside>
 
-  <script src="/app.js?v=3"></script>
+  <script src="/app.js?v=4"></script>
 </body>
 </html>

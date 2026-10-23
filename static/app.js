@@ -1060,6 +1060,29 @@ function renderTimetable() {
   });
 }
 
+/* PAGE ROUTING (KALENDER & EINSTELLUNGEN) */
+function switchAppPage(pageName, updateHash = true) {
+  const pageCalendar = document.getElementById("pageCalendar");
+  const pageSettings = document.getElementById("pageSettings");
+  if (!pageCalendar || !pageSettings) return;
+
+  if (pageName === "settings") {
+    pageCalendar.style.display = "none";
+    pageSettings.style.display = "block";
+    if (updateHash && window.location.hash !== "#settings") {
+      window.location.hash = "settings";
+    }
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  } else {
+    pageSettings.style.display = "none";
+    pageCalendar.style.display = "grid";
+    if (updateHash && window.location.hash !== "#calendar") {
+      window.location.hash = "calendar";
+    }
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+}
+
 /* SLIDE-IN HAMBURGER MENU DRAWER */
 function initDrawerMenu() {
   const hamburgerBtn = document.getElementById("btnHamburgerMenu");
@@ -1122,28 +1145,37 @@ function initDrawerMenu() {
     }
   });
 
-  // Nav item handlers: Einstellungen & Kalender
+  // Nav item handlers: Einstellungen & Kalender (Page switch)
   document.getElementById("drawerBtnSettings")?.addEventListener("click", () => {
     closeDrawer();
-    const target = document.getElementById("settingsPreferencesCard") || document.getElementById("accountVaultCard");
-    if (target) {
-      target.scrollIntoView({ behavior: "smooth", block: "start" });
-      target.classList.remove("card-target-highlight");
-      void target.offsetWidth;
-      target.classList.add("card-target-highlight");
-    }
+    switchAppPage("settings");
   });
 
   document.getElementById("drawerBtnCalendar")?.addEventListener("click", () => {
     closeDrawer();
-    const target = document.getElementById("calendarCard") || document.querySelector(".calendar-card");
-    if (target) {
-      target.scrollIntoView({ behavior: "smooth", block: "start" });
-      target.classList.remove("card-target-highlight");
-      void target.offsetWidth;
-      target.classList.add("card-target-highlight");
+    switchAppPage("calendar");
+  });
+
+  // Settings page back buttons
+  document.getElementById("btnBackToCalendar")?.addEventListener("click", () => {
+    switchAppPage("calendar");
+  });
+  document.getElementById("btnBackToCalendarBottom")?.addEventListener("click", () => {
+    switchAppPage("calendar");
+  });
+
+  // Hash-based routing
+  window.addEventListener("hashchange", () => {
+    if (window.location.hash === "#settings") {
+      switchAppPage("settings", false);
+    } else {
+      switchAppPage("calendar", false);
     }
   });
+
+  if (window.location.hash === "#settings") {
+    switchAppPage("settings", false);
+  }
 }
 
 /* EVENT BINDINGS */
@@ -1246,6 +1278,7 @@ function bindUIEvents() {
   }
   if (topAccountBtn) {
     topAccountBtn.addEventListener("click", () => {
+      switchAppPage("settings");
       toggleVaultCollapse(true);
       const card = document.getElementById("accountVaultCard");
       if (card) card.scrollIntoView({ behavior: "smooth", block: "start" });
