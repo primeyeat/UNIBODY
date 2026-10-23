@@ -4036,3 +4036,307 @@ body.dark-mode .badge-success {
   color: #6ee7b7;
   border-color: rgba(52, 211, 153, 0.35);
 }
+
+
+/* ==========================================================================
+   TURNUS-MANAGER & TURNUS-AUSWAHL (WOCHE A / WOCHE B / JEDE WOCHE)
+   ========================================================================== */
+
+/* Clickable Turnus Pill on Timetable Event Block */
+.tt-turnus-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 3px;
+  padding: 1.5px 7px;
+  border-radius: 999px;
+  font-size: 0.65rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  cursor: pointer;
+  border: 1px solid rgba(255, 255, 255, 0.45);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
+  transition: all 0.16s ease;
+  user-select: none;
+}
+
+.tt-turnus-pill:hover {
+  transform: translateY(-1px) scale(1.05);
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.18);
+  filter: brightness(1.1);
+}
+
+.tt-turnus-pill.turnus-all {
+  background: rgba(2, 132, 199, 0.18);
+  color: #034674;
+  border-color: rgba(2, 132, 199, 0.35);
+}
+
+.tt-turnus-pill.turnus-a {
+  background: linear-gradient(180deg, #0284c7 0%, #0369a1 100%);
+  color: #ffffff;
+  border-color: #38bdf8;
+  box-shadow: 0 2px 6px rgba(2, 132, 199, 0.3);
+}
+
+.tt-turnus-pill.turnus-b {
+  background: linear-gradient(180deg, #8b5cf6 0%, #6d28d9 100%);
+  color: #ffffff;
+  border-color: #c084fc;
+  box-shadow: 0 2px 6px rgba(139, 92, 246, 0.3);
+}
+
+/* Turnus Manager List Modal */
+.turnus-manager-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-height: 480px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.turnus-manager-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 12px 16px;
+  border-radius: var(--radius-md);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.95) 0%, rgba(240, 248, 255, 0.88) 100%);
+  border: 1px solid rgba(0, 132, 214, 0.18);
+  box-shadow: 0 2px 8px rgba(0, 70, 140, 0.05);
+  transition: all 0.15s ease;
+}
+
+.turnus-manager-row:hover {
+  border-color: #0284c7;
+  box-shadow: 0 4px 14px rgba(2, 132, 199, 0.12);
+}
+
+.turnus-row-info {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  flex: 1;
+  min-width: 0;
+}
+
+.turnus-row-title {
+  font-size: 0.88rem;
+  font-weight: 800;
+  color: #032b4e;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.turnus-row-sub {
+  font-size: 0.75rem;
+  color: var(--aero-ink-muted);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.turnus-segmented-control {
+  display: inline-flex;
+  background: rgba(0, 0, 0, 0.06);
+  border-radius: 999px;
+  padding: 3px;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  flex-shrink: 0;
+}
+
+.turnus-seg-btn {
+  padding: 5px 12px;
+  border-radius: 999px;
+  border: none;
+  background: transparent;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--aero-ink-muted);
+  cursor: pointer;
+  transition: all 0.18s ease;
+}
+
+.turnus-seg-btn:hover {
+  color: #0284c7;
+}
+
+.turnus-seg-btn.active {
+  background: #ffffff;
+  color: #0284c7;
+  font-weight: 800;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.14);
+}
+
+.turnus-seg-btn.active.turnus-btn-a {
+  color: #0284c7;
+}
+
+.turnus-seg-btn.active.turnus-btn-b {
+  color: #8b5cf6;
+}
+
+/* Turnus Select Modal (Single Event) */
+.modal-turnus-select {
+  max-width: 440px;
+  border-radius: 18px;
+}
+
+.turnus-select-body {
+  padding: 18px 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.turnus-select-sub {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--aero-ink-muted);
+  margin-top: -4px;
+}
+
+.turnus-options {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.turnus-opt-btn {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 12px 16px;
+  border-radius: var(--radius-md);
+  border: 1.5px solid rgba(0, 132, 214, 0.18);
+  background: #ffffff;
+  cursor: pointer;
+  text-align: left;
+  transition: all 0.18s ease;
+}
+
+.turnus-opt-btn:hover {
+  border-color: #0284c7;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 14px rgba(2, 132, 199, 0.12);
+}
+
+.turnus-opt-btn.active {
+  background: linear-gradient(180deg, #f0f9ff 0%, #e0f2fe 100%);
+  border-color: #0284c7;
+  box-shadow: 0 4px 16px rgba(2, 132, 199, 0.2);
+}
+
+.turnus-opt-btn .opt-icon {
+  font-size: 1.4rem;
+  line-height: 1;
+}
+
+.turnus-opt-btn .opt-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.turnus-opt-btn .opt-info strong {
+  font-size: 0.9rem;
+  font-weight: 800;
+  color: #032b4e;
+}
+
+.turnus-opt-btn .opt-info span {
+  font-size: 0.74rem;
+  color: var(--aero-ink-muted);
+}
+
+.turnus-opt-btn .opt-check {
+  font-size: 1.1rem;
+  font-weight: 900;
+  color: #0284c7;
+  opacity: 0;
+  transform: scale(0.6);
+  transition: all 0.18s ease;
+}
+
+.turnus-opt-btn.active .opt-check {
+  opacity: 1;
+  transform: scale(1);
+}
+
+/* Dark Mode Overrides */
+body.dark-mode .tt-turnus-pill.turnus-all {
+  background: rgba(0, 217, 255, 0.15);
+  color: #7dd3fc;
+  border-color: rgba(0, 217, 255, 0.3);
+}
+
+body.dark-mode .turnus-manager-row {
+  background: rgba(10, 28, 52, 0.88);
+  border-color: rgba(0, 217, 255, 0.22);
+}
+
+body.dark-mode .turnus-manager-row:hover {
+  border-color: #00d9ff;
+  box-shadow: 0 4px 16px rgba(0, 217, 255, 0.2);
+}
+
+body.dark-mode .turnus-row-title {
+  color: #e0f2fe;
+}
+
+body.dark-mode .turnus-row-sub {
+  color: #7dd3fc;
+}
+
+body.dark-mode .turnus-segmented-control {
+  background: rgba(0, 0, 0, 0.4);
+  border-color: rgba(0, 217, 255, 0.2);
+}
+
+body.dark-mode .turnus-seg-btn {
+  color: #7dd3fc;
+}
+
+body.dark-mode .turnus-seg-btn.active {
+  background: rgba(0, 217, 255, 0.25);
+  color: #ffffff;
+  box-shadow: 0 2px 10px rgba(0, 217, 255, 0.4);
+}
+
+body.dark-mode .modal-turnus-select {
+  background: rgba(8, 26, 50, 0.96);
+  border-color: rgba(0, 217, 255, 0.3);
+}
+
+body.dark-mode .turnus-opt-btn {
+  background: rgba(14, 38, 68, 0.85);
+  border-color: rgba(0, 217, 255, 0.22);
+}
+
+body.dark-mode .turnus-opt-btn:hover {
+  background: rgba(20, 56, 100, 0.95);
+  border-color: #00d9ff;
+}
+
+body.dark-mode .turnus-opt-btn.active {
+  background: rgba(0, 217, 255, 0.18);
+  border-color: #00d9ff;
+  box-shadow: 0 4px 18px rgba(0, 217, 255, 0.3);
+}
+
+body.dark-mode .turnus-opt-btn .opt-info strong {
+  color: #e0f2fe;
+}
+
+body.dark-mode .turnus-opt-btn .opt-info span {
+  color: #7dd3fc;
+}
+
+body.dark-mode .turnus-opt-btn .opt-check {
+  color: #00d9ff;
+}

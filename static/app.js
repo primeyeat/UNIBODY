@@ -844,10 +844,31 @@ function renderTimetable() {
         ? `👆 Klick = Diesen Kurs ('${linkedCourseToken}') sofort in Schritt 1 auswählen · Shift+Klick = Pausieren · Rechtsklick = Löschen`
         : "Shift+Klick zum Pausieren/Aktivieren · Rechtsklick zum Löschen";
 
+      let turnusLabel = "🔄 Jede Woche";
+      let turnusCls = "turnus-all";
+      if (ev.week_type === "A") {
+        turnusLabel = "🅰️ Woche A";
+        turnusCls = "turnus-a";
+      } else if (ev.week_type === "B") {
+        turnusLabel = "🅱️ Woche B";
+        turnusCls = "turnus-b";
+      }
+
       el.innerHTML = `
         <div class="tt-ev-title">${isSelectedCourse ? "🎯 " : ""}${ev.title}</div>
         <div class="tt-ev-time">${ev.start_time}–${ev.end_time} ${ev.room ? `· ${ev.room}` : ""}</div>
+        <div style="display:flex;align-items:center;gap:4px;margin-top:3px;">
+          <button type="button" class="tt-turnus-pill ${turnusCls}" title="Klick = Turnus ändern (Jede Woche / Woche A / Woche B)">
+            ${turnusLabel}
+          </button>
+        </div>
       `;
+
+      el.querySelector(".tt-turnus-pill")?.addEventListener("click", (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        openTurnusSelectModal(ev);
+      });
 
       el.addEventListener("click", async (e) => {
         e.stopPropagation();
@@ -1427,6 +1448,7 @@ function renderFutureCalAgenda(weeks) {
 }
 
 function openEventDetailModal(ev, dayObj) {
+  currentTurnusEditingEv = ev;
   const modal = document.getElementById("modalEventDetail");
   if (!modal) return;
 
@@ -1527,6 +1549,142 @@ function initFutureCalEvents() {
       }
     });
   }
+}
+
+/* ==========================================================================
+   TURNUS MANAGER & TURNUS SELECTION LOGIC
+   ========================================================================== */
+
+let currentTurnusEditingEv = null;
+
+async function setScheduleTurnus(evId, weekType) {
+  const cleanWt = (weekType === "all" || !weekType) ? null : weekType;
+  const res = await apiPost("/api/schedule/set-turnus", {
+    id: evId,
+    week_type: cleanWt
+  });
+  if (res.ok) {
+    appState.schedule = res.schedule;
+    if (appState.currentCourse) {
+      await verifyAndRankCourse(appState.currentCourse.course_id);
+    } else {
+      renderTimetable();
+    }
+    renderFutureCalendar();
+    renderTurnusManagerList();
+    if (currentTurnusEditingEv && String(currentTurnusEditingEv.id) === String(evId)) {
+      currentTurnusEditingEv.week_type = cleanWt;
+      const turnusEl = document.getElementById("evDetailTurnus");
+      const wtEl = document.getElementById("evDetailWeekType");
+      if (turnusEl) turnusEl.textContent = cleanWt ? "14-tägig im Semester" : "Wöchentlich";
+      if (wtEl) wtEl.textContent = cleanWt ? `Findet nur in Woche ${cleanWt} statt` : "Findet jede Woche statt";
+    }
+  }
+  return res;
+}
+
+function openTurnusSelectModal(ev) {
+  currentTurnusEditingEv = ev;
+  const modal = document.getElementById("modalTurnusSelect");
+  if (!modal) return;
+
+  const titleEl = document.getElementById("turnusSelectTitle");
+  const badgeEl = document.getElementById("turnusSelectBadge");
+  const subEl = document.getElementById("turnusSelectSub");
+
+  if (titleEl) titleEl.textContent = ev.title;
+  if (badgeEl) {
+    badgeEl.textContent = ev.type === "enrolled_exercise" ? "Übungsgruppe" : "Vorlesung";
+  }
+  if (subEl) {
+    const dayName = ev.day_name || DAY_NAMES[ev.day] || "Termin";
+    subEl.textContent = `${dayName}, ${ev.start_time}–${ev.end_time} Uhr ${ev.room ? `(${ev.room})` : ""}`;
+  }
+
+  const currentWt = ev.week_type || "all";
+  document.getElementById("turnusOptAll")?.classList.toggle("active", currentWt === "all");
+  document.getElementById("turnusOptA")?.classList.toggle("active", currentWt === "A");
+  document.getElementById("turnusOptB")?.classList.toggle("active", currentWt === "B");
+
+  modal.classList.remove("hidden");
+}
+
+function renderTurnusManagerList() {
+  const listEl = document.getElementById("turnusManagerList");
+  if (!listEl) return;
+  listEl.innerHTML = "";
+
+  if (!appState.schedule || appState.schedule.length === 0) {
+    listEl.innerHTML = `<div class="empty-state">Keine Termine im Stundenplan vorhanden.</div>`;
+    return;
+  }
+
+  const sorted = [...appState.schedule].sort((a, b) => {
+    if (Number(a.day) !== Number(b.day)) return Number(a.day) - Number(b.day);
+    return timeToMinutes(a.start_time) - timeToMinutes(b.start_time);
+  });
+
+  sorted.forEach((ev) => {
+    const row = document.createElement("div");
+    row.className = "turnus-manager-row";
+
+    const currentWt = ev.week_type || "all";
+    const dayStr = ev.day_name || (DAY_NAMES[ev.day] || "Termin");
+
+    row.innerHTML = `
+      <div class="turnus-row-info">
+        <div class="turnus-row-title" title="${ev.title}">${ev.title}</div>
+        <div class="turnus-row-sub">
+          <span>📅 ${dayStr} ${ev.start_time}–${ev.end_time}</span>
+          ${ev.room ? `<span>· 📍 ${ev.room}</span>` : ""}
+        </div>
+      </div>
+      <div class="turnus-segmented-control">
+        <button type="button" class="turnus-seg-btn ${currentWt === 'all' ? 'active' : ''}" data-wt="all">
+          🔄 Jede Woche
+        </button>
+        <button type="button" class="turnus-seg-btn turnus-btn-a ${currentWt === 'A' ? 'active' : ''}" data-wt="A">
+          🅰️ Woche A
+        </button>
+        <button type="button" class="turnus-seg-btn turnus-btn-b ${currentWt === 'B' ? 'active' : ''}" data-wt="B">
+          🅱️ Woche B
+        </button>
+      </div>
+    `;
+
+    row.querySelectorAll(".turnus-seg-btn").forEach((btn) => {
+      btn.addEventListener("click", async () => {
+        const wt = btn.dataset.wt;
+        await setScheduleTurnus(ev.id, wt);
+      });
+    });
+
+    listEl.appendChild(row);
+  });
+}
+
+function initTurnusEvents() {
+  ["all", "A", "B"].forEach((wt) => {
+    const btn = document.getElementById(`turnusOpt${wt}`);
+    if (btn) {
+      btn.addEventListener("click", async () => {
+        if (!currentTurnusEditingEv) return;
+        await setScheduleTurnus(currentTurnusEditingEv.id, wt);
+        document.getElementById("modalTurnusSelect")?.classList.add("hidden");
+      });
+    }
+  });
+
+  document.getElementById("btnOpenTurnusManagerModal")?.addEventListener("click", () => {
+    renderTurnusManagerList();
+    document.getElementById("modalTurnusManager")?.classList.remove("hidden");
+  });
+
+  document.getElementById("btnEvDetailChangeTurnus")?.addEventListener("click", () => {
+    if (currentTurnusEditingEv) {
+      openTurnusSelectModal(currentTurnusEditingEv);
+    }
+  });
 }
 
 /* PAGE ROUTING (STUNDENPLAN & KURSE, KALENDER, EINSTELLUNGEN) */
@@ -1676,6 +1834,7 @@ function initDrawerMenu() {
 function bindUIEvents() {
   initDrawerMenu();
   initFutureCalEvents();
+  initTurnusEvents();
 
   // Sync already enrolled groups from open browser tabs
   const syncEnrolledBtn = document.getElementById("btnSyncEnrolledGroups");
@@ -1961,6 +2120,7 @@ function bindUIEvents() {
   // Add Manual Schedule Event
   document.getElementById("formAddEvent").addEventListener("submit", async (e) => {
     e.preventDefault();
+    const wtVal = document.getElementById("evWeekType")?.value || "all";
     const ev = {
       title: document.getElementById("evTitle").value,
       day: Number(document.getElementById("evDay").value),
@@ -1968,6 +2128,7 @@ function bindUIEvents() {
       end_time: document.getElementById("evEnd").value,
       room: document.getElementById("evRoom").value,
       type: "lecture",
+      week_type: wtVal === "all" ? null : wtVal,
     };
     const res = await apiPost("/api/schedule/add", { event: ev });
     if (res.ok) {

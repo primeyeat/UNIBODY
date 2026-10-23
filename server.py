@@ -491,6 +491,13 @@ class CAUBotRequestHandler(SimpleHTTPRequestHandler):
         if path == "/api/schedule/add":
             ev = body.get("event", {})
             day_idx = int(ev.get("day", 0))
+            wt = ev.get("week_type")
+            if wt in ("all", "", None, "null"):
+                wt = None
+            elif str(wt).upper() in ("A", "B"):
+                wt = str(wt).upper()
+            else:
+                wt = None
             new_ev = {
                 "id": ev.get("id") or f"manual-{uuid.uuid4().hex[:8]}",
                 "title": ev.get("title", "Veranstaltung").strip() or "Veranstaltung",
@@ -500,12 +507,36 @@ class CAUBotRequestHandler(SimpleHTTPRequestHandler):
                 "end_time": ev.get("end_time", "11:45"),
                 "room": ev.get("room", ""),
                 "type": ev.get("type", "lecture"),
+                "week_type": wt,
                 "enabled": True,
             }
             with STATE_LOCK:
                 APP_STATE["schedule"].append(new_ev)
                 save_state(APP_STATE)
             session_mgr.add_log("INFO", f"Termin hinzugefügt: {new_ev['title']} ({new_ev['day_name']} {new_ev['start_time']}–{new_ev['end_time']})")
+            self._send_json({"ok": True, "schedule": APP_STATE["schedule"]})
+            return
+
+        if path == "/api/schedule/set-turnus":
+            ev_id = str(body.get("id") or "")
+            week_type = body.get("week_type")
+            if week_type in ("all", "", None, "null"):
+                week_type = None
+            elif str(week_type).upper() in ("A", "B"):
+                week_type = str(week_type).upper()
+            else:
+                week_type = None
+
+            with STATE_LOCK:
+                matched_title = ""
+                for e in APP_STATE["schedule"]:
+                    if str(e.get("id")) == ev_id:
+                        e["week_type"] = week_type
+                        matched_title = e.get("title", ev_id)
+                        break
+                save_state(APP_STATE)
+            turnus_label = f"Woche {week_type}" if week_type else "Jede Woche"
+            session_mgr.add_log("INFO", f"Turnus für '{matched_title}' auf '{turnus_label}' gesetzt.")
             self._send_json({"ok": True, "schedule": APP_STATE["schedule"]})
             return
 

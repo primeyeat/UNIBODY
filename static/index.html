@@ -10,7 +10,7 @@
   <link rel="icon" type="image/png" sizes="192x192" href="/favicon-192.png" />
   <link rel="icon" type="image/x-icon" href="/favicon.ico" />
   <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
-  <link rel="stylesheet" href="/styles.css?v=9" />
+  <link rel="stylesheet" href="/styles.css?v=10" />
 </head>
 <body>
   <!-- TOP HEADER -->
@@ -179,6 +179,9 @@
             </p>
           </div>
           <div class="calendar-actions">
+            <button type="button" id="btnOpenTurnusManagerModal" class="btn btn-xs btn-outline" title="Turnus aller Vorlesungen (Woche A / B / Jede Woche) anpassen">
+              🔄 Turnus (A / B / Jede)
+            </button>
             <button id="btnOpenIcsModal" class="btn btn-xs btn-outline">
               🧹 UnivIS .ics Import &amp; Bereiniger
             </button>
@@ -421,9 +424,19 @@
             <input type="time" id="evEnd" value="11:45" required />
           </div>
         </div>
-        <div class="form-group">
-          <label>Raum / Gebäude (optional)</label>
-          <input type="text" id="evRoom" placeholder="z. B. CAP3 - Hörsaal 1" />
+        <div class="form-row">
+          <div class="form-group">
+            <label>Raum / Gebäude (optional)</label>
+            <input type="text" id="evRoom" placeholder="z. B. CAP3 - Hörsaal 1" />
+          </div>
+          <div class="form-group">
+            <label>Turnus / Rhythmus</label>
+            <select id="evWeekType">
+              <option value="all">🔄 Jede Woche (Wöchentlich)</option>
+              <option value="A">🅰️ Woche A (14-tägig · ungerade KW)</option>
+              <option value="B">🅱️ Woche B (14-tägig · gerade KW)</option>
+            </select>
+          </div>
         </div>
         <div class="modal-footer">
           <button type="button" class="btn btn-ghost" data-close="modalAddEvent">Abbrechen</button>
@@ -783,6 +796,9 @@
             <strong id="evDetailTurnus">Wöchentlich</strong>
             <span id="evDetailWeekType" class="detail-sub">Jede Woche</span>
           </div>
+          <button type="button" id="btnEvDetailChangeTurnus" class="btn btn-xs btn-outline" style="margin-left:auto;">
+            ✏️ Turnus ändern
+          </button>
         </div>
         <div class="event-detail-row" id="evDetailCourseWrap">
           <span class="detail-icon">🎓</span>
@@ -794,6 +810,73 @@
       </div>
       <div class="modal-footer">
         <button type="button" class="btn btn-primary" data-close="modalEventDetail">Fertig</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: TURNUS-MANAGER (ALLE VORLESUNGEN & TERMINE) -->
+  <div id="modalTurnusManager" class="modal-backdrop hidden">
+    <div class="modal modal-large">
+      <div class="modal-header">
+        <div class="modal-title-wrap">
+          <span class="aero-badge week-badge-a">Vorlesungs-Rhythmus</span>
+          <h3>🔄 Turnus der Vorlesungen &amp; Termine festlegen</h3>
+        </div>
+        <button class="btn-close" data-close="modalTurnusManager">&times;</button>
+      </div>
+      <div class="modal-body">
+        <p class="helper-text" style="margin-bottom: 16px;">
+          Wähle für jede Vorlesung oder jeden Termin, ob er <strong>jede Woche</strong>, nur in <strong>Woche A</strong> (ungerade Kalenderwochen: KW 43, 45, 47, 49) oder nur in <strong>Woche B</strong> (gerade Kalenderwochen: KW 44, 46, 48, 50) stattfindet. Änderungen werden sofort gespeichert und synchronisieren automatisch den Stundenplan sowie den 8-Wochen Zukunftskalender!
+        </p>
+        <div class="turnus-manager-list" id="turnusManagerList"></div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-primary" data-close="modalTurnusManager">Fertig</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: TURNUS-AUSWAHL (EINZELNER TERMIN) -->
+  <div id="modalTurnusSelect" class="modal-backdrop hidden">
+    <div class="modal modal-turnus-select">
+      <div class="modal-header">
+        <div class="modal-title-wrap">
+          <span id="turnusSelectBadge" class="aero-badge week-badge-a">Turnus wählen</span>
+          <h3 id="turnusSelectTitle">VL Vorlesung</h3>
+        </div>
+        <button class="btn-close" data-close="modalTurnusSelect">&times;</button>
+      </div>
+      <div class="modal-body turnus-select-body">
+        <p class="turnus-select-sub" id="turnusSelectSub">Wähle den Rhythmus dieser Vorlesung:</p>
+        <div class="turnus-options">
+          <button type="button" class="turnus-opt-btn" data-turnus="all" id="turnusOptAll">
+            <div class="opt-icon">🔄</div>
+            <div class="opt-info">
+              <strong>Jede Woche</strong>
+              <span>Findet wöchentlich in jeder Woche statt (Standard)</span>
+            </div>
+            <span class="opt-check">✓</span>
+          </button>
+          <button type="button" class="turnus-opt-btn" data-turnus="A" id="turnusOptA">
+            <div class="opt-icon">🅰️</div>
+            <div class="opt-info">
+              <strong>Woche A (14-tägig)</strong>
+              <span>Nur ungerade Kalenderwochen (KW 43, 45, 47, 49...)</span>
+            </div>
+            <span class="opt-check">✓</span>
+          </button>
+          <button type="button" class="turnus-opt-btn" data-turnus="B" id="turnusOptB">
+            <div class="opt-icon">🅱️</div>
+            <div class="opt-info">
+              <strong>Woche B (14-tägig)</strong>
+              <span>Nur gerade Kalenderwochen (KW 44, 46, 48, 50...)</span>
+            </div>
+            <span class="opt-check">✓</span>
+          </button>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-ghost" data-close="modalTurnusSelect">Schließen</button>
       </div>
     </div>
   </div>
@@ -839,6 +922,6 @@
     </div>
   </aside>
 
-  <script src="/app.js?v=9"></script>
+  <script src="/app.js?v=10"></script>
 </body>
 </html>
