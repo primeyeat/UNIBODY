@@ -1169,6 +1169,19 @@ body.dark-mode .tt-event.candidate-enrolled {
   font-size: 0.75rem;
 }
 
+.btn-sync-prominent {
+  padding: 8px 18px;
+  font-size: 0.86rem;
+  font-weight: 800;
+  letter-spacing: 0.2px;
+  box-shadow: 0 4px 14px rgba(0, 132, 219, 0.4), inset 0 1px 1.5px rgba(255, 255, 255, 0.95);
+  transition: all 0.2s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.btn-sync-prominent:hover {
+  transform: translateY(-1.5px) scale(1.02);
+  box-shadow: 0 6px 18px rgba(0, 149, 245, 0.5), inset 0 1px 2px #ffffff;
+}
+
 /* Signature Aqua Blue Glossy Pill */
 .btn-primary {
   background: linear-gradient(

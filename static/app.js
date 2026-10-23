@@ -2471,35 +2471,44 @@ function bindUIEvents() {
     document.getElementById("modalCustomCourse").classList.remove("hidden");
   });
 
-  document.getElementById("btnEditCurrentGroups").addEventListener("click", () => {
-    if (!appState.currentCourse) {
-      alert("Bitte wähle zuerst oben in Schritt 1 einen Kurs aus!");
-      return;
-    }
-    document.getElementById("editGroupsTitle").textContent = `✏️ Übungsgruppen für ${appState.currentCourse.course_id} anpassen / aus LMS einfügen`;
-    const currentLines = (appState.currentCourse.groups || []).map(
-      (g) => `${g.name}`
-    );
-    document.getElementById("editGroupsTextarea").value = currentLines.join("\n");
-    document.getElementById("modalEditGroups").classList.remove("hidden");
-  });
-
-  document.getElementById("formEditGroups").addEventListener("submit", async (e) => {
-    e.preventDefault();
-    if (!appState.currentCourse) return;
-    const rawText = document.getElementById("editGroupsTextarea").value;
-    const res = await apiPost("/api/course/update-groups", {
-      course_id: appState.currentCourse.course_id,
-      raw_text: rawText,
+  const btnEditCurrentGroups = document.getElementById("btnEditCurrentGroups");
+  if (btnEditCurrentGroups) {
+    btnEditCurrentGroups.addEventListener("click", () => {
+      if (!appState.currentCourse) {
+        alert("Bitte wähle zuerst oben in Schritt 1 einen Kurs aus!");
+        return;
+      }
+      const titleEl = document.getElementById("editGroupsTitle");
+      if (titleEl) titleEl.textContent = `✏️ Übungsgruppen für ${appState.currentCourse.course_id} anpassen / aus LMS einfügen`;
+      const currentLines = (appState.currentCourse.groups || []).map((g) => `${g.name}`);
+      const ta = document.getElementById("editGroupsTextarea");
+      if (ta) ta.value = currentLines.join("\n");
+      const m = document.getElementById("modalEditGroups");
+      if (m) m.classList.remove("hidden");
     });
-    if (!res.ok) {
-      alert(res.error || "Fehler beim Parsen der Gruppen.");
-      return;
-    }
-    document.getElementById("modalEditGroups").classList.add("hidden");
-    await fetchInitialState();
-    await verifyAndRankCourse(appState.currentCourse.course_id);
-  });
+  }
+
+  const formEditGroups = document.getElementById("formEditGroups");
+  if (formEditGroups) {
+    formEditGroups.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      if (!appState.currentCourse) return;
+      const ta = document.getElementById("editGroupsTextarea");
+      const rawText = ta ? ta.value : "";
+      const res = await apiPost("/api/course/update-groups", {
+        course_id: appState.currentCourse.course_id,
+        raw_text: rawText,
+      });
+      if (!res.ok) {
+        alert(res.error || "Fehler beim Parsen der Gruppen.");
+        return;
+      }
+      const m = document.getElementById("modalEditGroups");
+      if (m) m.classList.add("hidden");
+      await fetchInitialState();
+      await verifyAndRankCourse(appState.currentCourse.course_id);
+    });
+  }
 
   document.querySelectorAll("[data-close]").forEach((btn) => {
     btn.addEventListener("click", () => {

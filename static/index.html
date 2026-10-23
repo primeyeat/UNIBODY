@@ -10,7 +10,7 @@
   <link rel="icon" type="image/png" sizes="192x192" href="/favicon-192.png" />
   <link rel="icon" type="image/x-icon" href="/favicon.ico" />
   <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
-  <link rel="stylesheet" href="/styles.css?v=15" />
+  <link rel="stylesheet" href="/styles.css?v=16" />
 </head>
 <body>
   <!-- TOP HEADER -->
@@ -136,12 +136,9 @@
             <span class="step-pill">SCHRITT 2</span>
             <h2>Berechnetes Übungsgruppen-Ranking &amp; Direkteinschreibung</h2>
           </div>
-          <div class="mode-switch" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
-            <button type="button" id="btnSyncEnrolledGroups" class="btn btn-xs btn-primary" title="Öffnet in Chrome automatisch deine Gruppen-Übersicht auf lms.uni-kiel.de (OpenOlat) und elearn.informatik.uni-kiel.de (Moodle), liest alle bereits gebuchten Übungsgruppen samt Uhrzeit & Raum aus und trägt sie in deinen Stundenplan ein!">
+          <div class="mode-switch">
+            <button type="button" id="btnSyncEnrolledGroups" class="btn btn-primary btn-sync-prominent" title="Öffnet in Chrome automatisch deine Gruppen-Übersicht auf lms.uni-kiel.de (OpenOlat) und elearn.informatik.uni-kiel.de (Moodle), liest alle bereits gebuchten Übungsgruppen samt Uhrzeit &amp; Raum aus und trägt sie in deinen Stundenplan ein!">
               🔄 UNIBODY Deep-Sync (Gebuchte Übungen holen)
-            </button>
-            <button type="button" id="btnEditCurrentGroups" class="btn btn-xs btn-outline" title="Übungsgruppen dieses Kurses direkt aus OpenOlat / Moodle / UnivIS einfügen oder anpassen">
-              ✏️ Gruppenzeiten anpassen
             </button>
           </div>
         </div>
@@ -522,29 +519,6 @@
     </div>
   </div>
 
-  <!-- MODAL 4: EDIT / PASTE REAL LMS GROUPS FOR CURRENT COURSE -->
-  <div id="modalEditGroups" class="modal-backdrop hidden">
-    <div class="modal modal-large">
-      <div class="modal-header">
-        <h3 id="editGroupsTitle">✏️ Übungsgruppen aus OpenOlat / Moodle / UnivIS anpassen</h3>
-        <button class="btn-close" data-close="modalEditGroups">&times;</button>
-      </div>
-      <form id="formEditGroups" class="modal-body">
-        <p class="helper-text">
-          Kopiere einfach die echten Übungsgruppen-Zeilen aus deiner OpenOlat- oder Moodle-Einschreibeseite hier hinein (oder passe die bestehenden Zeiten an).
-          Der Parser erkennt Wochentag, Uhrzeit (auch <code>c.t.</code>), Raum und freie Plätze automatisch!
-        </p>
-        <div class="form-group">
-          <label>Angebotene Übungsgruppen (eine Gruppe pro Zeile):</label>
-          <textarea id="editGroupsTextarea" rows="7" required></textarea>
-        </div>
-        <div class="modal-footer">
-          <button type="button" class="btn btn-ghost" data-close="modalEditGroups">Abbrechen</button>
-          <button type="submit" class="btn btn-primary">✅ Echte Gruppen speichern &amp; neu berechnen</button>
-        </div>
-      </form>
-    </div>
-  </div>
 
   <!-- MODAL 5: ENROLLMENT SUCCESS NOTIFICATION POPUP -->
   <div id="modalEnrollmentSuccess" class="modal-backdrop hidden">
@@ -911,6 +885,6 @@
     </div>
   </aside>
 
-  <script src="/app.js?v=15"></script>
+  <script src="/app.js?v=16"></script>
 </body>
 </html>
