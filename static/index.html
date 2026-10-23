@@ -10,7 +10,7 @@
   <link rel="icon" type="image/png" sizes="192x192" href="/favicon-192.png" />
   <link rel="icon" type="image/x-icon" href="/favicon.ico" />
   <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
-  <link rel="stylesheet" href="/styles.css?v=14" />
+  <link rel="stylesheet" href="/styles.css?v=15" />
 </head>
 <body>
   <!-- TOP HEADER -->
@@ -143,10 +143,6 @@
             <button type="button" id="btnEditCurrentGroups" class="btn btn-xs btn-outline" title="Übungsgruppen dieses Kurses direkt aus OpenOlat / Moodle / UnivIS einfügen oder anpassen">
               ✏️ Gruppenzeiten anpassen
             </button>
-            <select id="enrollModeSelect">
-              <option value="direct">⚡ Sofort-Einschreibung (Bestplatz #1)</option>
-              <option value="priority">📊 Verteilungsverfahren (Prioritäten 1–3 eintragen)</option>
-            </select>
           </div>
         </div>
 
@@ -506,16 +502,9 @@
           </div>
         </div>
         <div class="form-row">
-          <div class="form-group" style="flex:2">
+          <div class="form-group" style="flex:1">
             <label>Vollständiger Kurstitel *</label>
             <input type="text" id="custTitle" placeholder="z. B. inf-ADS: Algorithmen und Datenstrukturen" required />
-          </div>
-          <div class="form-group">
-            <label>Anmelde-Modus</label>
-            <select id="custMode">
-              <option value="direct">Direkt-Einschreibung (FCFS)</option>
-              <option value="priority">Verteilungsverfahren (Prio 1-3)</option>
-            </select>
           </div>
         </div>
         <div class="form-group">
@@ -922,6 +911,6 @@
     </div>
   </aside>
 
-  <script src="/app.js?v=14"></script>
+  <script src="/app.js?v=15"></script>
 </body>
 </html>

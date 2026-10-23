@@ -283,7 +283,7 @@ public class AppState: ObservableObject {
                 platformHost: "lms.uni-kiel.de",
                 platformBadge: "🏛️ lms.uni-kiel.de",
                 url: "https://lms.uni-kiel.de/url/RepositoryEntry/5804556477",
-                enrollmentMode: "priority",
+                enrollmentMode: "sniper",
                 enrollmentOpensAt: "2026-10-19T09:00:00",
                 groups: [
                     ExerciseGroup(groupId: "060098", name: "Ü:MathInfA (Di 16:15–17:45 · HHP6)", day: 1, dayName: "Dienstag", startTime: "16:15", endTime: "17:45", room: "HHP6 - R.EG.004", tutor: "UnivIS 060098", spotsFree: 13, spotsTotal: 40),
@@ -305,7 +305,7 @@ public class AppState: ObservableObject {
                 platformHost: "elearn.informatik.uni-kiel.de",
                 platformBadge: "⚡ elearn.informatik.uni-kiel.de",
                 url: "https://elearn.informatik.uni-kiel.de/course/view.php?id=382",
-                enrollmentMode: "priority",
+                enrollmentMode: "sniper",
                 enrollmentOpensAt: "2026-10-23T10:00:00",
                 groups: [
                     ExerciseGroup(groupId: "080058-g1", name: "Große Übung 01 (Di 10:15–11:45)", day: 1, dayName: "Dienstag", startTime: "10:15", endTime: "11:45", room: "CAP3 - Hörsaal 1", tutor: "Wilke", spotsFree: 85, spotsTotal: 90),

@@ -329,7 +329,8 @@ async function verifyAndRankCourse(queryId) {
     else delete appState.enrolledGroups[ck];
   }
   appState.rankedGroups = res.ranked_groups || [];
-  document.getElementById("enrollModeSelect").value = res.course.enrollment_mode === "priority" ? "priority" : "direct";
+  const modeSel = document.getElementById("enrollModeSelect");
+  if (modeSel) modeSel.value = "direct";
 
   const isElearnInf = res.course.platform_id === "elearn_inf";
   const unibodyPillStyle = isElearnInf
@@ -2633,7 +2634,7 @@ function bindUIEvents() {
         univis_id: document.getElementById("custUnivisId").value.trim(),
         olat_repo_id: document.getElementById("custOlatId").value.trim(),
         title: document.getElementById("custTitle").value.trim(),
-        enrollment_mode: document.getElementById("custMode").value,
+        enrollment_mode: "sniper",
         groups: lines,
       },
     };
@@ -2697,7 +2698,8 @@ async function triggerEnrollment() {
     alert("Bitte zuerst eine Kurs-ID in Schritt 1 verifizieren!");
     return;
   }
-  const mode = document.getElementById("enrollModeSelect").value;
+  const modeSel = document.getElementById("enrollModeSelect");
+  const mode = modeSel ? modeSel.value : "sniper";
   const chkFallback = document.getElementById("chkSimulateFallback");
   const simulateFallback = chkFallback ? chkFallback.checked : false;
 

@@ -6,9 +6,7 @@ Supports:
    is verified and scraped with 100% authentic CAU UnivIS data!
 2. Interactive Google Chrome / Chromium Login via DevTools Protocol (CDP) so Shibboleth SSO & 2FA work seamlessly.
 3. Strict ID/Module Code verification (checks exact Modulcode / UnivIS-Kennnummer / OpenOlat Repository-ID).
-4. Dual-Mode Execution:
-   - Mode A: First-Come-First-Served Sniper (high-frequency polling / countdown trigger -> instant click on Rank 1, automatic fallback to Rank 2/3 if full).
-   - Mode B: Priority Allocator (Verteilungsverfahren -> fills out Rank 1, 2, 3 dropdowns/sliders automatically).
+4. First-Come-First-Served Sniper (high-frequency polling / countdown trigger -> instant click on Rank 1, automatic fallback to Rank 2/3 if full).
 """
 
 import os
@@ -193,7 +191,7 @@ BUILTIN_CAU_COURSES: Dict[str, Dict[str, Any]] = {
         "lecturer": "Dr. Barbara Langfeld",
         "semester": "WiSe 2026/27 (UnivIS 2026w)",
         "platform": "OpenOlat (lms.uni-kiel.de)",
-        "enrollment_mode": "priority",
+        "enrollment_mode": "sniper",
         "enrollment_opens_at": "2026-10-19T09:00:00",
         "url": "https://lms.uni-kiel.de/auth/RepositoryEntry/5804556477",
         "verified_tokens": [
