@@ -1562,6 +1562,273 @@ function renderFutureCalAgenda(weeks) {
   });
 }
 
+/**
+ * CAU KIEL CAMPUS LOCATION RESOLVER
+ * Maps CAU Kiel building and room abbreviations (OS75, CAP3, LMS6, HHP6, OHP5, LMS2, LMS4, LMS8, WSP3, Audimax, etc.)
+ * to their exact building names, street addresses, campus zones, and precise GPS coordinates.
+ */
+const CAU_CAMPUS_LOCATIONS = [
+  {
+    id: "OS75",
+    regex: /\b(os\s*75|olshausenstr(?:a\u00dfe)?\.?\s*75)\b/i,
+    code: "OS 75",
+    name: "Hörsaalgebäude OS 75",
+    address: "Olshausenstraße 75, 24118 Kiel",
+    area: "Campus Nord",
+    lat: 54.343602,
+    lon: 10.117215,
+  },
+  {
+    id: "CAP3",
+    regex: /\b(cap\s*3|christian-albrechts-platz\s*3|murmann)\b/i,
+    code: "CAP 3",
+    name: "Hörsaalgebäude CAP 3",
+    address: "Christian-Albrechts-Platz 3, 24118 Kiel",
+    area: "Campus Mitte (Hauptcampus)",
+    lat: 54.338464,
+    lon: 10.121958,
+  },
+  {
+    id: "CAP2",
+    regex: /\b(cap\s*2|audimax|frederik-paulsen|paulsen)\b/i,
+    code: "CAP 2 (Audimax)",
+    name: "Audimax (Auditorium Maximum)",
+    address: "Christian-Albrechts-Platz 2, 24118 Kiel",
+    area: "Campus Mitte (Hauptcampus)",
+    lat: 54.338236,
+    lon: 10.123757,
+  },
+  {
+    id: "CAP4",
+    regex: /\b(cap\s*4|christian-albrechts-platz\s*4)\b/i,
+    code: "CAP 4",
+    name: "Universitäts-Hochhaus CAP 4",
+    address: "Christian-Albrechts-Platz 4, 24118 Kiel",
+    area: "Campus Mitte",
+    lat: 54.338920,
+    lon: 10.121980,
+  },
+  {
+    id: "LMS8",
+    regex: /\b(lms\s*8|ludewig-meyn-str(?:a\u00dfe)?\.?\s*8|cip|informatik)\b/i,
+    code: "LMS 8",
+    name: "Institut für Informatik LMS 8",
+    address: "Ludewig-Meyn-Straße 8, 24118 Kiel",
+    area: "Campus West (Informatik)",
+    lat: 54.337512,
+    lon: 10.121552,
+  },
+  {
+    id: "LMS6",
+    regex: /\b(lms\s*6|ludewig-meyn-str(?:a\u00dfe)?\.?\s*6)\b/i,
+    code: "LMS 6",
+    name: "Geowissenschaften LMS 6",
+    address: "Ludewig-Meyn-Straße 6, 24118 Kiel",
+    area: "Campus West",
+    lat: 54.337680,
+    lon: 10.121570,
+  },
+  {
+    id: "LMS4",
+    regex: /\b(lms\s*4|ludewig-meyn-str(?:a\u00dfe)?\.?\s*4)\b/i,
+    code: "LMS 4",
+    name: "Mathematik & Informatik LMS 4",
+    address: "Ludewig-Meyn-Straße 4, 24118 Kiel",
+    area: "Campus West",
+    lat: 54.337850,
+    lon: 10.121600,
+  },
+  {
+    id: "LMS2",
+    regex: /\b(lms\s*2|ludewig-meyn-str(?:a\u00dfe)?\.?\s*2)\b/i,
+    code: "LMS 2",
+    name: "Geowissenschaften LMS 2",
+    address: "Ludewig-Meyn-Straße 2, 24118 Kiel",
+    area: "Campus West",
+    lat: 54.337997,
+    lon: 10.121653,
+  },
+  {
+    id: "LMS11",
+    regex: /\b(lms\s*11a?|ludewig-meyn-str(?:a\u00dfe)?\.?\s*11a?)\b/i,
+    code: "LMS 11a",
+    name: "Biologie- & Agrarwissenschaften LMS 11a",
+    address: "Ludewig-Meyn-Straße 11a, 24118 Kiel",
+    area: "Campus West",
+    lat: 54.336900,
+    lon: 10.122100,
+  },
+  {
+    id: "HHP6",
+    regex: /\b(hhp\s*6|heinrich-hecht(?:-platz)?(?:\s*6)?)\b/i,
+    code: "HHP 6",
+    name: "Mathematik-Institut & Physikzentrum (HHP 6)",
+    address: "Heinrich-Hecht-Platz 6, 24118 Kiel",
+    area: "Campus Nordost (Physik & Mathematik)",
+    lat: 54.341271,
+    lon: 10.124403,
+  },
+  {
+    id: "OHP5",
+    regex: /\b(ohp\s*5|otto-hahn(?:-platz)?(?:\s*5)?|chemie\s*ii)\b/i,
+    code: "OHP 5",
+    name: "Chemie II Institut (Otto-Hahn-Platz 5)",
+    address: "Otto-Hahn-Platz 5, 24118 Kiel",
+    area: "Campus Ost",
+    lat: 54.339832,
+    lon: 10.126442,
+  },
+  {
+    id: "OH14",
+    regex: /\b(oh\s*14|os\s*40|olshausenstr(?:a\u00dfe)?\.?\s*40|chemie\s*i)\b/i,
+    code: "OS 40 / OH 14",
+    name: "Chemiezentrum & Geozentrum",
+    address: "Olshausenstraße 40, 24118 Kiel",
+    area: "Campus Nordwest",
+    lat: 54.339409,
+    lon: 10.121270,
+  },
+  {
+    id: "WSP3",
+    regex: /\b(wsp\s*3|wilhelm-seelig(?:-platz)?(?:\s*3)?)\b/i,
+    code: "WSP 3",
+    name: "Seminarräume Wilhelm-Seelig-Platz 3",
+    address: "Wilhelm-Seelig-Platz 3, 24118 Kiel",
+    area: "Campus Nord (WiSo)",
+    lat: 54.339550,
+    lon: 10.123500,
+  },
+  {
+    id: "WSP7",
+    regex: /\b(wsp\s*7|wilhelm-seelig(?:-platz)?(?:\s*7)?|wiso)\b/i,
+    code: "WSP 7",
+    name: "Wirtschafts- & Sozialwissenschaften (WiSo)",
+    address: "Wilhelm-Seelig-Platz 7, 24118 Kiel",
+    area: "Campus Nord (WiSo-Hochhaus)",
+    lat: 54.339718,
+    lon: 10.123655,
+  },
+  {
+    id: "MENSA1",
+    regex: /\b(mensa\s*1|mensa\s*i|westring\s*385)\b/i,
+    code: "Mensa I",
+    name: "Mensa I & AStA",
+    address: "Westring 385, 24118 Kiel",
+    area: "Campus Mitte",
+    lat: 54.337469,
+    lon: 10.122759,
+  },
+  {
+    id: "MENSA2",
+    regex: /\b(mensa\s*2|mensa\s*ii|leibnizstr(?:a\u00dfe)?\.?\s*14)\b/i,
+    code: "Mensa II",
+    name: "Mensa II (Campus Nord)",
+    address: "Leibnizstraße 14, 24118 Kiel",
+    area: "Campus Nord",
+    lat: 54.344400,
+    lon: 10.118600,
+  },
+  {
+    id: "UB",
+    regex: /\b(universit\u00e4tsbibliothek|leibnizstr(?:a\u00dfe)?\.?\s*9)\b/i,
+    code: "UB",
+    name: "Universitätsbibliothek Kiel",
+    address: "Leibnizstraße 9, 24118 Kiel",
+    area: "Campus Mitte",
+    lat: 54.339000,
+    lon: 10.121000,
+  },
+  {
+    id: "SPORT",
+    regex: /\b(sportforum|olshausenstr(?:a\u00dfe)?\.?\s*7[04])\b/i,
+    code: "Sportforum",
+    name: "Universitäts-Sportforum",
+    address: "Olshausenstraße 70-74, 24118 Kiel",
+    area: "Campus Nord",
+    lat: 54.344000,
+    lon: 10.116000,
+  }
+];
+
+function resolveCampusLocation(roomStr) {
+  if (!roomStr || typeof roomStr !== "string") {
+    return {
+      isOnline: false,
+      name: "Christian-Albrechts-Universität zu Kiel",
+      address: "Christian-Albrechts-Platz 4, 24118 Kiel",
+      area: "Campus Mitte",
+      lat: 54.338700,
+      lon: 10.122300,
+      mapsUrl: "https://maps.apple.com/?ll=54.338700,10.122300&q=" + encodeURIComponent("Christian-Albrechts-Universität zu Kiel (Hauptcampus)") + "&z=18"
+    };
+  }
+
+  const s = roomStr.trim();
+  const isOnline = /online|zoom|bbb|bigbluebutton|moodle|virtuell/i.test(s);
+  if (isOnline) {
+    return {
+      isOnline: true,
+      name: "Virtuelle Online-Veranstaltung (Zoom / LMS)",
+      address: "Online im Browser (Keine Anfahrt nötig)",
+      area: "Digitale Lehre",
+      lat: null,
+      lon: null,
+      mapsUrl: null
+    };
+  }
+
+  // 1. Try matching the leading building code prefix first (e.g. "LMS6" in "LMS6 - R.11 / CAP2")
+  const leadingPrefix = s.split(/[\s–\-\/]+/)[0] || "";
+  if (leadingPrefix) {
+    for (const loc of CAU_CAMPUS_LOCATIONS) {
+      if (loc.regex.test(leadingPrefix)) {
+        const pinLabel = `${s} · ${loc.name} (${loc.address})`;
+        const mapsUrl = `https://maps.apple.com/?ll=${loc.lat},${loc.lon}&q=${encodeURIComponent(pinLabel)}&z=18`;
+        return {
+          isOnline: false,
+          name: loc.name,
+          address: loc.address,
+          area: loc.area,
+          lat: loc.lat,
+          lon: loc.lon,
+          mapsUrl: mapsUrl,
+          code: loc.code
+        };
+      }
+    }
+  }
+
+  // 2. Otherwise match anywhere in the room string
+  for (const loc of CAU_CAMPUS_LOCATIONS) {
+    if (loc.regex.test(s)) {
+      const pinLabel = `${s} · ${loc.name} (${loc.address})`;
+      const mapsUrl = `https://maps.apple.com/?ll=${loc.lat},${loc.lon}&q=${encodeURIComponent(pinLabel)}&z=18`;
+      return {
+        isOnline: false,
+        name: loc.name,
+        address: loc.address,
+        area: loc.area,
+        lat: loc.lat,
+        lon: loc.lon,
+        mapsUrl: mapsUrl,
+        code: loc.code
+      };
+    }
+  }
+
+  // Fallback for general CAU Kiel campus
+  const pinLabel = `${s} · Christian-Albrechts-Universität zu Kiel`;
+  return {
+    isOnline: false,
+    name: "Christian-Albrechts-Universität zu Kiel",
+    address: "Christian-Albrechts-Platz 4, 24118 Kiel",
+    area: "Campus Mitte",
+    lat: 54.338700,
+    lon: 10.122300,
+    mapsUrl: `https://maps.apple.com/?ll=54.338700,10.122300&q=${encodeURIComponent(pinLabel)}&z=18`
+  };
+}
+
 function openEventDetailModal(ev, dayObj) {
   currentTurnusEditingEv = ev;
   const modal = document.getElementById("modalEventDetail");
@@ -1589,20 +1856,30 @@ function openEventDetailModal(ev, dayObj) {
     dateEl.textContent = `${dayObj.dayName}, ${dayObj.dayNum}. ${dayObj.monthName} ${dayObj.year}`;
   }
   if (timeEl) timeEl.textContent = `${ev.start_time} – ${ev.end_time} Uhr`;
+
+  const campusLoc = resolveCampusLocation(ev.room);
+
   if (roomEl) roomEl.textContent = ev.room || "Kein Raum angegeben";
   if (bldEl) {
-    bldEl.textContent = ev.room && ev.room.includes("Online")
-      ? "Virtuelle Online-Veranstaltung (Zoom / Moodle)"
-      : "Christian-Albrechts-Universität zu Kiel";
+    if (campusLoc.isOnline) {
+      bldEl.textContent = "💻 Virtuelle Online-Veranstaltung (Zoom / Moodle)";
+    } else {
+      bldEl.textContent = `${campusLoc.name} · ${campusLoc.address} (${campusLoc.area})`;
+    }
   }
 
   if (appleMapsBtn) {
-    appleMapsBtn.onclick = () => {
-      const isOnline = ev.room && ev.room.includes("Online");
-      const query = isOnline ? "Christian-Albrechts-Universität zu Kiel" : `${ev.room} Kiel`;
-      const mapsUrl = `https://maps.apple.com/?q=${encodeURIComponent(query)}`;
-      window.open(mapsUrl, "_blank");
-    };
+    if (campusLoc.isOnline || !campusLoc.mapsUrl) {
+      appleMapsBtn.style.display = "none";
+      appleMapsBtn.removeAttribute("href");
+    } else {
+      appleMapsBtn.style.display = "inline-flex";
+      appleMapsBtn.href = campusLoc.mapsUrl;
+      appleMapsBtn.target = "_blank";
+      appleMapsBtn.rel = "noopener noreferrer";
+      appleMapsBtn.title = `In Apple Maps öffnen: ${campusLoc.name} (${campusLoc.address})`;
+      appleMapsBtn.onclick = null;
+    }
   }
 
   if (turnusEl) {
