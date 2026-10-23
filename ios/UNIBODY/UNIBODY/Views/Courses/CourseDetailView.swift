@@ -142,12 +142,28 @@ public struct CourseDetailView: View {
                             HStack(spacing: 12) {
                                 Label("\(grp.dayName) \(grp.startTime)–\(grp.endTime)", systemImage: "clock")
                                 if !grp.room.isEmpty {
-                                    Button {
-                                        CampusLocationEngine.openInAppleMaps(for: grp.room)
-                                    } label: {
-                                        Label(grp.room, systemImage: "mappin.and.ellipse")
+                                    let resolvedRooms = CampusLocationEngine.resolveAll(room: grp.room).filter { !$0.isOnline }
+                                    if resolvedRooms.count > 1 {
+                                        Menu {
+                                            ForEach(resolvedRooms) { res in
+                                                Button {
+                                                    CampusLocationEngine.openInAppleMaps(forResolved: res)
+                                                } label: {
+                                                    Label("\(res.displayTitle) in Apple Maps", systemImage: "map")
+                                                }
+                                            }
+                                        } label: {
+                                            Label(grp.room, systemImage: "mappin.and.ellipse")
+                                        }
+                                        .buttonStyle(.plain)
+                                    } else {
+                                        Button {
+                                            CampusLocationEngine.openInAppleMaps(for: grp.room)
+                                        } label: {
+                                            Label(grp.room, systemImage: "mappin.and.ellipse")
+                                        }
+                                        .buttonStyle(.plain)
                                     }
-                                    .buttonStyle(.plain)
                                 }
                             }
                             .font(.caption2)
@@ -337,12 +353,28 @@ private struct GroupDetailCard: View {
             HStack(spacing: 12) {
                 Label("\(group.dayName) \(group.startTime)–\(group.endTime)", systemImage: "clock")
                 if !group.room.isEmpty {
-                    Button {
-                        CampusLocationEngine.openInAppleMaps(for: group.room)
-                    } label: {
-                        Label(group.room, systemImage: "mappin.and.ellipse")
+                    let resolvedRooms = CampusLocationEngine.resolveAll(room: group.room).filter { !$0.isOnline }
+                    if resolvedRooms.count > 1 {
+                        Menu {
+                            ForEach(resolvedRooms) { res in
+                                Button {
+                                    CampusLocationEngine.openInAppleMaps(forResolved: res)
+                                } label: {
+                                    Label("\(res.displayTitle) in Apple Maps", systemImage: "map")
+                                }
+                            }
+                        } label: {
+                            Label(group.room, systemImage: "mappin.and.ellipse")
+                        }
+                        .buttonStyle(.plain)
+                    } else {
+                        Button {
+                            CampusLocationEngine.openInAppleMaps(for: group.room)
+                        } label: {
+                            Label(group.room, systemImage: "mappin.and.ellipse")
+                        }
+                        .buttonStyle(.plain)
                     }
-                    .buttonStyle(.plain)
                 }
             }
             .font(.caption)

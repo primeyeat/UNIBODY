@@ -82,18 +82,40 @@ public struct ScheduleEventCard: View {
                 }
                 
                 if !event.room.isEmpty {
-                    Button {
-                        CampusLocationEngine.openInAppleMaps(for: event.room)
-                    } label: {
-                        HStack(spacing: 4) {
-                            Image(systemName: "mappin.and.ellipse")
-                                .font(.caption2)
-                            Text(event.room)
-                                .font(.caption.weight(.medium))
-                                .lineLimit(1)
+                    let resolvedRooms = CampusLocationEngine.resolveAll(room: event.room).filter { !$0.isOnline }
+                    if resolvedRooms.count > 1 {
+                        Menu {
+                            ForEach(resolvedRooms) { res in
+                                Button {
+                                    CampusLocationEngine.openInAppleMaps(forResolved: res)
+                                } label: {
+                                    Label("\(res.displayTitle) in Apple Maps", systemImage: "map")
+                                }
+                            }
+                        } label: {
+                            HStack(spacing: 4) {
+                                Image(systemName: "mappin.and.ellipse")
+                                    .font(.caption2)
+                                Text(event.room)
+                                    .font(.caption.weight(.medium))
+                                    .lineLimit(1)
+                            }
                         }
+                        .buttonStyle(.plain)
+                    } else {
+                        Button {
+                            CampusLocationEngine.openInAppleMaps(for: event.room)
+                        } label: {
+                            HStack(spacing: 4) {
+                                Image(systemName: "mappin.and.ellipse")
+                                    .font(.caption2)
+                                Text(event.room)
+                                    .font(.caption.weight(.medium))
+                                    .lineLimit(1)
+                            }
+                        }
+                        .buttonStyle(.plain)
                     }
-                    .buttonStyle(.plain)
                 }
             }
             .foregroundColor(.secondary)
@@ -141,11 +163,13 @@ public struct ScheduleEventCard: View {
                 }
                 
                 if !event.room.lowercased().contains("online") {
-                    let resolved = CampusLocationEngine.resolve(room: event.room)
-                    Button {
-                        CampusLocationEngine.openInAppleMaps(for: event.room)
-                    } label: {
-                        Label("\(resolved.building.code) in Apple Maps zeigen", systemImage: "map.fill")
+                    let resolvedRooms = CampusLocationEngine.resolveAll(room: event.room).filter { !$0.isOnline }
+                    ForEach(resolvedRooms) { res in
+                        Button {
+                            CampusLocationEngine.openInAppleMaps(forResolved: res)
+                        } label: {
+                            Label("\(res.displayTitle) in Apple Maps zeigen", systemImage: "map.fill")
+                        }
                     }
                 }
             }

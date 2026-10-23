@@ -28,7 +28,7 @@ public struct CampusBuilding: Identifiable, Hashable {
 }
 
 // MARK: - Indoor Room Blueprint Model
-public struct FloorRoom: Identifiable {
+public struct FloorRoom: Identifiable, Hashable {
     public let id = UUID()
     public let name: String
     public let code: String
@@ -38,10 +38,18 @@ public struct FloorRoom: Identifiable {
     public let widthFraction: CGFloat
     public let heightFraction: CGFloat
     public let details: String
+    
+    public func hash(into hasher: inout Hasher) {
+        hasher.combine(id)
+    }
+    
+    public static func == (lhs: FloorRoom, rhs: FloorRoom) -> Bool {
+        lhs.id == rhs.id
+    }
 }
 
 // MARK: - Resolved Campus Room
-public struct ResolvedCampusRoom: Identifiable {
+public struct ResolvedCampusRoom: Identifiable, Hashable {
     public let id = UUID()
     public let rawRoomString: String
     public let building: CampusBuilding
@@ -51,6 +59,31 @@ public struct ResolvedCampusRoom: Identifiable {
     public let floorRooms: [FloorRoom]
     public let walkingDistanceMeters: Int
     public let navigationTip: String
+    
+    public func hash(into hasher: inout Hasher) {
+        hasher.combine(id)
+    }
+    
+    public static func == (lhs: ResolvedCampusRoom, rhs: ResolvedCampusRoom) -> Bool {
+        lhs.id == rhs.id
+    }
+    
+    public var displayTitle: String {
+        let clean = roomName.trimmingCharacters(in: .whitespacesAndNewlines)
+        let cleanNorm = clean.replacingOccurrences(of: " ", with: "").lowercased()
+        let codeNorm = building.code.replacingOccurrences(of: " ", with: "").lowercased()
+        
+        if clean.isEmpty || cleanNorm == codeNorm || codeNorm.contains(cleanNorm) {
+            return building.code
+        }
+        
+        if cleanNorm.contains("paulsen") || cleanNorm.contains("audimax") {
+            return building.code
+        }
+        
+        let baseCode = building.code.components(separatedBy: " (").first ?? building.code
+        return "\(baseCode) (\(clean))"
+    }
 }
 
 // MARK: - Campus Location Engine
@@ -563,9 +596,64 @@ public enum CampusLocationEngine {
         )
     }
     
-    // Generates direct Apple Maps URL targeting building code and exact coordinates
-    public static func appleMapsURL(for room: String) -> URL? {
-        let resolved = resolve(room: room)
+    // MARK: - Multi-Room Split & Resolution
+    
+    /// Splits composite room strings like "LMS6 - R.11 / CAP2" into individual room segments
+    public static func splitRoomLocations(room: String) -> [String] {
+        let trimmed = room.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return [] }
+        
+        let pattern = #"(?i)\s+/\s+|\s*[,;]\s*|\s+(?:oder|und)\s+|/(?=(?:cap|lms|hhp|wsp|ohp|os|mensa|audimax)(?:\b|\d|\s))"#
+        guard let regex = try? NSRegularExpression(pattern: pattern) else {
+            return [trimmed]
+        }
+        
+        let nsString = trimmed as NSString
+        let matches = regex.matches(in: trimmed, range: NSRange(location: 0, length: nsString.length))
+        
+        var results: [String] = []
+        var lastIndex = 0
+        for match in matches {
+            let range = match.range
+            let sub = nsString.substring(with: NSRange(location: lastIndex, length: range.location - lastIndex))
+            let clean = sub.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !clean.isEmpty {
+                results.append(clean)
+            }
+            lastIndex = range.location + range.length
+        }
+        if lastIndex < nsString.length {
+            let tail = nsString.substring(from: lastIndex).trimmingCharacters(in: .whitespacesAndNewlines)
+            if !tail.isEmpty {
+                results.append(tail)
+            }
+        }
+        
+        return results.isEmpty ? [trimmed] : results
+    }
+    
+    /// Resolves all distinct room locations for composite room strings
+    public static func resolveAll(room: String) -> [ResolvedCampusRoom] {
+        let parts = splitRoomLocations(room: room)
+        if parts.isEmpty {
+            return [resolve(room: room)]
+        }
+        
+        var results: [ResolvedCampusRoom] = []
+        var seenKeys = Set<String>()
+        for part in parts {
+            let res = resolve(room: part)
+            let key = "\(res.building.id):\(res.roomName.lowercased())"
+            if !seenKeys.contains(key) {
+                seenKeys.insert(key)
+                results.append(res)
+            }
+        }
+        return results.isEmpty ? [resolve(room: room)] : results
+    }
+    
+    // Generates direct Apple Maps URL for a specific resolved campus room
+    public static func appleMapsURL(forResolved resolved: ResolvedCampusRoom) -> URL? {
         if resolved.isOnline { return nil }
         
         let building = resolved.building
@@ -576,14 +664,29 @@ public enum CampusLocationEngine {
         return URL(string: "http://maps.apple.com/?q=\(encodedLabel)&ll=\(lat),\(lon)&z=18")
     }
     
-    // Opens the target building in Apple Maps directly, dropping pin on the exact building
-    public static func openInAppleMaps(for room: String) {
-        guard let url = appleMapsURL(for: room) else { return }
+    // Generates direct Apple Maps URL targeting the first resolvable campus location
+    public static func appleMapsURL(for room: String) -> URL? {
+        if let first = resolveAll(room: room).first(where: { !$0.isOnline }) {
+            return appleMapsURL(forResolved: first)
+        }
+        return nil
+    }
+    
+    // Opens a specific resolved campus room in Apple Maps directly
+    public static func openInAppleMaps(forResolved resolved: ResolvedCampusRoom) {
+        guard let url = appleMapsURL(forResolved: resolved) else { return }
         #if canImport(UIKit)
         DispatchQueue.main.async {
             UIApplication.shared.open(url)
         }
         #endif
+    }
+    
+    // Opens the campus location in Apple Maps directly (or the first available if multiple)
+    public static func openInAppleMaps(for room: String) {
+        if let first = resolveAll(room: room).first(where: { !$0.isOnline }) {
+            openInAppleMaps(forResolved: first)
+        }
     }
     
     private static func extractRoomName(from raw: String, fallback: String) -> String {
