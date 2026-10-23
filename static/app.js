@@ -1122,16 +1122,19 @@ function bindUIEvents() {
   });
 
   // Launch CAU UNIBODY Chrome window (opens both lms.uni-kiel.de & elearn.informatik.uni-kiel.de or routes to selected course)
-  document.getElementById("btnLaunchBrowser").addEventListener("click", async () => {
-    const plat = document.getElementById("credPlatform")?.value || "unibody";
-    const targetUrl = plat === "unibody" ? "unibody" : (appState.currentCourse ? appState.currentCourse.url : plat);
-    const res = await apiPost("/api/browser/launch", {
-      url: targetUrl,
-      force_auto_login: true,
+  const btnLaunchBrowser = document.getElementById("btnLaunchBrowser");
+  if (btnLaunchBrowser) {
+    btnLaunchBrowser.addEventListener("click", async () => {
+      const plat = document.getElementById("credPlatform")?.value || "unibody";
+      const targetUrl = plat === "unibody" ? "unibody" : (appState.currentCourse ? appState.currentCourse.url : plat);
+      const res = await apiPost("/api/browser/launch", {
+        url: targetUrl,
+        force_auto_login: true,
+      });
+      if (res.status) updateBrowserBadge(res.status);
+      await pollTelemetry();
     });
-    if (res.status) updateBrowserBadge(res.status);
-    await pollTelemetry();
-  });
+  }
 
   // CAU Account Vault handlers
   const formCreds = document.getElementById("formCredentials");
@@ -1821,6 +1824,7 @@ function updateBrowserBadge(status) {
   if (!status) return;
   const badge = document.getElementById("ssoBadge");
   const text = document.getElementById("ssoStatusText");
+  if (!badge || !text) return;
   if (status.logged_in) {
     badge.className = "sso-badge connected";
     text.textContent = status.saved_username
