@@ -3097,3 +3097,884 @@ body.dark-mode .claire-text {
 }
 
 
+
+
+/* ==========================================================================
+   APPLE CALENDAR STYLE: 8-WEEKS FUTURE CALENDAR (ZUKUNFTSKALENDER)
+   ========================================================================== */
+
+.calendar-app-page {
+  width: 100%;
+  max-width: 1440px;
+  margin: 0 auto;
+  padding: 16px 20px 80px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  box-sizing: border-box;
+}
+
+.future-cal-card {
+  background: var(--aero-glass-elevated);
+  border: 1.5px solid var(--aero-glass-border);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 16px 40px rgba(0, 70, 140, 0.12), inset 0 1px 0 #ffffff;
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Top Toolbar */
+.future-cal-top-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 16px 22px;
+  border-bottom: 1px solid rgba(0, 132, 214, 0.14);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.95) 0%, rgba(240, 248, 255, 0.85) 100%);
+  flex-wrap: wrap;
+}
+
+.future-cal-title-section {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.future-cal-nav-buttons {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background: rgba(2, 132, 199, 0.08);
+  padding: 3px;
+  border-radius: 999px;
+  border: 1px solid rgba(2, 132, 199, 0.18);
+}
+
+.future-cal-nav-buttons button {
+  min-width: 32px;
+  height: 28px;
+  padding: 0 12px;
+  border-radius: 999px;
+  font-size: 0.85rem;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  border: none;
+  transition: all 0.18s ease;
+}
+
+#btnCalPrevWeek, #btnCalNextWeek {
+  background: transparent;
+  color: var(--aero-ink);
+  font-size: 1.1rem;
+}
+
+#btnCalPrevWeek:hover, #btnCalNextWeek:hover {
+  background: rgba(2, 132, 199, 0.15);
+  color: #0284c7;
+}
+
+#btnCalToday {
+  background: linear-gradient(180deg, #38bdf8 0%, #0284c7 100%);
+  color: #ffffff;
+  box-shadow: 0 2px 6px rgba(2, 132, 199, 0.35);
+}
+
+#btnCalToday:hover {
+  background: linear-gradient(180deg, #60a5fa 0%, #0369a1 100%);
+}
+
+.future-cal-heading {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.future-cal-heading h2 {
+  font-size: 1.35rem;
+  font-weight: 800;
+  color: #032b4e;
+  letter-spacing: -0.02em;
+  margin: 0;
+}
+
+.week-badge-a {
+  background: linear-gradient(180deg, #0284c7 0%, #0369a1 100%);
+  color: #ffffff;
+}
+
+.week-badge-b {
+  background: linear-gradient(180deg, #8b5cf6 0%, #6d28d9 100%);
+  color: #ffffff;
+}
+
+/* Actions Segmented Control */
+.future-cal-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.view-segmented-control {
+  display: inline-flex;
+  background: rgba(0, 0, 0, 0.06);
+  border-radius: 999px;
+  padding: 3px;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+.seg-btn {
+  padding: 6px 14px;
+  border-radius: 999px;
+  border: none;
+  background: transparent;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--aero-ink-muted);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.seg-btn.active {
+  background: #ffffff;
+  color: #0284c7;
+  font-weight: 800;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+}
+
+/* 8-Weeks Ribbon Bar */
+.future-cal-ribbon-wrap {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 10px 22px;
+  background: rgba(240, 248, 255, 0.6);
+  border-bottom: 1px solid rgba(0, 132, 214, 0.1);
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
+
+.future-cal-ribbon-label {
+  font-size: 0.78rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--aero-ink-muted);
+  white-space: nowrap;
+}
+
+.future-cal-ribbon {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  overflow-x: auto;
+  padding-bottom: 2px;
+}
+
+.ribbon-pill {
+  padding: 6px 13px;
+  border-radius: 999px;
+  border: 1.2px solid rgba(0, 132, 214, 0.22);
+  background: #ffffff;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--aero-ink);
+  cursor: pointer;
+  white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  transition: all 0.18s ease;
+  user-select: none;
+}
+
+.ribbon-pill:hover {
+  border-color: #0284c7;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(2, 132, 199, 0.15);
+}
+
+.ribbon-pill.active {
+  background: linear-gradient(180deg, #38bdf8 0%, #0284c7 100%);
+  color: #ffffff;
+  border-color: #0284c7;
+  box-shadow: 0 4px 14px rgba(2, 132, 199, 0.35);
+}
+
+.ribbon-pill .ribbon-week-type {
+  font-size: 0.7rem;
+  padding: 2px 6px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.07);
+}
+
+.ribbon-pill.active .ribbon-week-type {
+  background: rgba(255, 255, 255, 0.25);
+  color: #ffffff;
+}
+
+.ribbon-pill.is-today-week::after {
+  content: "•";
+  color: #ff3b30;
+  font-size: 1.1rem;
+  line-height: 0;
+}
+
+.ribbon-pill.active.is-today-week::after {
+  color: #ffdddd;
+}
+
+/* Calendar Week View Grid */
+.future-cal-week-view {
+  display: flex;
+  flex-direction: column;
+  background: #ffffff;
+  position: relative;
+}
+
+.future-cal-day-headers {
+  display: grid;
+  grid-template-columns: 64px repeat(5, 1fr);
+  border-bottom: 1.5px solid rgba(0, 132, 214, 0.15);
+  background: linear-gradient(180deg, #fbfdff 0%, #f4f9fd 100%);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.future-cal-header-corner {
+  border-right: 1px solid rgba(0, 132, 214, 0.12);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--aero-ink-muted);
+}
+
+.future-cal-day-header-cell {
+  padding: 12px 8px;
+  text-align: center;
+  border-right: 1px solid rgba(0, 132, 214, 0.1);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+.future-cal-day-header-cell:last-child {
+  border-right: none;
+}
+
+.cal-day-name {
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--aero-ink-muted);
+}
+
+.cal-day-bubble {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.05rem;
+  font-weight: 800;
+  color: #032b4e;
+  transition: all 0.2s ease;
+}
+
+/* Apple Calendar Today Red Circle! */
+.future-cal-day-header-cell.is-today .cal-day-name {
+  color: #ff3b30;
+  font-weight: 900;
+}
+
+.future-cal-day-header-cell.is-today .cal-day-bubble {
+  background: #ff3b30;
+  color: #ffffff;
+  box-shadow: 0 4px 12px rgba(255, 59, 48, 0.35);
+}
+
+/* Cal Grid Body */
+.future-cal-grid-body {
+  display: grid;
+  grid-template-columns: 64px 1fr;
+  position: relative;
+  min-height: 600px;
+}
+
+.future-cal-time-gutter {
+  border-right: 1px solid rgba(0, 132, 214, 0.12);
+  background: #fbfdff;
+  user-select: none;
+}
+
+.future-cal-time-cell {
+  height: 60px;
+  box-sizing: border-box;
+  padding: 0 8px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--aero-ink-muted);
+  text-align: right;
+  transform: translateY(-8px);
+}
+
+.future-cal-columns {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  position: relative;
+  background-image: linear-gradient(to bottom, rgba(0, 132, 214, 0.08) 1px, transparent 1px);
+  background-size: 100% 60px;
+}
+
+.future-cal-col {
+  border-right: 1px solid rgba(0, 132, 214, 0.1);
+  position: relative;
+  height: 600px; /* 10 hours * 60px = 600px */
+}
+
+.future-cal-col:last-child {
+  border-right: none;
+}
+
+.future-cal-col.is-today-col {
+  background: rgba(2, 132, 199, 0.025);
+}
+
+/* Apple Calendar Event Card */
+.cal-event-card {
+  position: absolute;
+  border-radius: 8px;
+  padding: 6px 9px;
+  box-sizing: border-box;
+  overflow: hidden;
+  cursor: pointer;
+  transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+
+.cal-event-card:hover {
+  transform: scale(1.02);
+  z-index: 30 !important;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18) !important;
+}
+
+.cal-ev-time {
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  opacity: 0.88;
+}
+
+.cal-ev-title {
+  font-size: 0.78rem;
+  font-weight: 800;
+  line-height: 1.25;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.cal-ev-room {
+  font-size: 0.68rem;
+  font-weight: 600;
+  opacity: 0.85;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.cal-ev-badge {
+  font-size: 0.62rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  padding: 1px 5px;
+  border-radius: 999px;
+  display: inline-block;
+  align-self: flex-start;
+  margin-top: 2px;
+}
+
+/* Color palettes for courses */
+.ev-theme-blue {
+  background: rgba(2, 132, 199, 0.12);
+  border-left: 4px solid #0284c7;
+  color: #034674;
+  box-shadow: 0 2px 8px rgba(2, 132, 199, 0.1);
+}
+.ev-theme-blue .cal-ev-badge {
+  background: #0284c7;
+  color: #ffffff;
+}
+
+.ev-theme-purple {
+  background: rgba(139, 92, 246, 0.12);
+  border-left: 4px solid #8b5cf6;
+  color: #4c1d95;
+  box-shadow: 0 2px 8px rgba(139, 92, 246, 0.1);
+}
+.ev-theme-purple .cal-ev-badge {
+  background: #8b5cf6;
+  color: #ffffff;
+}
+
+.ev-theme-green {
+  background: rgba(16, 185, 129, 0.14);
+  border-left: 4px solid #10b981;
+  color: #064e3b;
+  box-shadow: 0 2px 8px rgba(16, 185, 129, 0.1);
+}
+.ev-theme-green .cal-ev-badge {
+  background: #10b981;
+  color: #ffffff;
+}
+
+.ev-theme-orange {
+  background: rgba(245, 158, 11, 0.14);
+  border-left: 4px solid #f59e0b;
+  color: #78350f;
+  box-shadow: 0 2px 8px rgba(245, 158, 11, 0.1);
+}
+.ev-theme-orange .cal-ev-badge {
+  background: #f59e0b;
+  color: #ffffff;
+}
+
+.ev-theme-teal {
+  background: rgba(13, 148, 136, 0.13);
+  border-left: 4px solid #0d9488;
+  color: #134e4a;
+  box-shadow: 0 2px 8px rgba(13, 148, 136, 0.1);
+}
+.ev-theme-teal .cal-ev-badge {
+  background: #0d9488;
+  color: #ffffff;
+}
+
+/* Red Time Indicator Line */
+.future-cal-now-line {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: #ff3b30;
+  z-index: 25;
+  pointer-events: none;
+}
+.future-cal-now-line::before {
+  content: "";
+  position: absolute;
+  left: -5px;
+  top: -4px;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #ff3b30;
+}
+
+/* Agenda View (8-Wochen Agenda) */
+.future-cal-agenda-view {
+  padding: 24px;
+  background: #ffffff;
+}
+
+.future-cal-agenda-list {
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+  max-width: 900px;
+  margin: 0 auto;
+}
+
+.agenda-week-block {
+  border: 1px solid rgba(0, 132, 214, 0.15);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  background: #ffffff;
+  box-shadow: 0 4px 16px rgba(0, 70, 140, 0.05);
+}
+
+.agenda-week-header {
+  padding: 12px 18px;
+  background: linear-gradient(180deg, #f0f7fc 0%, #e6f1f8 100%);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid rgba(0, 132, 214, 0.12);
+}
+
+.agenda-week-title {
+  font-size: 0.95rem;
+  font-weight: 800;
+  color: #032b4e;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.agenda-days-list {
+  display: flex;
+  flex-direction: column;
+}
+
+.agenda-day-group {
+  padding: 12px 18px;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+  display: grid;
+  grid-template-columns: 140px 1fr;
+  gap: 16px;
+  align-items: flex-start;
+}
+
+.agenda-day-group:last-child {
+  border-bottom: none;
+}
+
+.agenda-day-date {
+  font-size: 0.84rem;
+  font-weight: 700;
+  color: var(--aero-ink-muted);
+}
+
+.agenda-day-date.is-today {
+  color: #ff3b30;
+  font-weight: 900;
+}
+
+.agenda-events-col {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.agenda-event-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.18s ease;
+}
+
+.agenda-event-row:hover {
+  background: rgba(0, 132, 214, 0.06);
+  transform: translateX(4px);
+}
+
+.agenda-time-pill {
+  font-size: 0.75rem;
+  font-weight: 700;
+  padding: 3px 8px;
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.06);
+  white-space: nowrap;
+}
+
+.agenda-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.agenda-title {
+  font-size: 0.88rem;
+  font-weight: 800;
+  color: var(--aero-ink);
+}
+
+.agenda-sub {
+  font-size: 0.74rem;
+  color: var(--aero-ink-muted);
+  display: flex;
+  gap: 8px;
+}
+
+/* Event Detail Modal (Apple Calendar style) */
+.modal-event-detail {
+  max-width: 480px;
+  border-radius: 18px;
+  overflow: hidden;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.28);
+}
+
+.event-detail-header {
+  padding: 18px 22px;
+  border-bottom: 1px solid rgba(0, 132, 214, 0.12);
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+}
+
+.event-detail-title-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.event-detail-title-wrap h3 {
+  font-size: 1.15rem;
+  font-weight: 800;
+  color: #032b4e;
+  line-height: 1.3;
+}
+
+.event-detail-body {
+  padding: 20px 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.event-detail-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+}
+
+.detail-icon {
+  font-size: 1.25rem;
+  line-height: 1.2;
+}
+
+.detail-sub {
+  display: block;
+  font-size: 0.78rem;
+  color: var(--aero-ink-muted);
+  margin-top: 2px;
+}
+
+/* Workspace subnav bar */
+.workspace-subnav-bar {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  padding: 8px 12px;
+  background: rgba(255, 255, 255, 0.7);
+  border: 1px solid rgba(0, 132, 214, 0.15);
+  border-radius: var(--radius-md);
+  margin-bottom: -10px;
+}
+
+/* Dark Mode Overrides for 8-Weeks Future Calendar */
+body.dark-mode .calendar-app-page {
+  color: #e0f2fe;
+}
+
+body.dark-mode .future-cal-card {
+  background: rgba(10, 28, 52, 0.88);
+  border-color: rgba(0, 217, 255, 0.25);
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+
+body.dark-mode .future-cal-top-bar {
+  background: linear-gradient(180deg, rgba(16, 44, 78, 0.95) 0%, rgba(9, 27, 49, 0.95) 100%);
+  border-bottom-color: rgba(0, 217, 255, 0.2);
+}
+
+body.dark-mode .future-cal-heading h2 {
+  color: #e0f2fe;
+  text-shadow: 0 0 12px rgba(0, 217, 255, 0.4);
+}
+
+body.dark-mode .future-cal-nav-buttons {
+  background: rgba(0, 217, 255, 0.1);
+  border-color: rgba(0, 217, 255, 0.25);
+}
+
+body.dark-mode #btnCalPrevWeek, body.dark-mode #btnCalNextWeek {
+  color: #7dd3fc;
+}
+
+body.dark-mode .view-segmented-control {
+  background: rgba(0, 0, 0, 0.35);
+  border-color: rgba(0, 217, 255, 0.2);
+}
+
+body.dark-mode .seg-btn {
+  color: #7dd3fc;
+}
+
+body.dark-mode .seg-btn.active {
+  background: rgba(0, 217, 255, 0.25);
+  color: #ffffff;
+  box-shadow: 0 2px 10px rgba(0, 217, 255, 0.35);
+}
+
+body.dark-mode .future-cal-ribbon-wrap {
+  background: rgba(7, 20, 38, 0.7);
+  border-bottom-color: rgba(0, 217, 255, 0.15);
+}
+
+body.dark-mode .ribbon-pill {
+  background: rgba(14, 38, 68, 0.85);
+  border-color: rgba(0, 217, 255, 0.25);
+  color: #bae6fd;
+}
+
+body.dark-mode .ribbon-pill:hover {
+  background: rgba(20, 56, 100, 0.95);
+  border-color: #00d9ff;
+}
+
+body.dark-mode .ribbon-pill.active {
+  background: linear-gradient(180deg, #0284c7 0%, #0369a1 100%);
+  color: #ffffff;
+  border-color: #00d9ff;
+  box-shadow: 0 4px 16px rgba(0, 217, 255, 0.4);
+}
+
+body.dark-mode .future-cal-week-view,
+body.dark-mode .future-cal-agenda-view {
+  background: rgba(5, 18, 34, 0.95);
+}
+
+body.dark-mode .future-cal-day-headers {
+  background: linear-gradient(180deg, rgba(14, 38, 68, 0.95) 0%, rgba(8, 24, 46, 0.95) 100%);
+  border-bottom-color: rgba(0, 217, 255, 0.2);
+}
+
+body.dark-mode .future-cal-header-corner,
+body.dark-mode .future-cal-day-header-cell {
+  border-right-color: rgba(0, 217, 255, 0.15);
+}
+
+body.dark-mode .cal-day-name {
+  color: #7dd3fc;
+}
+
+body.dark-mode .cal-day-bubble {
+  color: #e0f2fe;
+}
+
+body.dark-mode .future-cal-time-gutter {
+  background: rgba(8, 24, 46, 0.7);
+  border-right-color: rgba(0, 217, 255, 0.15);
+}
+
+body.dark-mode .future-cal-time-cell {
+  color: #7dd3fc;
+}
+
+body.dark-mode .future-cal-columns {
+  background-image: linear-gradient(to bottom, rgba(0, 217, 255, 0.08) 1px, transparent 1px);
+}
+
+body.dark-mode .future-cal-col {
+  border-right-color: rgba(0, 217, 255, 0.12);
+}
+
+body.dark-mode .future-cal-col.is-today-col {
+  background: rgba(0, 217, 255, 0.04);
+}
+
+body.dark-mode .ev-theme-blue {
+  background: rgba(2, 132, 199, 0.28);
+  border-left-color: #38bdf8;
+  color: #e0f2fe;
+}
+
+body.dark-mode .ev-theme-purple {
+  background: rgba(139, 92, 246, 0.28);
+  border-left-color: #a78bfa;
+  color: #ede9fe;
+}
+
+body.dark-mode .ev-theme-green {
+  background: rgba(16, 185, 129, 0.28);
+  border-left-color: #34d399;
+  color: #ecfdf5;
+}
+
+body.dark-mode .ev-theme-orange {
+  background: rgba(245, 158, 11, 0.28);
+  border-left-color: #fbbf24;
+  color: #fef3c7;
+}
+
+body.dark-mode .ev-theme-teal {
+  background: rgba(13, 148, 136, 0.28);
+  border-left-color: #2dd4bf;
+  color: #ccfbf1;
+}
+
+body.dark-mode .agenda-week-block {
+  background: rgba(10, 28, 52, 0.85);
+  border-color: rgba(0, 217, 255, 0.2);
+}
+
+body.dark-mode .agenda-week-header {
+  background: linear-gradient(180deg, rgba(16, 44, 78, 0.95) 0%, rgba(9, 27, 49, 0.95) 100%);
+  border-bottom-color: rgba(0, 217, 255, 0.2);
+}
+
+body.dark-mode .agenda-week-title {
+  color: #e0f2fe;
+}
+
+body.dark-mode .agenda-day-group {
+  border-bottom-color: rgba(0, 217, 255, 0.1);
+}
+
+body.dark-mode .agenda-day-date {
+  color: #7dd3fc;
+}
+
+body.dark-mode .agenda-event-row:hover {
+  background: rgba(0, 217, 255, 0.1);
+}
+
+body.dark-mode .agenda-title {
+  color: #f0f9ff;
+}
+
+body.dark-mode .agenda-sub {
+  color: #7dd3fc;
+}
+
+body.dark-mode .agenda-time-pill {
+  background: rgba(0, 217, 255, 0.15);
+  color: #bae6fd;
+}
+
+body.dark-mode .modal-event-detail {
+  background: rgba(8, 26, 50, 0.96);
+  border-color: rgba(0, 217, 255, 0.3);
+}
+
+body.dark-mode .event-detail-header {
+  border-bottom-color: rgba(0, 217, 255, 0.2);
+}
+
+body.dark-mode .event-detail-title-wrap h3 {
+  color: #e0f2fe;
+}
+
+body.dark-mode .detail-sub {
+  color: #7dd3fc;
+}
+
+body.dark-mode .workspace-subnav-bar {
+  background: rgba(10, 28, 52, 0.7);
+  border-color: rgba(0, 217, 255, 0.2);
+}

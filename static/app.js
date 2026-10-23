@@ -191,6 +191,7 @@ async function fetchInitialState() {
   syncPreferencesUI();
   renderCatalogChips();
   renderTimetable();
+  renderFutureCalendar();
   renderLogs(data.logs || []);
   updateBrowserBadge(data.browser_status);
 
@@ -1058,27 +1059,509 @@ function renderTimetable() {
       dayCols[dayIdx].appendChild(el);
     });
   });
+
+  if (typeof renderFutureCalendar === "function") {
+    renderFutureCalendar();
+  }
 }
 
-/* PAGE ROUTING (KALENDER & EINSTELLUNGEN) */
+/* ==========================================================================
+   APPLE CALENDAR STYLE: 8-WEEKS FUTURE CALENDAR (ZUKUNFTSKALENDER)
+   ========================================================================== */
+
+const MONTH_NAMES_DE = [
+  "Januar", "Februar", "März", "April", "Mai", "Juni",
+  "Juli", "August", "September", "Oktober", "November", "Dezember"
+];
+const DAY_NAMES_FULL_DE = [
+  "Montag", "Dienstag", "Mittwoch", "Donnerstag", "Freitag"
+];
+const DAY_NAMES_SHORT_DE = ["MO", "DI", "MI", "DO", "FR"];
+
+const futureCalState = {
+  currentWeekOffset: 0, // 0 to 7
+  viewMode: "week",      // "week" or "agenda"
+  baseMonday: new Date(2026, 9, 19), // 19. Oktober 2026 (Semesterstart KW 43)
+  todayRef: new Date(2026, 9, 23)    // 23. Oktober 2026
+};
+
+function generate8WeeksData() {
+  const weeks = [];
+  const KW_START = 43;
+  for (let i = 0; i < 8; i++) {
+    const monday = new Date(futureCalState.baseMonday);
+    monday.setDate(futureCalState.baseMonday.getDate() + i * 7);
+
+    const friday = new Date(monday);
+    friday.setDate(monday.getDate() + 4);
+
+    const sunday = new Date(monday);
+    sunday.setDate(monday.getDate() + 6);
+
+    const kw = KW_START + i;
+    const weekType = (kw % 2 === 1) ? "A" : "B";
+
+    const days = [];
+    for (let d = 0; d < 5; d++) {
+      const dDate = new Date(monday);
+      dDate.setDate(monday.getDate() + d);
+      const isToday = (
+        dDate.getFullYear() === futureCalState.todayRef.getFullYear() &&
+        dDate.getMonth() === futureCalState.todayRef.getMonth() &&
+        dDate.getDate() === futureCalState.todayRef.getDate()
+      );
+      days.push({
+        dayIndex: d,
+        dayName: DAY_NAMES_FULL_DE[d],
+        dayShort: DAY_NAMES_SHORT_DE[d],
+        date: dDate,
+        dayNum: dDate.getDate(),
+        monthNum: dDate.getMonth() + 1,
+        monthName: MONTH_NAMES_DE[dDate.getMonth()],
+        year: dDate.getFullYear(),
+        isToday: isToday
+      });
+    }
+
+    const hasToday = days.some((d) => d.isToday);
+
+    weeks.push({
+      index: i,
+      kw: kw,
+      weekType: weekType,
+      monday: monday,
+      friday: friday,
+      sunday: sunday,
+      days: days,
+      isCurrentWeek: i === 0,
+      hasToday: hasToday
+    });
+  }
+  return weeks;
+}
+
+function getCourseEventTheme(ev) {
+  const title = (ev.title || "").toLowerCase();
+  const cId = (ev.course_id || "").toLowerCase();
+  if (ev.type === "enrolled_exercise") return "ev-theme-green";
+  if (cId.includes("math") || title.includes("mathematik")) return "ev-theme-purple";
+  if (cId.includes("einf") || title.includes("informatik")) {
+    if (cId.includes("recht") || title.includes("recht")) return "ev-theme-teal";
+    if (cId.includes("winf") || title.includes("wirtschaftsinformatik")) return "ev-theme-green";
+    return "ev-theme-blue";
+  }
+  if (cId.includes("bwl") || title.includes("bwl")) return "ev-theme-orange";
+  return "ev-theme-blue";
+}
+
+function isEventInWeek(ev, weekType) {
+  if (ev.enabled === false) return false;
+  if (!ev.week_type || ev.week_type === "all" || ev.week_type === "weekly") return true;
+  return String(ev.week_type).toUpperCase() === String(weekType).toUpperCase();
+}
+
+function renderFutureCalendar() {
+  const weeks = generate8WeeksData();
+  const currentWeek = weeks[futureCalState.currentWeekOffset] || weeks[0];
+
+  // 1. Update Month Title and Week Badge
+  const titleEl = document.getElementById("futureCalMonthTitle");
+  const badgeEl = document.getElementById("futureCalWeekBadge");
+  if (titleEl) {
+    const mStart = MONTH_NAMES_DE[currentWeek.monday.getMonth()];
+    const mEnd = MONTH_NAMES_DE[currentWeek.friday.getMonth()];
+    const yr = currentWeek.monday.getFullYear();
+    titleEl.textContent = mStart === mEnd ? `${mStart} ${yr}` : `${mStart} – ${mEnd} ${yr}`;
+  }
+  if (badgeEl) {
+    badgeEl.className = `aero-badge week-badge-${currentWeek.weekType.toLowerCase()}`;
+    badgeEl.textContent = `KW ${currentWeek.kw} · Woche ${currentWeek.weekType}${currentWeek.isCurrentWeek ? " (Aktuell)" : ""}`;
+  }
+
+  // 2. Render 8-Week Quick Ribbon
+  const ribbonEl = document.getElementById("futureCalRibbon");
+  if (ribbonEl) {
+    ribbonEl.innerHTML = "";
+    weeks.forEach((w) => {
+      const pill = document.createElement("button");
+      pill.type = "button";
+      pill.className = `ribbon-pill ${w.index === futureCalState.currentWeekOffset ? "active" : ""} ${w.hasToday ? "is-today-week" : ""}`;
+
+      const m1 = String(w.monday.getDate()).padStart(2, "0") + "." + String(w.monday.getMonth() + 1).padStart(2, "0");
+      const m2 = String(w.friday.getDate()).padStart(2, "0") + "." + String(w.friday.getMonth() + 1).padStart(2, "0");
+
+      pill.innerHTML = `
+        <span>KW ${w.kw}</span>
+        <span style="opacity:0.75;font-weight:600;">${m1}–${m2}</span>
+        <span class="ribbon-week-type">Woche ${w.weekType}</span>
+      `;
+      pill.addEventListener("click", () => {
+        futureCalState.currentWeekOffset = w.index;
+        renderFutureCalendar();
+      });
+      ribbonEl.appendChild(pill);
+    });
+  }
+
+  // 3. Render View Toggle States
+  const weekViewEl = document.getElementById("futureCalWeekContainer");
+  const agendaViewEl = document.getElementById("futureCalAgendaContainer");
+  const btnWeek = document.getElementById("btnViewWeek");
+  const btnAgenda = document.getElementById("btnViewAgenda");
+
+  if (futureCalState.viewMode === "agenda") {
+    if (weekViewEl) weekViewEl.classList.add("hidden");
+    if (agendaViewEl) agendaViewEl.classList.remove("hidden");
+    btnWeek?.classList.remove("active");
+    btnAgenda?.classList.add("active");
+    renderFutureCalAgenda(weeks);
+  } else {
+    if (agendaViewEl) agendaViewEl.classList.add("hidden");
+    if (weekViewEl) weekViewEl.classList.remove("hidden");
+    btnWeek?.classList.add("active");
+    btnAgenda?.classList.remove("active");
+    renderFutureCalWeek(currentWeek);
+  }
+}
+
+function renderFutureCalWeek(currentWeek) {
+  const headersEl = document.getElementById("futureCalDayHeaders");
+  const gutterEl = document.getElementById("futureCalTimeGutter");
+  const colsContainer = document.getElementById("futureCalColumns");
+  if (!headersEl || !gutterEl || !colsContainer) return;
+
+  // Day Headers
+  headersEl.innerHTML = "";
+  const corner = document.createElement("div");
+  corner.className = "future-cal-header-corner";
+  corner.textContent = "Zeit";
+  headersEl.appendChild(corner);
+
+  currentWeek.days.forEach((d) => {
+    const cell = document.createElement("div");
+    cell.className = `future-cal-day-header-cell ${d.isToday ? "is-today" : ""}`;
+    cell.innerHTML = `
+      <div class="cal-day-name">${d.dayShort}</div>
+      <div class="cal-day-bubble">${d.dayNum}</div>
+    `;
+    headersEl.appendChild(cell);
+  });
+
+  // Time Gutter (08:00 to 18:00)
+  gutterEl.innerHTML = "";
+  for (let hr = 8; hr <= 18; hr++) {
+    const slot = document.createElement("div");
+    slot.className = "future-cal-time-cell";
+    slot.textContent = `${String(hr).padStart(2, "0")}:00`;
+    gutterEl.appendChild(slot);
+  }
+
+  // 5 Day Columns
+  colsContainer.innerHTML = "";
+  const dayColEls = [];
+  currentWeek.days.forEach((d) => {
+    const col = document.createElement("div");
+    col.className = `future-cal-col ${d.isToday ? "is-today-col" : ""}`;
+    colsContainer.appendChild(col);
+    dayColEls.push(col);
+
+    // If today is in this column, render current time red indicator line
+    if (d.isToday) {
+      const now = new Date();
+      let curHour = now.getHours();
+      let curMins = now.getMinutes();
+      if (curHour < 8 || curHour >= 18) {
+        curHour = 10;
+        curMins = 30; // standard indicator placement during off-hours demo
+      }
+      const nowTop = ((curHour * 60 + curMins - 8 * 60) / 60) * 60;
+      if (nowTop >= 0 && nowTop <= 600) {
+        const line = document.createElement("div");
+        line.className = "future-cal-now-line";
+        line.style.top = `${nowTop}px`;
+        line.title = `Aktuelle Uhrzeit: ${String(curHour).padStart(2, "0")}:${String(curMins).padStart(2, "0")} Uhr`;
+        col.appendChild(line);
+      }
+    }
+  });
+
+  // Filter events that happen in this week (respecting weekType A/B and enabled state)
+  const activeEvents = appState.schedule.filter((ev) => isEventInWeek(ev, currentWeek.weekType));
+
+  // Bucket events by day and time to avoid overlaps
+  const buckets = {};
+  activeEvents.forEach((ev) => {
+    const dIdx = Number(ev.day);
+    if (dIdx < 0 || dIdx > 4) return;
+    const key = `${dIdx}-${ev.start_time}-${ev.end_time}`;
+    if (!buckets[key]) buckets[key] = [];
+    buckets[key].push(ev);
+  });
+
+  Object.values(buckets).forEach((bucket) => {
+    bucket.sort((a, b) => String(a.id).localeCompare(String(b.id)));
+    bucket.forEach((ev, idxInBucket) => {
+      const dIdx = Number(ev.day);
+      const targetCol = dayColEls[dIdx];
+      if (!targetCol) return;
+
+      const dayObj = currentWeek.days[dIdx];
+      const startMins = timeToMinutes(ev.start_time);
+      const endMins = timeToMinutes(ev.end_time);
+      const topPx = ((startMins - 8 * 60) / 60) * 60;
+      const heightPx = Math.max(34, ((endMins - startMins) / 60) * 60);
+
+      const card = document.createElement("div");
+      const themeClass = getCourseEventTheme(ev);
+      card.className = `cal-event-card ${themeClass}`;
+      card.style.top = `${topPx}px`;
+      card.style.height = `${heightPx}px`;
+
+      if (bucket.length > 1) {
+        const gapPct = 2;
+        const totalGaps = (bucket.length - 1) * gapPct;
+        const widthPct = (96 - totalGaps) / bucket.length;
+        const leftPct = 2 + idxInBucket * (widthPct + gapPct);
+        card.style.left = `${leftPct}%`;
+        card.style.right = "auto";
+        card.style.width = `${widthPct}%`;
+      } else {
+        card.style.left = "4px";
+        card.style.right = "4px";
+        card.style.width = "auto";
+      }
+
+      const isTurnus = Boolean(ev.week_type);
+      const badgeText = isTurnus
+        ? `Woche ${ev.week_type}`
+        : (ev.type === "enrolled_exercise" ? "Übung" : "VL");
+
+      card.innerHTML = `
+        <div class="cal-ev-time">${ev.start_time} – ${ev.end_time}</div>
+        <div class="cal-ev-title" title="${ev.title}">${ev.title}</div>
+        <div class="cal-ev-room" title="${ev.room || 'Kein Raum'}">📍 ${ev.room || 'Online / Hörsaal'}</div>
+        <span class="cal-ev-badge">${badgeText}</span>
+      `;
+
+      card.addEventListener("click", (e) => {
+        e.stopPropagation();
+        openEventDetailModal(ev, dayObj);
+      });
+
+      targetCol.appendChild(card);
+    });
+  });
+}
+
+function renderFutureCalAgenda(weeks) {
+  const container = document.getElementById("futureCalAgendaList");
+  if (!container) return;
+  container.innerHTML = "";
+
+  weeks.forEach((w) => {
+    const weekBlock = document.createElement("div");
+    weekBlock.className = "agenda-week-block";
+
+    const dStart = `${w.monday.getDate()}. ${MONTH_NAMES_DE[w.monday.getMonth()]}`;
+    const dEnd = `${w.friday.getDate()}. ${MONTH_NAMES_DE[w.friday.getMonth()]} ${w.friday.getFullYear()}`;
+
+    weekBlock.innerHTML = `
+      <div class="agenda-week-header">
+        <div class="agenda-week-title">
+          <span>📅 KW ${w.kw} (${dStart} – ${dEnd})</span>
+          <span class="aero-badge week-badge-${w.weekType.toLowerCase()}">Woche ${w.weekType}${w.isCurrentWeek ? " · Aktuell" : ""}</span>
+        </div>
+      </div>
+      <div class="agenda-days-list" id="agendaWeekDays_${w.kw}"></div>
+    `;
+
+    const daysList = weekBlock.querySelector(`#agendaWeekDays_${w.kw}`);
+    const activeEvents = appState.schedule.filter((ev) => isEventInWeek(ev, w.weekType));
+
+    w.days.forEach((dayObj) => {
+      const dayEvs = activeEvents
+        .filter((ev) => Number(ev.day) === dayObj.dayIndex)
+        .sort((a, b) => timeToMinutes(a.start_time) - timeToMinutes(b.start_time));
+
+      if (dayEvs.length === 0) return;
+
+      const dayGroup = document.createElement("div");
+      dayGroup.className = "agenda-day-group";
+
+      dayGroup.innerHTML = `
+        <div class="agenda-day-date ${dayObj.isToday ? "is-today" : ""}">
+          <div>${dayObj.dayName}</div>
+          <div style="font-size:1.15rem;font-weight:900;">${dayObj.dayNum}. ${dayObj.monthName}</div>
+          ${dayObj.isToday ? '<span class="aero-badge" style="background:#ff3b30;color:#fff;margin-top:4px;">HEUTE</span>' : ""}
+        </div>
+        <div class="agenda-events-col"></div>
+      `;
+
+      const evsCol = dayGroup.querySelector(".agenda-events-col");
+      dayEvs.forEach((ev) => {
+        const row = document.createElement("div");
+        const theme = getCourseEventTheme(ev);
+        row.className = `agenda-event-row ${theme}`;
+        row.innerHTML = `
+          <span class="agenda-time-pill">${ev.start_time} – ${ev.end_time}</span>
+          <div class="agenda-info">
+            <div class="agenda-title">${ev.title}</div>
+            <div class="agenda-sub">
+              <span>📍 ${ev.room || "Online / Hörsaal"}</span>
+              ${ev.week_type ? `<span>· 🔄 Turnus: Woche ${ev.week_type}</span>` : ""}
+            </div>
+          </div>
+          <span class="cal-ev-badge" style="margin-left:auto;">${ev.week_type ? `Woche ${ev.week_type}` : (ev.type === "enrolled_exercise" ? "Übung" : "VL")}</span>
+        `;
+        row.addEventListener("click", () => {
+          openEventDetailModal(ev, dayObj);
+        });
+        evsCol.appendChild(row);
+      });
+
+      daysList.appendChild(dayGroup);
+    });
+
+    container.appendChild(weekBlock);
+  });
+}
+
+function openEventDetailModal(ev, dayObj) {
+  const modal = document.getElementById("modalEventDetail");
+  if (!modal) return;
+
+  const badgeEl = document.getElementById("evDetailBadge");
+  const titleEl = document.getElementById("evDetailTitle");
+  const dateEl = document.getElementById("evDetailDate");
+  const timeEl = document.getElementById("evDetailTime");
+  const roomEl = document.getElementById("evDetailRoom");
+  const bldEl = document.getElementById("evDetailBuilding");
+  const turnusEl = document.getElementById("evDetailTurnus");
+  const weekTypeEl = document.getElementById("evDetailWeekType");
+  const courseIdEl = document.getElementById("evDetailCourseId");
+  const univisEl = document.getElementById("evDetailUnivisId");
+  const appleMapsBtn = document.getElementById("btnEvDetailAppleMaps");
+
+  if (titleEl) titleEl.textContent = ev.title;
+  if (badgeEl) {
+    const isExercise = ev.type === "enrolled_exercise";
+    badgeEl.textContent = isExercise ? "Übungsgruppe" : "Vorlesung";
+    badgeEl.className = `aero-badge ${isExercise ? "badge-success" : "week-badge-a"}`;
+  }
+  if (dateEl && dayObj) {
+    dateEl.textContent = `${dayObj.dayName}, ${dayObj.dayNum}. ${dayObj.monthName} ${dayObj.year}`;
+  }
+  if (timeEl) timeEl.textContent = `${ev.start_time} – ${ev.end_time} Uhr`;
+  if (roomEl) roomEl.textContent = ev.room || "Kein Raum angegeben";
+  if (bldEl) {
+    bldEl.textContent = ev.room && ev.room.includes("Online")
+      ? "Virtuelle Online-Veranstaltung (Zoom / Moodle)"
+      : "Christian-Albrechts-Universität zu Kiel";
+  }
+
+  if (appleMapsBtn) {
+    appleMapsBtn.onclick = () => {
+      const isOnline = ev.room && ev.room.includes("Online");
+      const query = isOnline ? "Christian-Albrechts-Universität zu Kiel" : `${ev.room} Kiel`;
+      const mapsUrl = `https://maps.apple.com/?q=${encodeURIComponent(query)}`;
+      window.open(mapsUrl, "_blank");
+    };
+  }
+
+  if (turnusEl) {
+    turnusEl.textContent = ev.week_type ? "14-tägig im Semester" : "Wöchentlich";
+  }
+  if (weekTypeEl) {
+    weekTypeEl.textContent = ev.week_type ? `Findet nur in Woche ${ev.week_type} statt` : "Findet jede Woche statt";
+  }
+
+  if (courseIdEl) courseIdEl.textContent = ev.course_id || "Kurs-Termin";
+  if (univisEl) {
+    univisEl.textContent = ev.univis_id ? `UnivIS: #${ev.univis_id}` : "";
+    univisEl.style.display = ev.univis_id ? "inline" : "none";
+  }
+
+  modal.classList.remove("hidden");
+}
+
+function initFutureCalEvents() {
+  document.getElementById("btnCalPrevWeek")?.addEventListener("click", () => {
+    futureCalState.currentWeekOffset = Math.max(0, futureCalState.currentWeekOffset - 1);
+    renderFutureCalendar();
+  });
+
+  document.getElementById("btnCalToday")?.addEventListener("click", () => {
+    futureCalState.currentWeekOffset = 0;
+    renderFutureCalendar();
+  });
+
+  document.getElementById("btnCalNextWeek")?.addEventListener("click", () => {
+    futureCalState.currentWeekOffset = Math.min(7, futureCalState.currentWeekOffset + 1);
+    renderFutureCalendar();
+  });
+
+  document.getElementById("btnViewWeek")?.addEventListener("click", () => {
+    futureCalState.viewMode = "week";
+    renderFutureCalendar();
+  });
+
+  document.getElementById("btnViewAgenda")?.addEventListener("click", () => {
+    futureCalState.viewMode = "agenda";
+    renderFutureCalendar();
+  });
+
+  document.getElementById("btnJumpToTimetable")?.addEventListener("click", () => {
+    switchAppPage("timetable");
+  });
+
+  document.getElementById("btnSwitchToFutureCal")?.addEventListener("click", () => {
+    switchAppPage("calendar");
+  });
+
+  // Modal backdrop click closes detail modal
+  const evDetailModal = document.getElementById("modalEventDetail");
+  if (evDetailModal) {
+    evDetailModal.addEventListener("click", (e) => {
+      if (e.target === evDetailModal) {
+        evDetailModal.classList.add("hidden");
+      }
+    });
+  }
+}
+
+/* PAGE ROUTING (KALENDER, STUNDENPLAN & EINSTELLUNGEN) */
 function switchAppPage(pageName, updateHash = true) {
   const pageCalendar = document.getElementById("pageCalendar");
+  const pageTimetable = document.getElementById("pageTimetable");
   const pageSettings = document.getElementById("pageSettings");
   if (!pageCalendar || !pageSettings) return;
 
   if (pageName === "settings") {
     pageCalendar.style.display = "none";
+    if (pageTimetable) pageTimetable.style.display = "none";
     pageSettings.style.display = "block";
     if (updateHash && window.location.hash !== "#settings") {
       window.location.hash = "settings";
     }
     window.scrollTo({ top: 0, behavior: "smooth" });
-  } else {
+  } else if (pageName === "timetable") {
+    pageCalendar.style.display = "none";
     pageSettings.style.display = "none";
-    pageCalendar.style.display = "grid";
+    if (pageTimetable) pageTimetable.style.display = "grid";
+    if (updateHash && window.location.hash !== "#timetable") {
+      window.location.hash = "timetable";
+    }
+    renderTimetable();
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  } else {
+    // Default: "calendar" (8-Wochen Zukunftskalender)
+    pageSettings.style.display = "none";
+    if (pageTimetable) pageTimetable.style.display = "none";
+    pageCalendar.style.display = "flex";
     if (updateHash && window.location.hash !== "#calendar") {
       window.location.hash = "calendar";
     }
+    renderFutureCalendar();
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
 }
@@ -1145,15 +1628,20 @@ function initDrawerMenu() {
     }
   });
 
-  // Nav item handlers: Einstellungen & Kalender (Page switch)
-  document.getElementById("drawerBtnSettings")?.addEventListener("click", () => {
-    closeDrawer();
-    switchAppPage("settings");
-  });
-
+  // Nav item handlers: Kalender (8-Wochen-Vorschau), Stundenplan & Kurse, Einstellungen
   document.getElementById("drawerBtnCalendar")?.addEventListener("click", () => {
     closeDrawer();
     switchAppPage("calendar");
+  });
+
+  document.getElementById("drawerBtnTimetable")?.addEventListener("click", () => {
+    closeDrawer();
+    switchAppPage("timetable");
+  });
+
+  document.getElementById("drawerBtnSettings")?.addEventListener("click", () => {
+    closeDrawer();
+    switchAppPage("settings");
   });
 
   // Settings page back buttons
@@ -1168,6 +1656,8 @@ function initDrawerMenu() {
   window.addEventListener("hashchange", () => {
     if (window.location.hash === "#settings") {
       switchAppPage("settings", false);
+    } else if (window.location.hash === "#timetable") {
+      switchAppPage("timetable", false);
     } else {
       switchAppPage("calendar", false);
     }
@@ -1175,12 +1665,17 @@ function initDrawerMenu() {
 
   if (window.location.hash === "#settings") {
     switchAppPage("settings", false);
+  } else if (window.location.hash === "#timetable") {
+    switchAppPage("timetable", false);
+  } else {
+    switchAppPage("calendar", false);
   }
 }
 
 /* EVENT BINDINGS */
 function bindUIEvents() {
   initDrawerMenu();
+  initFutureCalEvents();
 
   // Sync already enrolled groups from open browser tabs
   const syncEnrolledBtn = document.getElementById("btnSyncEnrolledGroups");

@@ -10,7 +10,7 @@
   <link rel="icon" type="image/png" sizes="192x192" href="/favicon-192.png" />
   <link rel="icon" type="image/x-icon" href="/favicon.ico" />
   <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
-  <link rel="stylesheet" href="/styles.css?v=4" />
+  <link rel="stylesheet" href="/styles.css?v=6" />
 </head>
 <body>
   <!-- TOP HEADER -->
@@ -36,8 +36,63 @@
     </div>
   </header>
 
-  <!-- MAIN WORKSPACE GRID (KALENDER & KURSE) -->
-  <main class="workspace" id="pageCalendar">
+  <!-- DEDICATED 8-WEEKS FUTURE CALENDAR PAGE (APPLE CALENDAR STYLE) -->
+  <main class="calendar-app-page" id="pageCalendar">
+    <div class="future-cal-card">
+      <!-- Apple Calendar Topbar Toolbar -->
+      <div class="future-cal-top-bar">
+        <div class="future-cal-title-section">
+          <div class="future-cal-nav-buttons">
+            <button type="button" id="btnCalPrevWeek" class="btn btn-outline btn-xs" title="Vorherige Woche">‹</button>
+            <button type="button" id="btnCalToday" class="btn btn-primary btn-xs" title="Zur aktuellen Woche springen">Heute</button>
+            <button type="button" id="btnCalNextWeek" class="btn btn-outline btn-xs" title="Nächste Woche">›</button>
+          </div>
+          <div class="future-cal-heading">
+            <h2 id="futureCalMonthTitle">Oktober 2026</h2>
+            <span id="futureCalWeekBadge" class="aero-badge week-badge-a">KW 43 · Woche A (Aktuell)</span>
+          </div>
+        </div>
+
+        <div class="future-cal-actions">
+          <div class="view-segmented-control">
+            <button type="button" id="btnViewWeek" class="seg-btn active">🗓️ Wochenansicht</button>
+            <button type="button" id="btnViewAgenda" class="seg-btn">📋 8-Wochen Agenda</button>
+          </div>
+          <button type="button" id="btnJumpToTimetable" class="btn btn-outline btn-xs">
+            🗓️ Zum Stundenplan &amp; Kursen
+          </button>
+        </div>
+      </div>
+
+      <!-- 8-Weeks Ribbon Selector -->
+      <div class="future-cal-ribbon-wrap">
+        <div class="future-cal-ribbon-label">8-Wochen Vorausschau:</div>
+        <div class="future-cal-ribbon" id="futureCalRibbon"></div>
+      </div>
+
+      <!-- Main Calendar Display: Week Grid View -->
+      <div id="futureCalWeekContainer" class="future-cal-week-view">
+        <div class="future-cal-day-headers" id="futureCalDayHeaders"></div>
+        <div class="future-cal-grid-body">
+          <div class="future-cal-time-gutter" id="futureCalTimeGutter"></div>
+          <div class="future-cal-columns" id="futureCalColumns"></div>
+        </div>
+      </div>
+
+      <!-- Main Calendar Display: Agenda View (List of 8 Weeks) -->
+      <div id="futureCalAgendaContainer" class="future-cal-agenda-view hidden">
+        <div class="future-cal-agenda-list" id="futureCalAgendaList"></div>
+      </div>
+    </div>
+  </main>
+
+  <!-- MAIN WORKSPACE GRID (STUNDENPLAN & KURSE) -->
+  <main class="workspace" id="pageTimetable" style="display: none;">
+    <div class="workspace-subnav-bar">
+      <button type="button" id="btnSwitchToFutureCal" class="btn btn-outline btn-xs">
+        📅 Zum 8-Wochen Zukunftskalender wechseln →
+      </button>
+    </div>
     <!-- LEFT COLUMN: COURSE ID SNIPER + RANKED GROUPS -->
     <section class="left-panel">
       <!-- 1. STRICT COURSE ID LOOKUP CARD -->
@@ -694,6 +749,55 @@
     </div>
   </div>
 
+  <!-- MODAL: EVENT DETAIL (APPLE CALENDAR STYLE) -->
+  <div id="modalEventDetail" class="modal-backdrop hidden">
+    <div class="modal modal-event-detail">
+      <div class="modal-header event-detail-header">
+        <div class="event-detail-title-wrap">
+          <span id="evDetailBadge" class="aero-badge">Vorlesung</span>
+          <h3 id="evDetailTitle">VL infEWInf-01a</h3>
+        </div>
+        <button class="btn-close" data-close="modalEventDetail">&times;</button>
+      </div>
+      <div class="modal-body event-detail-body">
+        <div class="event-detail-row">
+          <span class="detail-icon">📅</span>
+          <div>
+            <strong id="evDetailDate">Donnerstag, 22. Oktober 2026</strong>
+            <span id="evDetailTime" class="detail-sub">10:15 – 11:45 Uhr</span>
+          </div>
+        </div>
+        <div class="event-detail-row">
+          <span class="detail-icon">📍</span>
+          <div>
+            <strong id="evDetailRoom">LMS6 - R.11 / CAP2</strong>
+            <span id="evDetailBuilding" class="detail-sub">Christian-Albrechts-Universität zu Kiel</span>
+          </div>
+          <button type="button" id="btnEvDetailAppleMaps" class="btn btn-xs btn-outline" style="margin-left:auto;">
+            🗺️ In Apple Maps öffnen
+          </button>
+        </div>
+        <div class="event-detail-row">
+          <span class="detail-icon">🔄</span>
+          <div>
+            <strong id="evDetailTurnus">Wöchentlich</strong>
+            <span id="evDetailWeekType" class="detail-sub">Jede Woche</span>
+          </div>
+        </div>
+        <div class="event-detail-row" id="evDetailCourseWrap">
+          <span class="detail-icon">🎓</span>
+          <div>
+            <strong id="evDetailCourseId">infEWInf-01a</strong>
+            <span id="evDetailUnivisId" class="detail-sub">UnivIS: #080038</span>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-primary" data-close="modalEventDetail">Fertig</button>
+      </div>
+    </div>
+  </div>
+
   <!-- SLIDE-IN HAMBURGER MENU DRAWER (LEFT-TO-RIGHT) -->
   <div id="drawerMenuBackdrop" class="drawer-backdrop" style="display:none;"></div>
   <aside id="drawerMenu" class="drawer-menu" style="display:none;" aria-label="UNIBODY Menü" role="dialog" aria-modal="true">
@@ -714,13 +818,17 @@
       <div class="drawer-section">
         <div class="drawer-section-title">Navigation</div>
         <nav class="drawer-nav">
+          <button type="button" class="drawer-item" id="drawerBtnCalendar">
+            <span class="drawer-icon">📅</span>
+            <span>Kalender (8-Wochen-Vorschau)</span>
+          </button>
+          <button type="button" class="drawer-item" id="drawerBtnTimetable">
+            <span class="drawer-icon">🗓️</span>
+            <span>Stundenplan &amp; Kurse</span>
+          </button>
           <button type="button" class="drawer-item" id="drawerBtnSettings">
             <span class="drawer-icon">⚙️</span>
             <span>Einstellungen</span>
-          </button>
-          <button type="button" class="drawer-item" id="drawerBtnCalendar">
-            <span class="drawer-icon">📅</span>
-            <span>Kalender</span>
           </button>
         </nav>
       </div>
@@ -731,6 +839,6 @@
     </div>
   </aside>
 
-  <script src="/app.js?v=4"></script>
+  <script src="/app.js?v=6"></script>
 </body>
 </html>
