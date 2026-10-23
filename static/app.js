@@ -1529,39 +1529,39 @@ function initFutureCalEvents() {
   }
 }
 
-/* PAGE ROUTING (KALENDER, STUNDENPLAN & EINSTELLUNGEN) */
+/* PAGE ROUTING (STUNDENPLAN & KURSE, KALENDER, EINSTELLUNGEN) */
 function switchAppPage(pageName, updateHash = true) {
   const pageCalendar = document.getElementById("pageCalendar");
   const pageTimetable = document.getElementById("pageTimetable");
   const pageSettings = document.getElementById("pageSettings");
-  if (!pageCalendar || !pageSettings) return;
+  if (!pageCalendar || !pageSettings || !pageTimetable) return;
 
   if (pageName === "settings") {
     pageCalendar.style.display = "none";
-    if (pageTimetable) pageTimetable.style.display = "none";
+    pageTimetable.style.display = "none";
     pageSettings.style.display = "block";
     if (updateHash && window.location.hash !== "#settings") {
       window.location.hash = "settings";
     }
     window.scrollTo({ top: 0, behavior: "smooth" });
-  } else if (pageName === "timetable") {
-    pageCalendar.style.display = "none";
+  } else if (pageName === "calendar") {
+    pageTimetable.style.display = "none";
     pageSettings.style.display = "none";
-    if (pageTimetable) pageTimetable.style.display = "grid";
-    if (updateHash && window.location.hash !== "#timetable") {
-      window.location.hash = "timetable";
-    }
-    renderTimetable();
-    window.scrollTo({ top: 0, behavior: "smooth" });
-  } else {
-    // Default: "calendar" (8-Wochen Zukunftskalender)
-    pageSettings.style.display = "none";
-    if (pageTimetable) pageTimetable.style.display = "none";
     pageCalendar.style.display = "flex";
     if (updateHash && window.location.hash !== "#calendar") {
       window.location.hash = "calendar";
     }
     renderFutureCalendar();
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  } else {
+    // Default: "timetable" (Stundenplan & Kurse)
+    pageCalendar.style.display = "none";
+    pageSettings.style.display = "none";
+    pageTimetable.style.display = "grid";
+    if (updateHash && window.location.hash && window.location.hash !== "#timetable") {
+      window.location.hash = "timetable";
+    }
+    renderTimetable();
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
 }
@@ -1646,29 +1646,29 @@ function initDrawerMenu() {
 
   // Settings page back buttons
   document.getElementById("btnBackToCalendar")?.addEventListener("click", () => {
-    switchAppPage("calendar");
+    switchAppPage("timetable");
   });
   document.getElementById("btnBackToCalendarBottom")?.addEventListener("click", () => {
-    switchAppPage("calendar");
+    switchAppPage("timetable");
   });
 
-  // Hash-based routing
+  // Hash-based routing (Default landing page: Stundenplan & Kurse)
   window.addEventListener("hashchange", () => {
     if (window.location.hash === "#settings") {
       switchAppPage("settings", false);
-    } else if (window.location.hash === "#timetable") {
-      switchAppPage("timetable", false);
-    } else {
+    } else if (window.location.hash === "#calendar") {
       switchAppPage("calendar", false);
+    } else {
+      switchAppPage("timetable", false);
     }
   });
 
   if (window.location.hash === "#settings") {
     switchAppPage("settings", false);
-  } else if (window.location.hash === "#timetable") {
-    switchAppPage("timetable", false);
-  } else {
+  } else if (window.location.hash === "#calendar") {
     switchAppPage("calendar", false);
+  } else {
+    switchAppPage("timetable", false);
   }
 }
 

@@ -10,7 +10,7 @@
   <link rel="icon" type="image/png" sizes="192x192" href="/favicon-192.png" />
   <link rel="icon" type="image/x-icon" href="/favicon.ico" />
   <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
-  <link rel="stylesheet" href="/styles.css?v=6" />
+  <link rel="stylesheet" href="/styles.css?v=7" />
 </head>
 <body>
   <!-- TOP HEADER -->
@@ -37,7 +37,7 @@
   </header>
 
   <!-- DEDICATED 8-WEEKS FUTURE CALENDAR PAGE (APPLE CALENDAR STYLE) -->
-  <main class="calendar-app-page" id="pageCalendar">
+  <main class="calendar-app-page" id="pageCalendar" style="display: none;">
     <div class="future-cal-card">
       <!-- Apple Calendar Topbar Toolbar -->
       <div class="future-cal-top-bar">
@@ -87,7 +87,7 @@
   </main>
 
   <!-- MAIN WORKSPACE GRID (STUNDENPLAN & KURSE) -->
-  <main class="workspace" id="pageTimetable" style="display: none;">
+  <main class="workspace" id="pageTimetable">
     <div class="workspace-subnav-bar">
       <button type="button" id="btnSwitchToFutureCal" class="btn btn-outline btn-xs">
         📅 Zum 8-Wochen Zukunftskalender wechseln →
@@ -210,7 +210,7 @@
     <div class="settings-container">
       <div class="settings-nav-bar">
         <button type="button" id="btnBackToCalendar" class="btn btn-outline">
-          ← Zurück zum Kalender
+          ← Zurück zum Stundenplan
         </button>
         <div class="settings-title-wrap">
           <h2>⚙️ Einstellungen</h2>
@@ -383,7 +383,7 @@
 
       <div class="settings-footer-actions">
         <button type="button" id="btnBackToCalendarBottom" class="btn btn-primary">
-          ✓ Zurück zum Kalender
+          ✓ Zurück zum Stundenplan
         </button>
       </div>
     </div>
@@ -839,6 +839,6 @@
     </div>
   </aside>
 
-  <script src="/app.js?v=6"></script>
+  <script src="/app.js?v=7"></script>
 </body>
 </html>
