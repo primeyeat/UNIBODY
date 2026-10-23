@@ -149,7 +149,7 @@ Jede Vorlesung und Übung im Kalender verfügt über einen Detail-Dialog mit App
 
 ## 📱 Native iOS App (100 % Autonom & Standalone)
 
-Unter [`ios/UNIBODY/UNIBODY.xcodeproj`](file:///Users/zer0/.gemini/antigravity/scratch/cau-lms-bot/ios/UNIBODY/UNIBODY.xcodeproj) liegt die native SwiftUI-App für iPhone und iPad:
+Unter [`ios/UNIBODY/UNIBODY.xcodeproj`](ios/UNIBODY/UNIBODY.xcodeproj) liegt die native SwiftUI-App für iPhone und iPad:
 
 - 🫧 **Frutiger Aero Liquid Glass Design:** Native iOS-Komponenten mit `.ultraThinMaterial`, Lichtreflexionen und haptischem Feedback.
 - 📱 **Vollkommen unabhängig:** Läuft 100 % autonom auf dem iPhone – kein laufender Mac oder lokales WLAN-Setup nötig.

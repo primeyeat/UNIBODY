@@ -12,9 +12,8 @@ public struct SyncResult {
 public class SyncService {
     public static let shared = SyncService()
     
-    // Default candidate endpoints: Local Wi-Fi IP of host Mac + Simulator loopback
+    // Default candidate endpoints: Simulator loopback
     public static let defaultCandidates: [String] = [
-        "http://192.168.178.74:8765",
         "http://127.0.0.1:8765",
         "http://localhost:8765"
     ]

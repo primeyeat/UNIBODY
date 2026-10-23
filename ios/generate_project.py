@@ -1,6 +1,6 @@
 import os
 
-base_dir = '/Users/zer0/.gemini/antigravity/scratch/cau-lms-bot/ios/UNIBODY'
+base_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), 'UNIBODY'))
 xcodeproj_dir = os.path.join(base_dir, 'UNIBODY.xcodeproj')
 os.makedirs(xcodeproj_dir, exist_ok=True)
 

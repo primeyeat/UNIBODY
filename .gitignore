@@ -8,5 +8,9 @@ data/
 cau_autofill_ext/
 *.log
 
-# macOS
+# macOS & Xcode
 .DS_Store
+build/
+DerivedData/
+xcuserdata/
+*.xcuserstate
