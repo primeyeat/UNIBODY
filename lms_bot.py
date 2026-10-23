@@ -1506,8 +1506,11 @@ setTimeout(runUnibodyAutoFill, 2200);
 
         # 3. Terminate any residual Chrome process on debug_port
         try:
-            p_cmd = f"lsof -ti :{self.debug_port}"
-            pids = subprocess.check_output(p_cmd, shell=True, text=True, stderr=subprocess.DEVNULL).strip().splitlines()
+            pids = subprocess.check_output(
+                ["lsof", "-ti", f":{int(self.debug_port)}"],
+                text=True,
+                stderr=subprocess.DEVNULL
+            ).strip().splitlines()
             for pid in pids:
                 if pid.strip().isdigit():
                     try:
