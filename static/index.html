@@ -10,7 +10,7 @@
   <link rel="icon" type="image/png" sizes="192x192" href="/favicon-192.png" />
   <link rel="icon" type="image/x-icon" href="/favicon.ico" />
   <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
-  <link rel="stylesheet" href="/styles.css?v=16" />
+  <link rel="stylesheet" href="/styles.css?v=17" />
 </head>
 <body>
   <!-- TOP HEADER -->
@@ -210,7 +210,40 @@
         </button>
         <div class="settings-title-wrap">
           <h2>⚙️ Einstellungen</h2>
-          <span class="settings-subtitle">CAU Account, Optimierungs-Präferenzen &amp; Telemetrie</span>
+          <span class="settings-subtitle">Design-Themen, CAU Account, Optimierungs-Präferenzen &amp; Telemetrie</span>
+        </div>
+      </div>
+
+      <!-- 0. APPEARANCE & THEME CARD -->
+      <div class="card theme-settings-card" id="settingsThemeCard">
+        <div class="card-header">
+          <div>
+            <span class="step-pill">DESIGN</span>
+            <h2>🎨 Erscheinungsbild &amp; Theme-Stile</h2>
+          </div>
+          <span class="live-recalc-tag" id="currentThemeBadge">🫧 Frutiger Aero</span>
+        </div>
+        <div class="vault-form-body">
+          <p class="helper-text">
+            Passe das Aussehen von UNIBODY deinem persönlichen Geschmack an. Jedes Theme bietet eine maßgeschneiderte <strong>Light-</strong> und <strong>Dark-Mode</strong>-Version.
+          </p>
+          <div class="form-row" style="align-items:flex-end;gap:16px;">
+            <div class="form-group" style="flex:2;">
+              <label for="selectThemeStyle">Design auswählen:</label>
+              <select id="selectThemeStyle" class="form-select" style="font-size:0.92rem;font-weight:700;padding:10px 14px;">
+                <option value="aero">🫧 Frutiger Aero (Klassik Aqua Glass)</option>
+                <option value="cupertino">🍏 Cupertino Minimal (Modern Apple macOS/iOS)</option>
+                <option value="botanical">🌿 Botanischer Garten (Emerald &amp; Nature)</option>
+                <option value="vaporwave">🌴 Vaporwave Sunset (Synthwave &amp; Neon Dreams)</option>
+              </select>
+            </div>
+            <div class="form-group" style="flex:1;">
+              <label>Modus:</label>
+              <button type="button" id="btnToggleDarkModeInSettings" class="btn btn-outline" style="width:100%;padding:10px 14px;justify-content:center;">
+                🌙 Dark Mode
+              </button>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -885,6 +918,6 @@
     </div>
   </aside>
 
-  <script src="/app.js?v=16"></script>
+  <script src="/app.js?v=17"></script>
 </body>
 </html>

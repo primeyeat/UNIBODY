@@ -159,19 +159,66 @@ function playClaireChime() {
   }
 }
 
-function initThemeMode() {
-  const savedTheme = localStorage.getItem("cau_dorfic_theme") || "light";
-  const btn = document.getElementById("btnToggleDarkMode");
-  if (savedTheme === "dark") {
-    document.body.classList.add("dark-mode");
-    if (btn) btn.textContent = "☀️ Daylight Mode";
+const THEME_NAMES = {
+  aero: "🫧 Frutiger Aero",
+  cupertino: "🍏 Cupertino Minimal",
+  botanical: "🌿 Botanischer Garten",
+  vaporwave: "🌴 Vaporwave Sunset",
+};
+
+function applyDesignTheme(themeKey) {
+  const valid = THEME_NAMES[themeKey] ? themeKey : "aero";
+  document.body.dataset.theme = valid;
+  localStorage.setItem("cau_design_theme", valid);
+
+  const selectEl = document.getElementById("selectThemeStyle");
+  if (selectEl && selectEl.value !== valid) {
+    selectEl.value = valid;
   }
-  if (btn) {
-    btn.addEventListener("click", () => {
-      const isDark = document.body.classList.toggle("dark-mode");
-      localStorage.setItem("cau_dorfic_theme", isDark ? "dark" : "light");
-      btn.textContent = isDark ? "☀️ Daylight Mode" : "🌙 Dark Mode";
-      checkClaireEasterEgg();
+  const badgeEl = document.getElementById("currentThemeBadge");
+  if (badgeEl) {
+    badgeEl.textContent = THEME_NAMES[valid] || "🫧 Frutiger Aero";
+  }
+}
+
+function updateThemeToggleButtons(isDark) {
+  const label = isDark ? "☀️ Daylight Mode" : "🌙 Dark Mode";
+  const btnTop = document.getElementById("btnToggleDarkMode");
+  if (btnTop) btnTop.textContent = label;
+  const btnSettings = document.getElementById("btnToggleDarkModeInSettings");
+  if (btnSettings) btnSettings.textContent = label;
+}
+
+function initThemeMode() {
+  // 1. Dark / Daylight Mode
+  const savedMode = localStorage.getItem("cau_dorfic_theme") || "light";
+  const isDark = savedMode === "dark";
+  if (isDark) {
+    document.body.classList.add("dark-mode");
+  }
+  updateThemeToggleButtons(isDark);
+
+  const toggleHandler = () => {
+    const darkNow = document.body.classList.toggle("dark-mode");
+    localStorage.setItem("cau_dorfic_theme", darkNow ? "dark" : "light");
+    updateThemeToggleButtons(darkNow);
+    checkClaireEasterEgg();
+  };
+
+  const btnTop = document.getElementById("btnToggleDarkMode");
+  if (btnTop) btnTop.addEventListener("click", toggleHandler);
+
+  const btnSettings = document.getElementById("btnToggleDarkModeInSettings");
+  if (btnSettings) btnSettings.addEventListener("click", toggleHandler);
+
+  // 2. Design-Theme (aero, cupertino, botanical, vaporwave)
+  const savedDesign = localStorage.getItem("cau_design_theme") || "aero";
+  applyDesignTheme(savedDesign);
+
+  const selectEl = document.getElementById("selectThemeStyle");
+  if (selectEl) {
+    selectEl.addEventListener("change", (e) => {
+      applyDesignTheme(e.target.value);
     });
   }
 }
