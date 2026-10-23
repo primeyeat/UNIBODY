@@ -1484,8 +1484,10 @@ async function triggerEnrollment() {
   const simulateFallback = chkFallback ? chkFallback.checked : false;
 
   const badge = document.getElementById("jobStatusBadge");
-  badge.className = "status-pill";
-  badge.textContent = "Einschreibung läuft...";
+  if (badge) {
+    badge.className = "status-pill";
+    badge.textContent = "Einschreibung läuft...";
+  }
 
   await apiPost("/api/enroll/execute", {
     course_id: appState.currentCourse.course_id,
@@ -1515,8 +1517,10 @@ async function pollTelemetry() {
       const latest = data.jobs[0];
       const badge = document.getElementById("jobStatusBadge");
       if (latest.status === "completed") {
-        badge.className = "status-pill completed";
-        badge.textContent = `✓ ${latest.result_message}`;
+        if (badge) {
+          badge.className = "status-pill completed";
+          badge.textContent = `✓ ${latest.result_message}`;
+        }
         appState.schedule = data.schedule || appState.schedule;
         renderTimetable();
 
@@ -1527,10 +1531,12 @@ async function pollTelemetry() {
           showEnrollmentSuccessModal(latest);
         }
       } else if (latest.status === "locked") {
-        badge.className = "status-pill";
-        badge.style.background = "linear-gradient(180deg, #ffe082 0%, #ffb300 100%)";
-        badge.style.color = "#5c2e00";
-        badge.textContent = `⏳ ${latest.result_message}`;
+        if (badge) {
+          badge.className = "status-pill";
+          badge.style.background = "linear-gradient(180deg, #ffe082 0%, #ffb300 100%)";
+          badge.style.color = "#5c2e00";
+          badge.textContent = `⏳ ${latest.result_message}`;
+        }
 
         // Show enrollment locked notification modal if not already notified
         const notifKey = `notified_job_${latest.job_id}`;
@@ -1539,15 +1545,19 @@ async function pollTelemetry() {
           showEnrollmentLockedModal(latest);
         }
       } else if (latest.status === "running" || latest.status === "armed") {
-        badge.className = "status-pill";
-        badge.style.background = "";
-        badge.style.color = "";
-        badge.textContent = `⚡ ${latest.result_message}`;
+        if (badge) {
+          badge.className = "status-pill";
+          badge.style.background = "";
+          badge.style.color = "";
+          badge.textContent = `⚡ ${latest.result_message}`;
+        }
       } else if (latest.status === "failed") {
-        badge.className = "status-pill";
-        badge.style.background = "linear-gradient(180deg, #ffcdd2 0%, #ef5350 100%)";
-        badge.style.color = "#491212";
-        badge.textContent = `❌ ${latest.result_message}`;
+        if (badge) {
+          badge.className = "status-pill";
+          badge.style.background = "linear-gradient(180deg, #ffcdd2 0%, #ef5350 100%)";
+          badge.style.color = "#491212";
+          badge.textContent = `❌ ${latest.result_message}`;
+        }
       }
     }
   } catch (e) {
@@ -1845,6 +1855,7 @@ function updateBrowserBadge(status) {
 
 function renderLogs(logs) {
   const container = document.getElementById("terminalLogs");
+  if (!container) return;
   const wasAtBottom = container.scrollHeight - container.scrollTop <= container.clientHeight + 30;
   container.innerHTML = logs
     .map(
