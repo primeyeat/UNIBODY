@@ -1558,28 +1558,51 @@ function initFutureCalEvents() {
 let currentTurnusEditingEv = null;
 
 async function setScheduleTurnus(evId, weekType) {
-  const cleanWt = (weekType === "all" || !weekType) ? null : weekType;
-  const res = await apiPost("/api/schedule/set-turnus", {
-    id: evId,
-    week_type: cleanWt
-  });
-  if (res.ok) {
-    appState.schedule = res.schedule;
-    if (appState.currentCourse) {
-      await verifyAndRankCourse(appState.currentCourse.course_id);
-    } else {
-      renderTimetable();
+  const cleanWt = (weekType === "all" || !weekType || weekType === "null") ? null : String(weekType).toUpperCase();
+
+  // 1. Optimistic instant update in memory
+  let matchedTitle = "";
+  appState.schedule = appState.schedule.map((e) => {
+    if (String(e.id) === String(evId)) {
+      matchedTitle = e.title || "Termin";
+      return { ...e, week_type: cleanWt };
     }
+    return e;
+  });
+
+  if (currentTurnusEditingEv && String(currentTurnusEditingEv.id) === String(evId)) {
+    currentTurnusEditingEv.week_type = cleanWt;
+    const turnusEl = document.getElementById("evDetailTurnus");
+    const wtEl = document.getElementById("evDetailWeekType");
+    if (turnusEl) turnusEl.textContent = cleanWt ? "14-tägig im Semester" : "Wöchentlich";
+    if (wtEl) wtEl.textContent = cleanWt ? `Findet nur in Woche ${cleanWt} statt` : "Findet jede Woche statt";
+  }
+
+  // 2. Immediately re-render all views so the user sees the change INSTANTLY!
+  renderTimetable();
+  renderFutureCalendar();
+  renderTurnusManagerList();
+
+  // 3. Persist to backend: use /api/schedule/update first (works on all running server versions!)
+  let res = await apiPost("/api/schedule/update", {
+    schedule: appState.schedule
+  });
+
+  // Fallback to /api/schedule/set-turnus if update returned not ok
+  if (!res || !res.ok) {
+    res = await apiPost("/api/schedule/set-turnus", {
+      id: evId,
+      week_type: cleanWt
+    });
+  }
+
+  if (res && res.ok && res.schedule) {
+    appState.schedule = res.schedule;
+    renderTimetable();
     renderFutureCalendar();
     renderTurnusManagerList();
-    if (currentTurnusEditingEv && String(currentTurnusEditingEv.id) === String(evId)) {
-      currentTurnusEditingEv.week_type = cleanWt;
-      const turnusEl = document.getElementById("evDetailTurnus");
-      const wtEl = document.getElementById("evDetailWeekType");
-      if (turnusEl) turnusEl.textContent = cleanWt ? "14-tägig im Semester" : "Wöchentlich";
-      if (wtEl) wtEl.textContent = cleanWt ? `Findet nur in Woche ${cleanWt} statt` : "Findet jede Woche statt";
-    }
   }
+
   return res;
 }
 
@@ -1602,9 +1625,9 @@ function openTurnusSelectModal(ev) {
   }
 
   const currentWt = ev.week_type || "all";
-  document.getElementById("turnusOptAll")?.classList.toggle("active", currentWt === "all");
-  document.getElementById("turnusOptA")?.classList.toggle("active", currentWt === "A");
-  document.getElementById("turnusOptB")?.classList.toggle("active", currentWt === "B");
+  modal.querySelectorAll(".turnus-opt-btn").forEach((btn) => {
+    btn.classList.toggle("active", btn.dataset.turnus === currentWt);
+  });
 
   modal.classList.remove("hidden");
 }
@@ -1664,15 +1687,14 @@ function renderTurnusManagerList() {
 }
 
 function initTurnusEvents() {
-  ["all", "A", "B"].forEach((wt) => {
-    const btn = document.getElementById(`turnusOpt${wt}`);
-    if (btn) {
-      btn.addEventListener("click", async () => {
-        if (!currentTurnusEditingEv) return;
-        await setScheduleTurnus(currentTurnusEditingEv.id, wt);
-        document.getElementById("modalTurnusSelect")?.classList.add("hidden");
-      });
-    }
+  // Bind all turnus option buttons using data-turnus attribute
+  document.querySelectorAll(".turnus-opt-btn").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      if (!currentTurnusEditingEv) return;
+      const wt = btn.dataset.turnus;
+      await setScheduleTurnus(currentTurnusEditingEv.id, wt);
+      document.getElementById("modalTurnusSelect")?.classList.add("hidden");
+    });
   });
 
   document.getElementById("btnOpenTurnusManagerModal")?.addEventListener("click", () => {
@@ -1683,6 +1705,16 @@ function initTurnusEvents() {
   document.getElementById("btnEvDetailChangeTurnus")?.addEventListener("click", () => {
     if (currentTurnusEditingEv) {
       openTurnusSelectModal(currentTurnusEditingEv);
+    }
+  });
+
+  // Modal backdrop click closes
+  ["modalTurnusSelect", "modalTurnusManager"].forEach((mId) => {
+    const modalEl = document.getElementById(mId);
+    if (modalEl) {
+      modalEl.addEventListener("click", (e) => {
+        if (e.target === modalEl) modalEl.classList.add("hidden");
+      });
     }
   });
 }
