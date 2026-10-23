@@ -7,7 +7,6 @@ public class AppState: ObservableObject {
     @Published public var courses: [Course] = []
     @Published public var enrolledGroups: [String: String] = [:] // [course_id: group_id]
     @Published public var jobs: [SniperJob] = []
-    @Published public var serverURL: String = "http://127.0.0.1:8765"
     @Published public var isSyncing: Bool = false
     @Published public var syncMessage: String? = nil
     
@@ -58,11 +57,6 @@ public class AppState: ObservableObject {
     public init() {
         loadCredentialsFromStorage()
         loadInitialData()
-        
-        // Auto-sync on startup
-        Task {
-            await syncWithLocalServer()
-        }
     }
     
     public func loadCredentialsFromStorage() {
@@ -96,11 +90,6 @@ public class AppState: ObservableObject {
         defaults.set(defaultPlatform, forKey: kPlatformKey)
         defaults.set(autoFill, forKey: kAutoFillKey)
         defaults.set(autoSubmit, forKey: kAutoSubmitKey)
-        
-        // Also sync credentials asynchronously to local backend if running
-        Task {
-            await syncCredentialsToServer()
-        }
     }
     
     public func clearCredentials() {
@@ -112,35 +101,6 @@ public class AppState: ObservableObject {
         defaults.removeObject(forKey: kUsernameKey)
         defaults.removeObject(forKey: kPasswordKey)
         defaults.removeObject(forKey: kPlatformKey)
-        
-        Task {
-            guard let url = URL(string: "\(serverURL)/api/credentials/clear") else { return }
-            var req = URLRequest(url: url)
-            req.httpMethod = "POST"
-            _ = try? await URLSession.shared.data(for: req)
-        }
-    }
-    
-    public func syncCredentialsToServer() async {
-        guard let url = URL(string: "\(serverURL)/api/credentials/save") else { return }
-        var req = URLRequest(url: url)
-        req.httpMethod = "POST"
-        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        
-        let payload: [String: Any] = [
-            "username": username,
-            "password": password,
-            "default_platform": defaultPlatform,
-            "auto_fill": isAutoFillActive,
-            "auto_submit": isAutoSubmitActive,
-            "use_keychain": true,
-            "launch_browser": false
-        ]
-        
-        if let data = try? JSONSerialization.data(withJSONObject: payload) {
-            req.httpBody = data
-            _ = try? await URLSession.shared.data(for: req)
-        }
     }
     
     public func loadInitialData() {
@@ -541,44 +501,5 @@ public class AppState: ObservableObject {
     
     public func fetchBookedExercisesFromOnlineAccounts() async {
         performDeepSync()
-    }
-    
-    public func syncWithLocalServer(customURL: String? = nil) async {
-        isSyncing = true
-        defer { isSyncing = false }
-        
-        let target = customURL ?? serverURL
-        guard let activeHost = await SyncService.shared.discoverActiveServer(preferredURL: target) else {
-            syncMessage = "⚠️ UNIBODY Server nicht erreichbar (\(target)). Lokaler Offline-Modus aktiv."
-            return
-        }
-        
-        self.serverURL = activeHost
-        
-        do {
-            let result = try await SyncService.shared.fetchServerState(serverURL: activeHost)
-            
-            // 1. Update Enrolled Groups Map
-            self.enrolledGroups = result.enrolled
-            
-            // 2. Update Schedule with server events (including ✅ enrolled exercises)
-            if !result.schedule.isEmpty {
-                self.schedule = result.schedule
-            }
-            
-            // 3. Mark enrolled groups in the course catalog
-            for i in 0..<courses.count {
-                let cid = courses[i].courseId.lowercased()
-                if let enrolledGid = result.enrolled[cid] {
-                    courses[i].enrolledGroupId = enrolledGid
-                }
-            }
-            
-            self.lastSyncDate = Date()
-            let count = result.enrolled.count
-            syncMessage = "✅ Synchronisiert (\(count) gebuchte Übung\(count == 1 ? "" : "en") aktiv) · Server: \(activeHost)"
-        } catch {
-            syncMessage = "Fehler beim Verarbeiten der Serverdaten: \(error.localizedDescription)"
-        }
     }
 }

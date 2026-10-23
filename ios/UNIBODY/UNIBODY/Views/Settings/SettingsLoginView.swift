@@ -180,6 +180,18 @@ public struct SettingsLoginView: View {
                             .disabled(inputUsername.trimmingCharacters(in: .whitespaces).isEmpty || appState.isDeepSyncing)
                             .padding(.top, 4)
                             
+                            if let d = appState.lastSyncDate {
+                                HStack(spacing: 4) {
+                                    Image(systemName: "checkmark.circle.fill")
+                                        .foregroundColor(AeroTheme.emerald)
+                                    Text("Letzter Deep-Sync: \(d.formatted(date: .omitted, time: .shortened)) Uhr")
+                                        .foregroundColor(.white.opacity(0.85))
+                                }
+                                .font(.caption2)
+                                .frame(maxWidth: .infinity, alignment: .center)
+                                .padding(.top, 2)
+                            }
+                            
                             // Save Button
                             Button {
                                 withAnimation {
@@ -272,86 +284,7 @@ public struct SettingsLoginView: View {
                         .padding(18)
                         .frutigerGlass(cornerRadius: 18)
                         
-                        // Backend Sync Section
-                        VStack(alignment: .leading, spacing: 12) {
-                            HStack {
-                                Image(systemName: "arrow.triangle.2.circlepath.circle.fill")
-                                    .font(.title3)
-                                    .foregroundColor(AeroTheme.skyBlue)
-                                Text("Übungs-Synchronisation")
-                                    .font(.system(.headline, design: .rounded).weight(.bold))
-                                    .foregroundColor(.white)
-                                Spacer()
-                                if let d = appState.lastSyncDate {
-                                    Text(d.formatted(date: .omitted, time: .shortened))
-                                        .font(.caption2)
-                                        .foregroundColor(AeroTheme.emerald)
-                                }
-                            }
-                            
-                            Text("Synchronisiert gebuchte Übungsgruppen, freie Plätze und den Wochenplan mit deinem Mac im selben WLAN:")
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                            
-                            // Quick IP Presets
-                            HStack(spacing: 8) {
-                                Button("Mac WLAN (192.168.178.74)") {
-                                    appState.serverURL = "http://192.168.178.74:8765"
-                                    Task { await appState.syncWithLocalServer() }
-                                }
-                                .font(.caption2.weight(.semibold))
-                                .padding(.horizontal, 10)
-                                .padding(.vertical, 6)
-                                .background(Capsule().fill(appState.serverURL.contains("192.168") ? AeroTheme.skyBlue.opacity(0.3) : Color.white.opacity(0.08)))
-                                .foregroundColor(.white)
-                                
-                                Button("Simulator (127.0.0.1)") {
-                                    appState.serverURL = "http://127.0.0.1:8765"
-                                    Task { await appState.syncWithLocalServer() }
-                                }
-                                .font(.caption2.weight(.semibold))
-                                .padding(.horizontal, 10)
-                                .padding(.vertical, 6)
-                                .background(Capsule().fill(appState.serverURL.contains("127.0.0.1") ? AeroTheme.skyBlue.opacity(0.3) : Color.white.opacity(0.08)))
-                                .foregroundColor(.white)
-                            }
-                            
-                            HStack {
-                                TextField("http://192.168.178.74:8765", text: $appState.serverURL)
-                                    .font(.system(.caption, design: .monospaced))
-                                    .foregroundColor(.white)
-                                    .padding(10)
-                                    .background(RoundedRectangle(cornerRadius: 10).fill(Color.white.opacity(0.08)))
-                                
-                                Button {
-                                    Task {
-                                        await appState.syncWithLocalServer()
-                                    }
-                                } label: {
-                                    if appState.isSyncing {
-                                        ProgressView()
-                                            .tint(.white)
-                                            .padding(.horizontal, 10)
-                                    } else {
-                                        Text("Jetzt syncen")
-                                            .font(.caption.weight(.bold))
-                                            .padding(.horizontal, 14)
-                                            .padding(.vertical, 10)
-                                            .background(Capsule().fill(AeroTheme.skyBlue))
-                                            .foregroundColor(.white)
-                                    }
-                                }
-                            }
-                            
-                            if let msg = appState.syncMessage {
-                                Text(msg)
-                                    .font(.caption2)
-                                    .foregroundColor(msg.contains("✅") ? AeroTheme.emerald : (msg.contains("⚠️") ? AeroTheme.solarOrange : .secondary))
-                                    .padding(.top, 2)
-                            }
-                        }
-                        .padding(18)
-                        .frutigerGlass(cornerRadius: 18)
+
                     }
                     .padding()
                 }
