@@ -1,0 +1,16 @@
+# Python virtual environment & bytecode
+.venv/
+__pycache__/
+*.py[cod]
+
+# Local browser session profile & runtime state (contains cookies / SSO session!)
+data/
+cau_autofill_ext/
+*.log
+
+# macOS & Xcode
+.DS_Store
+build/
+DerivedData/
+xcuserdata/
+*.xcuserstate

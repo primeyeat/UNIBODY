@@ -1,0 +1,924 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>UNIBODY</title>
+  <link rel="icon" type="image/png" sizes="32x32" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAAAXNSR0IArs4c6QAAAERlWElmTU0AKgAAAAgAAYdpAAQAAAABAAAAGgAAAAAAA6ABAAMAAAABAAEAAKACAAQAAAABAAAAIKADAAQAAAABAAAAIAAAAACshmLzAAALGUlEQVRYCZ1XeWxcZ709d5l7Z9/scWzXdhM7aTaaNg1IJQ1VWhJ4BVoWUUBCiE2Pp/fHk0ACtWVTBAiBVECA2IUKQnrvKRT1D6BVF0ggbUTaxiHBcRzH8TLeZt/vvnHuBEIJCBA3Gk1m5t7vO9/5nfM7Pwv4N69jFy8q9RUlijwwkLLNY3v32v/OUsK/+tCXn59LLbvRQ3FVPRzA2x+NiGOyIicDBFzD7+m+u255zjnHd04Uq83nn3rTnZ0b1g73Cm74Dv8UwAePTxeiA/n/kiT5/bcW4ts1UYAnidieVJGTBfhccbbdge07gCihZRjQbW2h1Kk/ZvrS4kg6c0iJyHvSqpISJKFaNcwnL5eLjz3zxjdqIZh/COA9P5t99+Rw/ovJVGzydYMRrHbaqPgS7hlKISICHg9U1HuQfReHR4YIRkDJsHG2ZeBsvYO1Th2SyipFE4gn4ihkk7g5LmFpY+OpX8/NvPPn99+vSzdSEn4+fOyEfPdHP/WlvRNDXyuk1NzBrIDdORlPbrSwfyALPwjQcHz0/AAlrYuDhQFCEVE3LZgEk+SqCVHBmJJAXnZweXPu4mK58QXDdtLb0omJTDaxw/GlmRe++60Z+UYADx4/Lvn+lu/u3Dr84dcOSqh1dewvZPF7nqjjAYbro+0EcAWSLwWIyCJmWy2MJ9PQXLe/XFqWsT8noh2X0bVVTKWlnSfnT4/+/HL7reO5xB/2T46MDMfUO3nz//8NAMPc+fldO7Z8+K4BCcW2jqmUjIB0a7aLim5jxXCgRvio6EHiK8EPC+0GyRewLZ0FGe5f5+sGsoqIruMhKuXk2yZf/bDtPG/nBKyqkjAiCkK4Cnl7xXX0+y89kEwnH5qKiYiJATZ7Nusnw/J8DPBds3qY73VhwIQjmKTdovgMFNJR0l9Bw6hCEghFCPqbG2QsGpEQBB4G5EHsGN3zGTlwbpNtD6IbrIZbX2fgyPdezgSS+GgmFhWTpLbr+/2NiRQ2AdyUjmMyBlw1G1DNKLaTGYkylCm98F+ahV831lAxSrglO4WtqQTKugVKBVUCMR0Hg6ltQiEZVXWWtaU7L4YArjOQiAQfmhzJ7nBtn5uzxqHdeIPphVoHFEnCfRMjCPQ6Nuw2imabTtCgSnSB0ON9LcgRlkXW8VL5FK60rmAgriDJMngUrcr1DC9AOhaBplnz87Xsmb8A+Njx2HBG/YhEqugitAhb480ivbbRNUEWUWL9h5Mp3FcYhqI3KMg2FowWzKALRbj28oImNL+OWNTHQusMTq/+hjoRMJ5Q4NHwuWgELk91dfN5T9oYDs93jYHbhvN3Tg1ndmmaCe7HenpY0x3kUgou1HSUNRcNAnCo8qPbpnD/0CTSegcqWlgyaijaDVhBi4x0uGAHukv/K0DFPIdnrzwOn44x+EshKqDY0JCPy7sGt7zh4HUAQ+nYkZsKGZiE16VAyj0Pq4YLSxCxTmdNb7ZJM2g5CTnK/E2TO/G2m16DjCVhVNBguWUs6uvYsMqwyYJEIJZfoUQ7qNhn8PTiM8jw9C3LRNPUMV7YJSTUiaMhgL4Iswn1QJS1ivNl8uSlhogIfWwLLlL5OM43O5jk+wgZCfXAno89gyPYkrwHZ8vTiGEeuthAzeiiwnrHKWJ6h9IUIUhxZFJj/H+TnVTEUEyCKKQQV4cOXGNg7zElqooTQeDj5qxKFgy0Oy42qy4MLtblXbHBKF5sttG2HXi+R1d4BOEiq8Zw7/hdGI3dBVfLIS7YbFR1rHWr2OhRpLKPsdwbMJrJ43KtiQR/T0boG0+CKmcm7vsGtYmJfFRRpKTNDnfLliTRm9A9CxsbJtbrDgVpoUomvKSIX2yUUDIpSpEnY0kCAgw9f2DLbhwae5AgdkF1JQiBgarWQFw+iKPjB0m7j8XyCayVn+D97AtsWrIYSzDPon0bBn4ghFbJ8ptDY3E4bDS2ZaO8oaFDYRqkfNGzEUkreK5exmynBYXqlgkkROKy/4+mBvD2Xe9DBvdAdmRucQui8j5M19dxcfMCHPsZivk8ar0SHyELfwpmkbI0DcvphfVw2HD2TQwwQEzWzoNna6hWNNTbVl9AZ/U2aoqDX3fX8cT6Enu/02fDZ/kclkRhTL9tz9sRF9+FieQDaFgV/GphAcubP6KDLOhOh6zOErgE2za0czMwRVw8ZmuGvQIqvsHeWbV8vGX3IE/Yo3A8OKS8Tes02tSGpdH7bSzRVC85FXxr4Twu1mpsv2I/IcNyLHcMDGZuR0yO4ErFxHzx+2g0uugZIkEwRXtXeVQXptVaXfgmrH4Jaq3eywabz3LbRofUjw+m8D93FOhzk4JhVyQIK+wRtKdhBahrBhZ7Oi55XXynOIOnV5YhsiTzTR3TlQY7oo6mnkGl8hTkoMTTRtHWIswPkcNKC47TRLtbmw5Z79uwWGo/e3mt8UigKKISBg/tODk1xBoK+OHMKjOeddYs1k6g8FhfVYXnkJmOjjpPfVyfx1ythwQHj0Q8wFLFxd1jo0hZr8KLpTlY1ITpMqQkGbGIilptAZu1ledCAH0G1l6aPXNptXoloiqIMGJknqbJ2D2wtYCH79yOrdRtwIbk6SwJpx2PKclOgWg8Dr1ro1722TMYTjRVsWTh7tEh7B1KYufIq+H7caQzUaTjBaSjI3wxpMqXFi5cPn/6OoCbbx/JrZWaecsw6Vs2WIsdkSUJQYwNpPDQ3ftwJJeGxBYdWBRrw4TbMgnIx3BkGIe37kBEUXH60ir2ZhTsHc70S5lPDpHiNCIR5kF+O8Yzk+hxgrqyPvuDC4+W+zNhn4Gomnr9ttHBQmmzxj4tMdmY9EwPjSDaJtOJjLznjt34z52TKDikki+9zFmhncDO/BY2JwkvzxVxqX4Jp1Zn+8+4tLUiqRRznO9RMrSAljmPhZX1q6Vq5Qfh6cOrDyAeix/KJGJYWFz/7cvzJS0dU1izEAQnIY5fXdNFmzF5YOsoPrRvNxK9CCaiw2SngGpVx3MXZrBqrUB0aKp2D00KNCErZIGji80Y4vAzmIpiY9MKlkqtT/zykV82r23/JwCu4443e/S0EDzx7IWNh65SUOG81+M4JdKzMY5dYeM4eamEx6dLzPQ8UhTTerGCswsz6Nk1CJ7K5pOFpgeocVI2+MBSfYUTk4YsZ0PLkLFUtB998XO/eOLPm4fvfReQYbPLELJt/4HpT//HUfXrz+TffWjnp8cyMWWZoms0ephbZxNiLKsKlcwmlYm4ONsowmczkpUMBJuzI5kSqfS25TCKTUwvv4Bh5ojgRzA93Xzs1NPlT75y8+sAHFP/jaFr70jkB+65/XNPnuqWu6d/8tSF6vabh24yOCEZPQ4JrGloy2GK9MitoxhKR3C2VkLDZkL22LJsGwKDpjCUQC6dw5m5M5whLiAnxXDuXOcrJx8qP0wOr43Nr0DRn2GdodsupzLZQ5l8fsL1hXElGjsoS3K6S7u5nPXDWWDPeBYH9w5hzxT/BqByTswsYrbcg9t2ENgBBxAFsUIEb54ag2Wu4eT8TwnKW569qP/37z77+FeB5fCPqL+5uPS1K/fglzLDYyMfSCRT98qyOEBpdwRRnNM63RccNZh61dTgR8YGU1MBZ/5FRnM4ooWNlOWDFI9AUWzcmuYedhGnLp5ckUX/x7V69NtLX/+/8p/3+Hvv1wH8vR//6rv3Hktv2zJwOJGOH1HT8TticWVUELykwOx0tKYWdIvrYlA/X9Krv0rkkif+8Mj/Xlf6X61zw4d/HcAND+5738cTkhyJc1xFJtYzTn77p/1EveG2f/rxj6frgAAzJqYwAAAAAElFTkSuQmCC" />
+  <link rel="icon" type="image/png" sizes="16x16" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAAXNSR0IArs4c6QAAAERlWElmTU0AKgAAAAgAAYdpAAQAAAABAAAAGgAAAAAAA6ABAAMAAAABAAEAAKACAAQAAAABAAAAEKADAAQAAAABAAAAEAAAAAA0VXHyAAADZUlEQVQ4EXVTTWzbZBh+Pjt2bMeO89e0TZo0/RMwhAoFBKcdpiFglZAmTkzTOFBAgADBhQuHHjaJ6w4FDWliYhoSquDCLjB+hKYxjQ21VbNAlrXLtiRLHefPiRPHjm3cwSaE4L180vu97/M+z/N9L8H/xNLPxSlR4BM0Q8i1Qa/8zVOZG/9VSv6dfPuHWy/Nxvg3KAaPZWRB7AxNENfq3ul21y5Xle9DojSbjkdYP6yV96fT5+8DJE5cEV55OPHJk6nwEYG1oVsOeAbwuwPsCcuomg4KXRObpYJq8NIvs1Fx4bay84jvLwbL1IFk6OP5idiRBwMWLtbaKNkU4hIB7xrg2g6SgSAmKILgeCqSa2yLPiKyEXFEpHYBnj25eDAqSS+bgy4sx8GU6ENOK6Hn1sExGlTrJm53tiGxDhjKR02Pzu0LuaSUbSd3KCwvU1NR4R3NJKjbDkrdAcYFAXtlHnf0Ijp2ES5VRtlYR1Y95/mhgaMZ1Ft5/dOzxKYPHD6Wnh2VjmaVIUuCDFrmAGneh73JBCIUjZ1+AQ0rj6HHRtH/QGPgyWIysEw1Ni82z1A0oVNjYSHgWgY2bvZR8Yy7auroWAPMR6fxzOgiJHsM+foGKJ+MmDSHcv03BPlIgOXnUr7+cOjppPH4BIvVXAN8mAHFUWg2Otgvxz0/wtifOgR9wEGzY7hS/BZW/3eEhXc993yg5adfJOnx0FJU5lieGCioLRiMgQrdxeVmBTCHkGgOijmOfGUDG9tfgqZpxLhUr1kvfERXf/xCSy4uPZ+MyekXZoKgbAtbagOm63jaLWxWat50GlGWQ0YYIqeuYySUBm+SX7OfHTtOJV47wdeURoSBg5YFHHxoAm89MINI24XQYDHjT+HS9pbHwkAiNImIFIXI+HH9Ru746ipsKhIfmex1DC5XuHVac4jdGDgQaR5JJwpZ57FWuIa8oiC704SqNyEINKpV9fOTr5/6avcP+fpGt25wfv781ZqoaKYuy3Kw29Hx6GQYID2sb5nguTBcT/fF4ndoK8bpn8413/R6nV2Au7uw8OHX+2g/+6ptem/p2tef2BN9LiCzC5vVttDS+hgL9PpxobSeL19YufDB2TO7jffi/jLdS/x9kpH3VmamM6EUBxVGba106eipLe/u7tR/1v4J2DdqWZEDA7gAAAAASUVORK5CYII=" />
+  <link rel="icon" type="image/png" href="/favicon-32x32.png" />
+  <link rel="icon" type="image/png" sizes="192x192" href="/favicon-192.png" />
+  <link rel="icon" type="image/x-icon" href="/favicon.ico" />
+  <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
+  <link rel="stylesheet" href="/styles.css?v=20" />
+</head>
+<body>
+  <!-- TOP HEADER -->
+  <header class="topbar">
+    <div class="brand">
+      <button type="button" id="btnHamburgerMenu" class="hamburger-btn" title="Menü öffnen (3-Balken)" aria-label="Menü öffnen">
+        <span class="hamburger-bar"></span>
+        <span class="hamburger-bar"></span>
+        <span class="hamburger-bar"></span>
+      </button>
+      <div class="cau-crest" id="logoClickable" role="button" tabindex="0" title="Menü öffnen">
+        <img src="/unibody-logo.png" alt="UNIBODY Logo" class="unibody-logo-img" />
+      </div>
+      <div class="brand-title" id="titleClickable" role="button" tabindex="0" title="Menü öffnen">
+        <h1>UNIBODY</h1>
+      </div>
+    </div>
+
+    <div class="session-controls">
+      <button id="btnToggleDarkMode" class="btn btn-outline" title="Zwischen Frutiger Aero Daylight und Deep Ocean Aurora Dark Mode wechseln">
+        🌙 Dark Mode
+      </button>
+    </div>
+  </header>
+
+  <!-- DEDICATED 8-WEEKS FUTURE CALENDAR PAGE (APPLE CALENDAR STYLE) -->
+  <main class="calendar-app-page" id="pageCalendar" style="display: none;">
+    <div class="future-cal-card">
+      <!-- Apple Calendar Topbar Toolbar -->
+      <div class="future-cal-top-bar">
+        <div class="future-cal-title-section">
+          <div class="future-cal-nav-buttons">
+            <button type="button" id="btnCalPrevWeek" class="btn btn-outline btn-xs" title="Vorherige Woche">‹</button>
+            <button type="button" id="btnCalToday" class="btn btn-primary btn-xs" title="Zur aktuellen Woche springen">Heute</button>
+            <button type="button" id="btnCalNextWeek" class="btn btn-outline btn-xs" title="Nächste Woche">›</button>
+          </div>
+          <div class="future-cal-heading">
+            <h2 id="futureCalMonthTitle">Oktober 2026</h2>
+            <span id="futureCalWeekBadge" class="aero-badge week-badge-a">KW 43 · Woche A (Aktuell)</span>
+          </div>
+        </div>
+
+        <div class="future-cal-actions">
+          <div class="view-segmented-control">
+            <button type="button" id="btnViewWeek" class="seg-btn active">🗓️ Wochenansicht</button>
+            <button type="button" id="btnViewAgenda" class="seg-btn">📋 8-Wochen Agenda</button>
+          </div>
+          <button type="button" id="btnJumpToTimetable" class="btn btn-outline btn-xs">
+            🗓️ Zum Stundenplan &amp; Kursen
+          </button>
+        </div>
+      </div>
+
+      <!-- 8-Weeks Ribbon Selector -->
+      <div class="future-cal-ribbon-wrap">
+        <div class="future-cal-ribbon-label">8-Wochen Vorausschau:</div>
+        <div class="future-cal-ribbon" id="futureCalRibbon"></div>
+      </div>
+
+      <!-- Main Calendar Display: Week Grid View -->
+      <div id="futureCalWeekContainer" class="future-cal-week-view">
+        <div class="future-cal-day-headers" id="futureCalDayHeaders"></div>
+        <div class="future-cal-grid-body">
+          <div class="future-cal-time-gutter" id="futureCalTimeGutter"></div>
+          <div class="future-cal-columns" id="futureCalColumns"></div>
+        </div>
+      </div>
+
+      <!-- Main Calendar Display: Agenda View (List of 8 Weeks) -->
+      <div id="futureCalAgendaContainer" class="future-cal-agenda-view hidden">
+        <div class="future-cal-agenda-list" id="futureCalAgendaList"></div>
+      </div>
+    </div>
+  </main>
+
+  <!-- MAIN WORKSPACE GRID (STUNDENPLAN & KURSE) -->
+  <main class="workspace" id="pageTimetable">
+    <div class="workspace-subnav-bar">
+      <button type="button" id="btnSwitchToFutureCal" class="btn btn-outline btn-xs">
+        📅 Zum 8-Wochen Zukunftskalender wechseln →
+      </button>
+    </div>
+    <!-- LEFT COLUMN: COURSE ID SNIPER + RANKED GROUPS -->
+    <section class="left-panel">
+      <!-- 1. STRICT COURSE ID LOOKUP CARD -->
+      <div class="card highlight-card">
+        <div class="card-header">
+          <div>
+            <span class="step-pill">SCHRITT 1</span>
+            <h2>Kurs-ID / UnivIS-Kennung / LMS-Code eingeben</h2>
+          </div>
+          <button id="btnOpenCustomCourseModal" class="btn btn-xs btn-ghost">+ Eigenen LMS-Kurs anlegen</button>
+        </div>
+
+        <p class="helper-text">
+          Gib den <strong>Wirtschaftsinformatik-Modulcode</strong> (z.&nbsp;B. <code>infEWInf-01a</code>, <code>infEInf-02a</code>, <code>Inf-Math-A</code>, <code>BWL-EinfBWL</code>), die exakte <strong>UnivIS-Kennung (2026w)</strong> (z.&nbsp;B. <code>080038</code>, <code>080042</code>, <code>080058</code>, <code>080056</code>, <code>060107</code>, <code>030225</code>, <code>080103</code>) oder eine beliebige andere 6-stellige UnivIS-Nummer für den <strong>Live-XML-Abruf</strong> ein.
+        </p>
+
+        <div class="search-bar">
+          <input
+            type="text"
+            id="courseQueryInput"
+            placeholder="z. B. 080038, 080058, 060107, 030225, infEWInf-01a, infEInf-02a..."
+            value="infEWInf-01a"
+            autocomplete="off"
+          />
+          <button id="btnVerifyCourse" class="btn btn-primary">
+            🔍 Kurs verifizieren &amp; berechnen
+          </button>
+        </div>
+
+        <!-- Quick-Select Verified CAU Courses -->
+        <div class="quick-chips" id="catalogChips"></div>
+
+        <!-- Verification Banner -->
+        <div id="verificationBanner" class="verification-banner hidden"></div>
+      </div>
+
+      <!-- 2. RANKED EXERCISE GROUPS & DIRECT ENROLLMENT ACTION CARD -->
+      <div class="card">
+        <div class="card-header">
+          <div>
+            <span class="step-pill">SCHRITT 2</span>
+            <h2>Berechnetes Übungsgruppen-Ranking &amp; Direkteinschreibung</h2>
+          </div>
+          <div class="mode-switch">
+            <button type="button" id="btnSyncEnrolledGroups" class="btn btn-primary btn-sync-prominent" title="Öffnet in Chrome automatisch deine Gruppen-Übersicht auf lms.uni-kiel.de (OpenOlat) und elearn.informatik.uni-kiel.de (Moodle), liest alle bereits gebuchten Übungsgruppen samt Uhrzeit &amp; Raum aus und trägt sie in deinen Stundenplan ein!">
+              🔄 UNIBODY Deep-Sync (Gebuchte Übungen holen)
+            </button>
+          </div>
+        </div>
+
+        <!-- Already Enrolled Status Banner (shown when user already has a group in this course) -->
+        <div id="currentCourseEnrolledBanner" class="verification-banner verified hidden" style="margin-bottom:10px;"></div>
+
+        <!-- Action Bar for Direct Live Enrollment -->
+        <div class="sniper-action-bar">
+          <div class="sniper-buttons" style="width:100%;">
+            <button id="btnExecuteNow" class="btn btn-accent" style="width:100%;font-size:1.05rem;padding:12px 20px;">
+              ⚡ Jetzt sofort einschreiben (Bestplatz sichern)
+            </button>
+          </div>
+        </div>
+
+        <!-- Ranked Groups List -->
+        <div id="rankedGroupsContainer" class="ranked-groups-list"></div>
+      </div>
+    </section>
+
+    <!-- RIGHT COLUMN: INTERACTIVE WEEKLY SCHEDULE + UNIVIS ICS CLEANER + LIVE LOG -->
+    <section class="right-panel">
+      <!-- WEEKLY TIMETABLE CARD -->
+      <div class="card calendar-card" id="calendarCard">
+        <div class="card-header">
+          <div>
+            <h2>📅 UNIBODY Wochen-Stundenplan (Frutiger Aero Glass)</h2>
+            <p class="helper-text">
+              <strong>🟦 Klick auf blauen Vorlesungs-Block</strong> = Kurs in Schritt 1 auswählen · <strong>🟧 Klick auf gestrichelten Übungs-Block</strong> = Übung als Wunsch #1 in Schritt 3 priorisieren!
+            </p>
+          </div>
+          <div class="calendar-actions">
+            <button type="button" id="btnOpenTurnusManagerModal" class="btn btn-xs btn-outline" title="Turnus aller Vorlesungen (Woche A / B / Jede Woche) anpassen">
+              🔄 Turnus (A / B / Jede)
+            </button>
+            <button id="btnOpenIcsModal" class="btn btn-xs btn-outline">
+              🧹 UnivIS .ics Import &amp; Bereiniger
+            </button>
+            <button id="btnOpenAddEventModal" class="btn btn-xs btn-primary">
+              + Eigener Termin
+            </button>
+          </div>
+        </div>
+
+        <!-- Legend -->
+        <div class="calendar-legend">
+          <span class="legend-item"><i class="swatch lecture"></i> Feste Vorlesung / Termin</span>
+          <span class="legend-item"><i class="swatch enrolled"></i> Bereits eingeschriebene Übung</span>
+          <span class="legend-item"><i class="swatch candidate-best"></i> Top-Empfehlung (#1)</span>
+          <span class="legend-item"><i class="swatch candidate-alt"></i> Alternative (#2 / #3)</span>
+          <span class="legend-item"><i class="swatch candidate-conflict"></i> Zeitkonflikt (Blockiert)</span>
+        </div>
+
+        <!-- Timetable Grid (Mo - Fr, 08:00 - 18:00) -->
+        <div class="timetable-wrapper">
+          <div class="timetable" id="timetableGrid"></div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- DEDICATED SETTINGS PAGE (OPENED FROM HAMBURGER MENU) -->
+  <main class="settings-page" id="pageSettings" style="display: none;">
+    <div class="settings-container">
+      <div class="settings-nav-bar">
+        <button type="button" id="btnBackToCalendar" class="btn btn-outline">
+          ← Zurück zum Stundenplan
+        </button>
+        <div class="settings-title-wrap">
+          <h2>⚙️ Einstellungen</h2>
+          <span class="settings-subtitle">Design-Themen, CAU Account, Optimierungs-Präferenzen &amp; Telemetrie</span>
+        </div>
+      </div>
+
+      <!-- 0. APPEARANCE & THEME CARD -->
+      <div class="card theme-settings-card" id="settingsThemeCard">
+        <div class="card-header">
+          <div>
+            <span class="step-pill">DESIGN</span>
+            <h2>🎨 Erscheinungsbild &amp; Theme-Stile</h2>
+          </div>
+          <span class="live-recalc-tag" id="currentThemeBadge">🫧 Frutiger Aero</span>
+        </div>
+        <div class="vault-form-body">
+          <p class="helper-text">
+            Passe das Aussehen von UNIBODY deinem persönlichen Geschmack an. Jedes Theme bietet eine maßgeschneiderte <strong>Light-</strong> und <strong>Dark-Mode</strong>-Version.
+          </p>
+          <div class="form-row" style="align-items:flex-end;gap:16px;">
+            <div class="form-group" style="flex:2;">
+              <label for="selectThemeStyle">Design auswählen:</label>
+              <select id="selectThemeStyle" class="form-select" style="font-size:0.92rem;font-weight:700;padding:10px 14px;">
+                <option value="aero">🫧 Frutiger Aero (Klassik Aqua Glass)</option>
+                <option value="matte">🪨 Matte Minimal (Flat &amp; Puristisch)</option>
+                <option value="cupertino">🍏 Cupertino Minimal (Modern Apple macOS/iOS)</option>
+                <option value="botanical">🌿 Botanischer Garten (Emerald &amp; Nature)</option>
+                <option value="vaporwave">🌴 Vaporwave Sunset (Synthwave &amp; Neon Dreams)</option>
+              </select>
+            </div>
+            <div class="form-group" style="flex:1;">
+              <label>Modus:</label>
+              <button type="button" id="btnToggleDarkModeInSettings" class="btn btn-outline" style="width:100%;padding:10px 14px;justify-content:center;">
+                🌙 Dark Mode
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 1. CAU ACCOUNT & AUTO-LOGIN VAULT CARD -->
+      <div class="card account-vault-card" id="accountVaultCard">
+        <div class="card-header">
+          <div>
+            <span class="step-pill" id="vaultStatusPill">🫧 UNIBODY TRESOR</span>
+            <h2>🔐 CAU Account &amp; UNIBODY Auto-Login (OpenOlat + Informatik eLearn)</h2>
+          </div>
+          <div style="display:flex;gap:6px;align-items:center;">
+            <span id="vaultSavedBadge" class="vault-badge unsaved">Noch kein Account gespeichert</span>
+            <button type="button" id="btnCollapseVault" class="btn btn-xs btn-ghost" title="Formular ein-/ausklappen">
+              🔽 Einklappen
+            </button>
+          </div>
+        </div>
+
+        <form id="formCredentials" class="vault-form-body">
+          <p class="helper-text">
+            Einmal eingeben, überall eingeloggt: Unsere <strong>UNIBODY-Engine</strong> nutzt deine gespeicherte <strong>CAU-Kennung (<code>stu...</code>)</strong> gleichzeitig für <strong>1. <code>lms.uni-kiel.de</code> (OpenOlat)</strong> und <strong>2. <code>elearn.informatik.uni-kiel.de</code> (Informatik-Moodle für <code>infEInf-02a</code>)</strong> und entscheidet bei jedem Kurs automatisch, welche der beiden Seiten angesteuert werden muss!
+          </p>
+
+          <div class="vault-grid">
+            <div class="form-group">
+              <label for="credUsername">CAU-Kennung / Login-Name *</label>
+              <input
+                type="text"
+                id="credUsername"
+                placeholder="z. B. stu241234 oder su..."
+                autocomplete="username"
+                required
+              />
+            </div>
+
+            <div class="form-group">
+              <label for="credPassword">Passwort (macOS Keychain) *</label>
+              <div class="password-input-wrap">
+                <input
+                  type="password"
+                  id="credPassword"
+                  placeholder="Dein CAU / Shibboleth Passwort..."
+                  autocomplete="current-password"
+                />
+                <button type="button" id="btnTogglePwVisibility" class="btn btn-xs btn-ghost" title="Passwort anzeigen/verbergen">
+                  👁️
+                </button>
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label for="credPlatform">UNIBODY Plattform-Modus</label>
+              <select id="credPlatform">
+                <option value="unibody">🫧 UNIBODY Auto-Router (Beide Seiten automatisch!)</option>
+                <option value="https://lms.uni-kiel.de">Nur 1. Seite: OpenOlat (lms.uni-kiel.de)</option>
+                <option value="https://elearn.informatik.uni-kiel.de">Nur 2. Seite: Info-Moodle (elearn.informatik.uni-kiel.de)</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="vault-toggles-row">
+            <label class="checkbox-inline">
+              <input type="checkbox" id="credAutoFill" checked />
+              <span>✨ Auf beiden Plattformen automatisch ausfüllen (Auto-Fill)</span>
+            </label>
+            <label class="checkbox-inline">
+              <input type="checkbox" id="credAutoSubmit" checked />
+              <span>⚡ Automatisch auf „Anmelden“ klicken (1-Klick Auto-Login)</span>
+            </label>
+            <label class="checkbox-inline">
+              <input type="checkbox" id="credUseKeychain" checked />
+              <span>🍏 Im macOS Schlüsselbund sichern</span>
+            </label>
+          </div>
+
+          <div class="vault-actions-row">
+            <button type="submit" id="btnSaveCreds" class="btn btn-primary">
+              💾 UNIBODY Login-Daten speichern
+            </button>
+            <button type="button" id="btnSaveAndAutoLogin" class="btn btn-accent">
+              🚀 Speichern &amp; beide Plattformen im Browser einloggen
+            </button>
+            <button type="button" id="btnClearCreds" class="btn btn-xs btn-ghost" style="margin-left:auto;">
+              🗑️ Gespeicherte Daten löschen
+            </button>
+          </div>
+        </form>
+      </div>
+
+      <!-- 2. OPTIMIZER WEIGHTS & PREFERENCES CARD -->
+      <div class="card" id="settingsPreferencesCard">
+        <div class="card-header">
+          <div>
+            <span class="step-pill">OPTIMIERUNG</span>
+            <h2>🎛️ Optimierungs-Gewichtung &amp; Stundenplan-Präferenzen</h2>
+          </div>
+          <span class="live-recalc-tag">⚡ Live-Berechnung aktiv</span>
+        </div>
+
+        <div class="sliders-grid">
+          <div class="slider-item">
+            <div class="slider-label">
+              <span>🧲 Kompakte Tage (Minimale Freistunden)</span>
+              <strong id="valCompact">85%</strong>
+            </div>
+            <input type="range" id="sliderCompact" min="0" max="100" value="85" />
+          </div>
+
+          <div class="slider-item">
+            <div class="slider-label">
+              <span>🏖️ Freie Tage komplett freihalten</span>
+              <strong id="valFreeDays">80%</strong>
+            </div>
+            <input type="range" id="sliderFreeDays" min="0" max="100" value="80" />
+          </div>
+
+          <div class="slider-item">
+            <div class="slider-label">
+              <span>⏰ Wunsch-Zeitfenster einhalten</span>
+              <strong id="valTimeWindow">70%</strong>
+            </div>
+            <input type="range" id="sliderTimeWindow" min="0" max="100" value="70" />
+          </div>
+
+          <div class="slider-item">
+            <div class="slider-label">
+              <span>🏃 Campus-Raumwechsel-Puffer (&ge; 15m c.t.)</span>
+              <strong id="valCampus">50%</strong>
+            </div>
+            <input type="range" id="sliderCampus" min="0" max="100" value="50" />
+          </div>
+        </div>
+
+        <div class="time-pref-row">
+          <div class="field-inline">
+            <label for="prefEarliest">Frühestens ab:</label>
+            <input type="time" id="prefEarliest" value="09:30" />
+          </div>
+          <div class="field-inline">
+            <label for="prefLatest">Spätestens bis:</label>
+            <input type="time" id="prefLatest" value="16:30" />
+          </div>
+          <div class="field-inline free-days-picker">
+            <label>Wunsch-Frei:</label>
+            <div class="day-toggles" id="freeDayToggles">
+              <button type="button" data-day="0" class="day-btn">Mo</button>
+              <button type="button" data-day="1" class="day-btn">Di</button>
+              <button type="button" data-day="2" class="day-btn">Mi</button>
+              <button type="button" data-day="3" class="day-btn">Do</button>
+              <button type="button" data-day="4" class="day-btn active">Fr</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 3. TELEMETRIE & ROUTING-PROTOKOLL CARD -->
+      <div class="card terminal-card" id="settingsTelemetryCard">
+        <div class="card-header">
+          <div>
+            <h2>🛡️ UNIBODY Telemetrie &amp; Routing-Protokoll</h2>
+          </div>
+          <span id="jobStatusBadge" class="status-pill idle">Bereit</span>
+        </div>
+        <div id="terminalLogs" class="terminal-logs"></div>
+      </div>
+
+      <div class="settings-footer-actions">
+        <button type="button" id="btnBackToCalendarBottom" class="btn btn-primary">
+          ✓ Zurück zum Stundenplan
+        </button>
+      </div>
+    </div>
+  </main>
+
+  <!-- MODAL 1: ADD MANUAL SCHEDULE BLOCK -->
+  <div id="modalAddEvent" class="modal-backdrop hidden">
+    <div class="modal">
+      <div class="modal-header">
+        <h3>+ Festen Termin zum Stundenplan hinzufügen</h3>
+        <button class="btn-close" data-close="modalAddEvent">&times;</button>
+      </div>
+      <form id="formAddEvent" class="modal-body">
+        <div class="form-group">
+          <label>Bezeichnung (z. B. Vorlesung, Nebenjob, Sport)</label>
+          <input type="text" id="evTitle" placeholder="z. B. VL Algorithmen & Datenstrukturen" required />
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Wochentag</label>
+            <select id="evDay">
+              <option value="0">Montag</option>
+              <option value="1">Dienstag</option>
+              <option value="2">Mittwoch</option>
+              <option value="3">Donnerstag</option>
+              <option value="4">Freitag</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Startzeit (c.t./s.t.)</label>
+            <input type="time" id="evStart" value="10:15" required />
+          </div>
+          <div class="form-group">
+            <label>Endzeit</label>
+            <input type="time" id="evEnd" value="11:45" required />
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Raum / Gebäude (optional)</label>
+            <input type="text" id="evRoom" placeholder="z. B. CAP3 - Hörsaal 1" />
+          </div>
+          <div class="form-group">
+            <label>Turnus / Rhythmus</label>
+            <select id="evWeekType">
+              <option value="all">🔄 Jede Woche (Wöchentlich)</option>
+              <option value="A">🅰️ Woche A (14-tägig · ungerade KW)</option>
+              <option value="B">🅱️ Woche B (14-tägig · gerade KW)</option>
+            </select>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-ghost" data-close="modalAddEvent">Abbrechen</button>
+          <button type="submit" class="btn btn-primary">Termin speichern</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL 2: UNIVIS ICS SMART IMPORTER & CLEANER -->
+  <div id="modalIcsImport" class="modal-backdrop hidden">
+    <div class="modal modal-large">
+      <div class="modal-header">
+        <h3>🧹 UnivIS .ics Smart-Import &amp; Geistertermin-Filter</h3>
+        <button class="btn-close" data-close="modalIcsImport">&times;</button>
+      </div>
+      <div class="modal-body">
+        <p class="helper-text">
+          Da der <strong>CAU UnivIS-Export (.ics)</strong> oft sämtliche Parallel-Übungsgruppen und Platzhalter gleichzeitig einträgt,
+          erkennt unser Filter diese automatisch und wählt sie vorab ab. Du kannst jeden Termin vor dem Übernehmen einzeln an- oder abwählen!
+        </p>
+
+        <div class="ics-upload-bar">
+          <input type="file" id="icsFileInput" accept=".ics,text/calendar" />
+          <button type="button" id="btnLoadDemoIcs" class="btn btn-xs btn-outline">
+            📄 Typischen CAU UnivIS-Export (mit Geister-Übungen) als Demo laden
+          </button>
+        </div>
+
+        <div id="icsPreviewContainer" class="ics-preview-list">
+          <div class="empty-hint">Wähle eine <code>.ics</code>-Datei aus oder klicke auf „Typischen CAU UnivIS-Export als Demo laden“.</div>
+        </div>
+
+        <div class="modal-footer">
+          <button type="button" class="btn btn-ghost" data-close="modalIcsImport">Schließen</button>
+          <button type="button" id="btnApplyIcsSelection" class="btn btn-primary" disabled>
+            ✅ Ausgewählte Termine in meinen Stundenplan übernehmen
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL 3: CREATE CUSTOM LMS COURSE BY ID -->
+  <div id="modalCustomCourse" class="modal-backdrop hidden">
+    <div class="modal modal-large">
+      <div class="modal-header">
+        <h3>+ Eigenen CAU LMS-Kurs mit exakter ID hinterlegen</h3>
+        <button class="btn-close" data-close="modalCustomCourse">&times;</button>
+      </div>
+      <form id="formCustomCourse" class="modal-body">
+        <p class="helper-text">
+          Hinterlege hier beliebige weitere Kurse aus OpenOlat (<code>lms.uni-kiel.de</code>) oder Moodle mit ihrer eindeutigen ID und kopiere die angebotenen Übungsgruppen-Zeiten hinein.
+        </p>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Modulcode / Kurz-ID *</label>
+            <input type="text" id="custCourseId" placeholder="z. B. inf-ADS" required />
+          </div>
+          <div class="form-group">
+            <label>UnivIS-Nr. (optional)</label>
+            <input type="text" id="custUnivisId" placeholder="z. B. 080025" />
+          </div>
+          <div class="form-group">
+            <label>OpenOlat Repo-ID (optional)</label>
+            <input type="text" id="custOlatId" placeholder="z. B. 918273645" />
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group" style="flex:1">
+            <label>Vollständiger Kurstitel *</label>
+            <input type="text" id="custTitle" placeholder="z. B. inf-ADS: Algorithmen und Datenstrukturen" required />
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Übungsgruppen (eine pro Zeile, z. B. <code>Gruppe 1: Mo 14:15 - 15:45</code> oder <code>Übung B: Do 12:15-13:45</code>)</label>
+          <textarea id="custGroupsText" rows="5" required>Übungsgruppe 1: Mo 14:15 - 15:45
+Übungsgruppe 2: Di 16:15 - 17:45
+Übungsgruppe 3: Mi 12:15 - 13:45
+Übungsgruppe 4: Do 14:15 - 15:45</textarea>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-ghost" data-close="modalCustomCourse">Abbrechen</button>
+          <button type="submit" class="btn btn-primary">Kurs speichern &amp; berechnen</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+
+  <!-- MODAL 5: ENROLLMENT SUCCESS NOTIFICATION POPUP -->
+  <div id="modalEnrollmentSuccess" class="modal-backdrop hidden">
+    <div class="modal modal-success-notification">
+      <div class="modal-header success-header">
+        <div class="success-header-badge">
+          <span class="confetti-icon">🎉</span>
+          <div>
+            <h3>Einschreibung erfolgreich abgeschlossen!</h3>
+            <p class="subtitle-modal">UNIBODY hat deinen Auftrag verbindlich ausgeführt</p>
+          </div>
+        </div>
+        <button class="btn-close" data-close="modalEnrollmentSuccess">&times;</button>
+      </div>
+      <div class="modal-body success-body">
+        <div class="success-card">
+          <div class="success-badge-pill" id="notifPlatformPill">🏛️ OpenOlat (lms.uni-kiel.de)</div>
+          <h4 class="success-course-title" id="notifCourseTitle">Kursname</h4>
+          <div class="success-group-name" id="notifGroupName">Übungsgruppe</div>
+
+          <div class="success-details-grid">
+            <div class="detail-item">
+              <span class="detail-label">📅 Wochentag &amp; Uhrzeit</span>
+              <span class="detail-val" id="notifTime">Mittwoch, 16:15 – 17:45 Uhr</span>
+            </div>
+            <div class="detail-item">
+              <span class="detail-label">📍 Hörsaal / Raum</span>
+              <span class="detail-val" id="notifRoom">HHP6 - R.EG.004</span>
+            </div>
+            <div class="detail-item">
+              <span class="detail-label">🌐 Ziel-Plattform</span>
+              <span class="detail-val" id="notifPlatform">lms.uni-kiel.de</span>
+            </div>
+            <div class="detail-item">
+              <span class="detail-label">🎟️ Bestätigungs-Token</span>
+              <span class="detail-val code-token" id="notifToken">OLAT-CONF-XXXXX</span>
+            </div>
+          </div>
+
+          <div class="chrome-closed-notice">
+            <span class="pulse-indicator"></span>
+            <div>
+              <strong>Google Chrome wurde automatisch beendet.</strong>
+              <p>Auftrag abgeschlossen – alle Browser-Tabs wurden geschlossen und Systemressourcen freigegeben.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-ghost" data-close="modalEnrollmentSuccess">Schließen</button>
+        <button type="button" class="btn btn-primary" id="btnNotifShowSchedule" data-close="modalEnrollmentSuccess">
+          📅 Im Wochenplan ansehen
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL 5B: UNENROLLMENT SUCCESS NOTIFICATION POPUP -->
+  <div id="modalUnenrollmentSuccess" class="modal-backdrop hidden">
+    <div class="modal modal-unenroll-notification">
+      <div class="modal-header unenroll-header">
+        <div class="unenroll-header-badge">
+          <span class="unenroll-icon">🚪</span>
+          <div>
+            <h3>Austragung erfolgreich abgeschlossen!</h3>
+            <p class="subtitle-modal">UNIBODY hat deine Übungsgruppe verbindlich abgemeldet</p>
+          </div>
+        </div>
+        <button class="btn-close" data-close="modalUnenrollmentSuccess">&times;</button>
+      </div>
+      <div class="modal-body unenroll-body">
+        <div class="unenroll-card">
+          <div class="unenroll-badge-pill" id="notifUnenrollPlatformPill">🏛️ OpenOlat (lms.uni-kiel.de)</div>
+          <h4 class="unenroll-course-title" id="notifUnenrollCourseTitle">Kursname</h4>
+          <div class="unenroll-group-name" id="notifUnenrollGroupName">Übungsgruppe</div>
+
+          <div class="unenroll-details-grid">
+            <div class="detail-item">
+              <span class="detail-label">📅 Freigegebener Termin</span>
+              <span class="detail-val" id="notifUnenrollTime">Mittwoch, 16:15 – 17:45 Uhr</span>
+            </div>
+            <div class="detail-item">
+              <span class="detail-label">📍 Hörsaal / Raum</span>
+              <span class="detail-val" id="notifUnenrollRoom">HHP6 - R.EG.004</span>
+            </div>
+            <div class="detail-item">
+              <span class="detail-label">🌐 Plattform</span>
+              <span class="detail-val" id="notifUnenrollPlatform">lms.uni-kiel.de</span>
+            </div>
+            <div class="detail-item">
+              <span class="detail-label">⚡ Status</span>
+              <span class="detail-val" id="notifUnenrollStatus" style="color:#f59e0b;font-weight:700;">Erfolgreich abgemeldet</span>
+            </div>
+          </div>
+
+          <div class="chrome-closed-notice">
+            <span class="pulse-indicator" style="background:#f59e0b; box-shadow:0 0 10px #f59e0b;"></span>
+            <div>
+              <strong>Wochenplan &amp; Browser aktualisiert.</strong>
+              <p>Die Übungsgruppe wurde auf der universitären Plattform verlassen und der Zeitslot in deinem Wochenplan freigegeben.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-ghost" data-close="modalUnenrollmentSuccess">Schließen</button>
+        <button type="button" class="btn btn-primary" id="btnNotifUnenrollSchedule" data-close="modalUnenrollmentSuccess">
+          📅 Wochenplan ansehen
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL 6: ENROLLMENT LOCKED / NOT YET OPEN NOTIFICATION POPUP -->
+  <div id="modalEnrollmentLocked" class="modal-backdrop hidden">
+    <div class="modal modal-locked-notification">
+      <div class="modal-header locked-header">
+        <div class="locked-header-badge">
+          <span class="lock-icon">⏳</span>
+          <div>
+            <h3>Anmeldung noch nicht freigeschaltet</h3>
+            <p class="subtitle-modal">Übungsgruppen von den Dozenten noch nicht eröffnet</p>
+          </div>
+        </div>
+        <button class="btn-close" data-close="modalEnrollmentLocked">&times;</button>
+      </div>
+      <div class="modal-body locked-body">
+        <div class="locked-card">
+          <div class="locked-badge-pill" id="lockedPlatformPill">⚡ Moodle (elearn.informatik.uni-kiel.de)</div>
+          <h4 class="locked-course-title" id="lockedCourseTitle">infEInf-02a: Einführung in die Informatik</h4>
+
+          <div class="locked-status-banner">
+            <span class="lock-indicator-pill">🔒 GESPERRT</span>
+            <div id="lockedDateNotice" class="locked-date-text">
+              Freischaltung erst am: <strong>Freitag, 23. Oktober 2026, 14:00 Uhr</strong>
+            </div>
+          </div>
+
+          <div class="locked-explanation">
+            <p>
+              UNIBODY hat den Reiter <strong>„Übungsgruppen“</strong> aufgerufen und live geprüft: Die Dozenten haben das Wahl-Formular für dieses Modul noch nicht aktiviert.
+            </p>
+            <p>
+              Sobald die Dozenten die Gruppen freischalten, ist UNIBODY sofort einsatzbereit und trägt dich in Millisekunden in deine Wunschgruppe ein!
+            </p>
+          </div>
+
+          <div class="chrome-closed-notice">
+            <span class="pulse-indicator amber"></span>
+            <div>
+              <strong>Google Chrome wurde sicher beendet.</strong>
+              <p>Auftragsprüfung abgeschlossen – Browser-Tabs wurden geschlossen und Ressourcen freigegeben.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-ghost" data-close="modalEnrollmentLocked">Schließen</button>
+        <button type="button" class="btn btn-secondary" id="btnLockedArmCountdown" data-close="modalEnrollmentLocked">
+          ⏱️ Zur Kurs-Auswahl
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- EASTER EGG MODAL: FÜR CLAIRE -->
+  <div id="modalClaireEasterEgg" class="modal-backdrop hidden">
+    <div class="modal modal-claire-easter-egg">
+      <div class="claire-gloss-bar"></div>
+      <div class="claire-hearts-container" id="claireHeartsContainer"></div>
+
+      <button class="btn-close claire-btn-close" data-close="modalClaireEasterEgg" aria-label="Schließen">&times;</button>
+
+      <div class="claire-body">
+        <div class="claire-heart-wrapper">
+          <div class="claire-halo"></div>
+          <div class="claire-floating-heart">💖</div>
+        </div>
+
+        <h2 class="claire-heading">Für Claire</h2>
+
+        <div class="claire-tag">
+          <span>💕 Von Herzen gemacht ✨</span>
+        </div>
+
+        <p class="claire-text">
+          Du bringst Licht in jeden Tag – ganz egal ob im Daylight- oder im Dark-Mode. 🌸
+        </p>
+
+        <div class="claire-decorations">
+          <span class="decor-item">🌸</span>
+          <span class="decor-item">✨</span>
+          <span class="decor-item">💖</span>
+          <span class="decor-item">✨</span>
+          <span class="decor-item">🌷</span>
+        </div>
+
+        <div class="claire-action-wrap">
+          <button type="button" class="btn btn-claire-action" data-close="modalClaireEasterEgg">
+            Hab dich lieb! 💖
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: EVENT DETAIL (APPLE CALENDAR STYLE) -->
+  <div id="modalEventDetail" class="modal-backdrop hidden">
+    <div class="modal modal-event-detail">
+      <div class="modal-header event-detail-header">
+        <div class="event-detail-title-wrap">
+          <span id="evDetailBadge" class="aero-badge">Vorlesung</span>
+          <h3 id="evDetailTitle">VL infEWInf-01a</h3>
+        </div>
+        <button class="btn-close" data-close="modalEventDetail">&times;</button>
+      </div>
+      <div class="modal-body event-detail-body">
+        <div class="event-detail-row">
+          <span class="detail-icon">📅</span>
+          <div>
+            <strong id="evDetailDate">Donnerstag, 22. Oktober 2026</strong>
+            <span id="evDetailTime" class="detail-sub">10:15 – 11:45 Uhr</span>
+          </div>
+        </div>
+        <div class="event-detail-row">
+          <span class="detail-icon">📍</span>
+          <div>
+            <strong id="evDetailRoom">LMS6 - R.11 / CAP2</strong>
+            <span id="evDetailBuilding" class="detail-sub">Christian-Albrechts-Universität zu Kiel</span>
+          </div>
+          <a id="btnEvDetailAppleMaps" class="btn btn-xs btn-outline" style="margin-left:auto; text-decoration:none;" target="_blank" rel="noopener noreferrer">
+            🗺️ In Apple Maps öffnen
+          </a>
+        </div>
+        <div class="event-detail-row">
+          <span class="detail-icon">🔄</span>
+          <div>
+            <strong id="evDetailTurnus">Wöchentlich</strong>
+            <span id="evDetailWeekType" class="detail-sub">Jede Woche</span>
+          </div>
+          <button type="button" id="btnEvDetailChangeTurnus" class="btn btn-xs btn-outline" style="margin-left:auto;">
+            ✏️ Turnus ändern
+          </button>
+        </div>
+        <div class="event-detail-row" id="evDetailCourseWrap">
+          <span class="detail-icon">🎓</span>
+          <div>
+            <strong id="evDetailCourseId">infEWInf-01a</strong>
+            <span id="evDetailUnivisId" class="detail-sub">UnivIS: #080038</span>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-primary" data-close="modalEventDetail">Fertig</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: TURNUS-MANAGER (ALLE VORLESUNGEN & TERMINE) -->
+  <div id="modalTurnusManager" class="modal-backdrop hidden">
+    <div class="modal modal-large">
+      <div class="modal-header">
+        <div class="modal-title-wrap">
+          <span class="aero-badge week-badge-a">Vorlesungs-Rhythmus</span>
+          <h3>🔄 Turnus der Vorlesungen &amp; Termine festlegen</h3>
+        </div>
+        <button class="btn-close" data-close="modalTurnusManager">&times;</button>
+      </div>
+      <div class="modal-body">
+        <p class="helper-text" style="margin-bottom: 16px;">
+          Wähle für jede Vorlesung oder jeden Termin, ob er <strong>jede Woche</strong>, nur in <strong>Woche A</strong> (ungerade Kalenderwochen: KW 43, 45, 47, 49) oder nur in <strong>Woche B</strong> (gerade Kalenderwochen: KW 44, 46, 48, 50) stattfindet. Änderungen werden sofort gespeichert und synchronisieren automatisch den Stundenplan sowie den 8-Wochen Zukunftskalender!
+        </p>
+        <div class="turnus-manager-list" id="turnusManagerList"></div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-primary" data-close="modalTurnusManager">Fertig</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: TURNUS-AUSWAHL (EINZELNER TERMIN) -->
+  <div id="modalTurnusSelect" class="modal-backdrop hidden">
+    <div class="modal modal-turnus-select">
+      <div class="modal-header">
+        <div class="modal-title-wrap">
+          <span id="turnusSelectBadge" class="aero-badge week-badge-a">Turnus wählen</span>
+          <h3 id="turnusSelectTitle">VL Vorlesung</h3>
+        </div>
+        <button class="btn-close" data-close="modalTurnusSelect">&times;</button>
+      </div>
+      <div class="modal-body turnus-select-body">
+        <p class="turnus-select-sub" id="turnusSelectSub">Wähle den Rhythmus dieser Vorlesung:</p>
+        <div class="turnus-options">
+          <button type="button" class="turnus-opt-btn" data-turnus="all" id="turnusOptAll">
+            <div class="opt-icon">🔄</div>
+            <div class="opt-info">
+              <strong>Jede Woche</strong>
+              <span>Findet wöchentlich in jeder Woche statt (Standard)</span>
+            </div>
+            <span class="opt-check">✓</span>
+          </button>
+          <button type="button" class="turnus-opt-btn" data-turnus="A" id="turnusOptA">
+            <div class="opt-icon">🅰️</div>
+            <div class="opt-info">
+              <strong>Woche A (14-tägig)</strong>
+              <span>Nur ungerade Kalenderwochen (KW 43, 45, 47, 49...)</span>
+            </div>
+            <span class="opt-check">✓</span>
+          </button>
+          <button type="button" class="turnus-opt-btn" data-turnus="B" id="turnusOptB">
+            <div class="opt-icon">🅱️</div>
+            <div class="opt-info">
+              <strong>Woche B (14-tägig)</strong>
+              <span>Nur gerade Kalenderwochen (KW 44, 46, 48, 50...)</span>
+            </div>
+            <span class="opt-check">✓</span>
+          </button>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-ghost" data-close="modalTurnusSelect">Schließen</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- SLIDE-IN HAMBURGER MENU DRAWER (LEFT-TO-RIGHT) -->
+  <div id="drawerMenuBackdrop" class="drawer-backdrop" style="display:none;"></div>
+  <aside id="drawerMenu" class="drawer-menu" style="display:none;" aria-label="UNIBODY Menü" role="dialog" aria-modal="true">
+    <div class="drawer-header">
+      <div class="drawer-brand">
+        <div class="drawer-hamburger-icon">
+          <span></span><span></span><span></span>
+        </div>
+        <div class="drawer-brand-text">
+          <h3>UNIBODY</h3>
+          <span class="drawer-subtitle">Menü &amp; System</span>
+        </div>
+      </div>
+      <button type="button" id="btnCloseDrawer" class="btn-close drawer-btn-close" aria-label="Menü schließen">&times;</button>
+    </div>
+
+    <div class="drawer-body">
+      <div class="drawer-section">
+        <div class="drawer-section-title">Navigation</div>
+        <nav class="drawer-nav">
+          <button type="button" class="drawer-item" id="drawerBtnTimetable">
+            <span class="drawer-icon">🗓️</span>
+            <span>Stundenplan &amp; Kurse</span>
+          </button>
+          <button type="button" class="drawer-item" id="drawerBtnCalendar">
+            <span class="drawer-icon">📅</span>
+            <span>Kalender (8-Wochen-Vorschau)</span>
+          </button>
+          <button type="button" class="drawer-item" id="drawerBtnSettings">
+            <span class="drawer-icon">⚙️</span>
+            <span>Einstellungen</span>
+          </button>
+        </nav>
+      </div>
+
+      <div class="drawer-footer-info">
+        <span>UNIBODY · CAU Kiel</span>
+      </div>
+    </div>
+  </aside>
+
+  <script src="/app.js?v=20"></script>
+</body>
+</html>
