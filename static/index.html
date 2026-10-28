@@ -10,7 +10,7 @@
   <link rel="icon" type="image/png" sizes="192x192" href="/favicon-192.png" />
   <link rel="icon" type="image/x-icon" href="/favicon.ico" />
   <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
-  <link rel="stylesheet" href="/styles.css?v=20" />
+  <link rel="stylesheet" href="/styles.css?v=23" />
 </head>
 <body>
   <!-- TOP HEADER -->
@@ -415,6 +415,185 @@
         <button type="button" id="btnBackToCalendarBottom" class="btn btn-primary">
           ✓ Zurück zum Stundenplan
         </button>
+      </div>
+    </div>
+  </main>
+
+  <!-- DEDICATED E-MAIL PAGE (CAU WEBMAIL ROUNDCUBE & IMAP CLIENT) -->
+  <main class="mail-app-page" id="pageMail" style="display: none;">
+    <div class="mail-container">
+      <!-- 1. Mail Top Navigation Bar -->
+      <div class="mail-nav-bar">
+        <div class="mail-nav-left">
+          <button type="button" id="btnBackFromMail" class="btn btn-outline">
+            ← Zurück zum Stundenplan
+          </button>
+          <div class="mail-header-title-wrap">
+            <div class="mail-title-row">
+              <span class="step-pill">WEBMAIL</span>
+              <h2>✉️ E-Mail</h2>
+              <span class="live-recalc-tag" id="mailConnectionStatusBadge">🟢 Verbunden</span>
+            </div>
+            <span class="mail-subtitle" id="mailAccountSubtitle">
+              CAU Webmail · <code id="mailAccountEmail">Postfach wird verbunden...</code> (imap.mail.uni-kiel.de)
+            </span>
+          </div>
+        </div>
+
+        <div class="mail-nav-actions">
+          <button type="button" id="btnMailRefresh" class="btn btn-outline" title="Postfach jetzt synchronisieren">
+            🔄 Aktualisieren
+          </button>
+          <a href="https://webmail.mail.uni-kiel.de/roundcube/" target="_blank" rel="noopener noreferrer" class="btn btn-primary" id="btnOpenRoundcubeExternal" title="Im Original CAU Roundcube Webmail öffnen">
+            🌐 In Roundcube öffnen ↗
+          </a>
+        </div>
+      </div>
+
+      <!-- 2. Split-View Modern Email Client Layout -->
+      <div class="mail-client-card card">
+        <div class="mail-split-layout">
+          <!-- Left Column: Folder Bar + Search + Email List -->
+          <section class="mail-list-column">
+            <!-- Folders / Mailbox Selector Bar -->
+            <div class="mail-folders-bar" id="mailFolderBar">
+              <button type="button" class="mail-folder-pill active" data-folder="INBOX">
+                <span class="folder-icon">📬</span>
+                <span class="folder-name">Posteingang</span>
+                <span class="folder-badge" id="badgeInboxCount">--</span>
+              </button>
+              <button type="button" class="mail-folder-pill" data-folder="Sent">
+                <span class="folder-icon">📤</span>
+                <span class="folder-name">Gesendet</span>
+              </button>
+              <button type="button" class="mail-folder-pill" data-folder="Drafts">
+                <span class="folder-icon">📝</span>
+                <span class="folder-name">Entwürfe</span>
+              </button>
+              <button type="button" class="mail-folder-pill" data-folder="Trash">
+                <span class="folder-icon">🗑️</span>
+                <span class="folder-name">Papierkorb</span>
+              </button>
+              <button type="button" class="mail-folder-pill" data-folder="Spam">
+                <span class="folder-icon">⚠️</span>
+                <span class="folder-name">Spam</span>
+              </button>
+            </div>
+
+            <!-- Search & Filter Controls -->
+            <div class="mail-search-filter-wrap">
+              <div class="mail-search-box">
+                <span class="search-icon">🔍</span>
+                <input type="text" id="mailSearchInput" placeholder="Mails nach Absender oder Betreff filtern..." autocomplete="off" />
+                <button type="button" id="btnMailSearchClear" class="btn-clear-search hidden" title="Suche zurücksetzen">&times;</button>
+              </div>
+              <div class="mail-filter-pills">
+                <button type="button" class="mail-filter-pill active" id="filterAllMails">Alle</button>
+                <button type="button" class="mail-filter-pill" id="filterUnreadMails">Ungelesen</button>
+                <span class="mail-counter-text" id="mailTotalCountText">-- Mails</span>
+              </div>
+            </div>
+
+            <!-- Mail List Items Container -->
+            <div class="mail-list-scroll-area" id="mailListScrollArea">
+              <!-- Loading spinner -->
+              <div id="mailListLoading" class="mail-status-box hidden">
+                <div class="spinner"></div>
+                <span>E-Mails von imap.mail.uni-kiel.de abrufen...</span>
+              </div>
+
+              <!-- Login Required Box -->
+              <div id="mailNeedsLoginBox" class="mail-status-box hidden">
+                <span class="status-icon">🔐</span>
+                <h4>CAU-Zugangsdaten erforderlich</h4>
+                <p>Hinterlege deine stu-Kennung und dein Passwort in den Einstellungen, um deine Uni-Mails direkt abzurufen.</p>
+                <button type="button" id="btnGoToSettingsFromMail" class="btn btn-primary btn-xs">Zu den Einstellungen ⚙️</button>
+              </div>
+
+              <!-- Empty state -->
+              <div id="mailListEmpty" class="mail-status-box hidden">
+                <span class="status-icon">📭</span>
+                <h4>Keine E-Mails gefunden</h4>
+                <p>Dieser Ordner ist derzeit leer oder deine Suchanfrage ergab keine Treffer.</p>
+              </div>
+
+              <!-- The actual items -->
+              <div class="mail-items-container" id="mailItemsContainer"></div>
+            </div>
+          </section>
+
+          <!-- Right Column: Reading & Preview Pane (Vorschau) -->
+          <section class="mail-reader-column" id="mailReaderColumn">
+            <!-- Placeholder (when no mail is selected) -->
+            <div class="mail-reader-empty" id="mailReaderPlaceholder">
+              <div class="empty-icon-bubble">✉️</div>
+              <h3>Keine E-Mail ausgewählt</h3>
+              <p>Wähle eine E-Mail aus der linken Liste aus, um den vollständigen Inhalt und Anhänge in der Vorschau anzuzeigen.</p>
+            </div>
+
+            <!-- Reader Loading Indicator -->
+            <div class="mail-reader-loading hidden" id="mailReaderLoading">
+              <div class="spinner"></div>
+              <span>E-Mail wird geladen...</span>
+            </div>
+
+            <!-- Detail Reading Pane -->
+            <div class="mail-reader-detail hidden" id="mailReaderDetail">
+              <!-- Header Bar of the selected mail -->
+              <div class="mail-detail-header">
+                <div class="mail-detail-subject-row">
+                  <h3 id="mailDetailSubject">(Kein Betreff)</h3>
+                  <div class="mail-detail-actions">
+                    <button type="button" id="btnToggleReadStatus" class="btn btn-xs btn-outline" title="Gelesen/Ungelesen markieren">
+                      ✉️ Als ungelesen markieren
+                    </button>
+                    <a href="https://webmail.mail.uni-kiel.de/roundcube/" target="_blank" rel="noopener noreferrer" class="btn btn-xs btn-outline" title="Im CAU Roundcube Webmail öffnen">
+                      🌐 Roundcube ↗
+                    </a>
+                  </div>
+                </div>
+
+                <div class="mail-detail-meta-row">
+                  <div class="mail-avatar-circle" id="mailDetailAvatar">U</div>
+                  <div class="mail-meta-info">
+                    <div class="mail-from-line">
+                      <strong id="mailDetailFromName">Absender</strong>
+                      <span class="mail-email-tag" id="mailDetailFromEmail">&lt;email@uni-kiel.de&gt;</span>
+                    </div>
+                    <div class="mail-to-line">
+                      <span>An: </span><span id="mailDetailTo">--</span>
+                    </div>
+                  </div>
+                  <div class="mail-detail-date" id="mailDetailDate">27. Okt 2026, 16:08</div>
+                </div>
+
+                <!-- Attachments bar -->
+                <div class="mail-attachments-bar hidden" id="mailAttachmentsBar">
+                  <span class="attachments-label">📎 Anhänge:</span>
+                  <div class="attachments-chips-list" id="mailAttachmentsList"></div>
+                </div>
+
+                <!-- View Mode Selector (HTML / Text) -->
+                <div class="mail-view-mode-bar" id="mailViewModeBar">
+                  <div class="mail-mode-pills">
+                    <button type="button" class="mail-mode-btn active" id="btnModeHtml">HTML-Ansicht</button>
+                    <button type="button" class="mail-mode-btn" id="btnModeText">Text-Ansicht</button>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Mail Content Body -->
+              <div class="mail-detail-body-container">
+                <div class="mail-html-wrapper" id="mailHtmlWrapper">
+                  <iframe id="mailHtmlFrame" sandbox="allow-same-origin allow-popups" title="E-Mail Inhalt"></iframe>
+                </div>
+                <div class="mail-text-wrapper hidden" id="mailTextWrapper">
+                  <pre id="mailTextContent"></pre>
+                </div>
+              </div>
+            </div>
+          </section>
+        </div>
       </div>
     </div>
   </main>
@@ -906,6 +1085,11 @@
             <span class="drawer-icon">📅</span>
             <span>Kalender (8-Wochen-Vorschau)</span>
           </button>
+          <button type="button" class="drawer-item" id="drawerBtnMail">
+            <span class="drawer-icon">✉️</span>
+            <span>E-Mail</span>
+            <span class="drawer-badge" id="drawerMailBadge" style="display: none;">0</span>
+          </button>
           <button type="button" class="drawer-item" id="drawerBtnSettings">
             <span class="drawer-icon">⚙️</span>
             <span>Einstellungen</span>
@@ -919,6 +1103,6 @@
     </div>
   </aside>
 
-  <script src="/app.js?v=20"></script>
+  <script src="/app.js?v=23"></script>
 </body>
 </html>

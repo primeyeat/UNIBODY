@@ -26,6 +26,14 @@ from lms_bot import (
     parse_groups_from_raw_text,
     enrich_course_with_unibody,
 )
+from cau_mail import (
+    get_mail_status,
+    get_mail_folders,
+    get_mail_list,
+    get_mail_message,
+    get_mail_attachment_data,
+    set_mail_flags,
+)
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DATA_DIR = os.path.join(BASE_DIR, "data")
@@ -386,23 +394,40 @@ class CAUBotRequestHandler(SimpleHTTPRequestHandler):
     def log_message(self, format, *args):
         print(f"[HTTP] {format % args}", flush=True)
 
+    def _is_local_request(self) -> bool:
+        host = self.headers.get("Host", "").split(":")[0].strip().lower()
+        return host in ("127.0.0.1", "localhost", "")
+
+    def _set_cors_headers(self):
+        origin = self.headers.get("Origin", "")
+        allowed_origins = (
+            "http://127.0.0.1",
+            "http://localhost",
+            "https://127.0.0.1",
+            "https://localhost",
+        )
+        if origin and any(origin.startswith(ao) for ao in allowed_origins):
+            self.send_header("Access-Control-Allow-Origin", origin)
+            self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+            self.send_header("Access-Control-Allow-Headers", "Content-Type, Authorization")
+            self.send_header("Vary", "Origin")
+
     def _send_json(self, data: Any, status: int = 200):
         raw = json.dumps(data, ensure_ascii=False).encode("utf-8")
         self.send_response(status)
         self.send_header("Content-Type", "application/json; charset=utf-8")
         self.send_header("Content-Length", str(len(raw)))
         self.send_header("Cache-Control", "no-store")
-        self.send_header("Access-Control-Allow-Origin", "*")
-        self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
-        self.send_header("Access-Control-Allow-Headers", "*")
+        self._set_cors_headers()
         self.end_headers()
         self.wfile.write(raw)
 
     def do_OPTIONS(self):
+        if not self._is_local_request():
+            self.send_error(403, "Forbidden: UNIBODY only accepts local connections")
+            return
         self.send_response(204)
-        self.send_header("Access-Control-Allow-Origin", "*")
-        self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
-        self.send_header("Access-Control-Allow-Headers", "*")
+        self._set_cors_headers()
         self.end_headers()
 
     def _read_json_body(self) -> Dict[str, Any]:
@@ -413,6 +438,10 @@ class CAUBotRequestHandler(SimpleHTTPRequestHandler):
         return json.loads(body) if body else {}
 
     def do_GET(self):
+        if not self._is_local_request():
+            self.send_error(403, "Forbidden: UNIBODY only accepts local connections")
+            return
+
         parsed = urlparse(self.path)
         path = parsed.path
 
@@ -472,12 +501,106 @@ class CAUBotRequestHandler(SimpleHTTPRequestHandler):
             })
             return
 
+        # ----------------------------------------------------
+        # CAU Webmail (IMAP) Endpoints
+        # ----------------------------------------------------
+        if path == "/api/mail/status":
+            creds = session_mgr.load_credentials(include_secret=True)
+            res = get_mail_status(creds.get("username", ""), creds.get("password", ""))
+            self._send_json(res)
+            return
+
+        if path == "/api/mail/folders":
+            creds = session_mgr.load_credentials(include_secret=True)
+            res = get_mail_folders(creds.get("username", ""), creds.get("password", ""))
+            self._send_json(res)
+            return
+
+        if path == "/api/mail/list":
+            qs = parse_qs(parsed.query)
+            folder = qs.get("folder", ["INBOX"])[0]
+            limit = int(qs.get("limit", [50])[0])
+            offset = int(qs.get("offset", [0])[0])
+            sq = qs.get("q", [None])[0]
+            creds = session_mgr.load_credentials(include_secret=True)
+            res = get_mail_list(
+                creds.get("username", ""),
+                creds.get("password", ""),
+                folder=folder,
+                limit=limit,
+                offset=offset,
+                search_query=sq,
+            )
+            self._send_json(res)
+            return
+
+        if path == "/api/mail/message":
+            qs = parse_qs(parsed.query)
+            mid = qs.get("id", [""])[0]
+            folder = qs.get("folder", ["INBOX"])[0]
+            mark_seen = qs.get("mark_seen", ["true"])[0].lower() in ("1", "true", "yes")
+            creds = session_mgr.load_credentials(include_secret=True)
+            res = get_mail_message(
+                creds.get("username", ""),
+                creds.get("password", ""),
+                message_id=mid,
+                folder=folder,
+                mark_seen=mark_seen,
+            )
+            self._send_json(res)
+            return
+
+        if path == "/api/mail/attachment":
+            qs = parse_qs(parsed.query)
+            mid = qs.get("id", [""])[0]
+            folder = qs.get("folder", ["INBOX"])[0]
+            att_idx = int(qs.get("index", [0])[0])
+            creds = session_mgr.load_credentials(include_secret=True)
+            payload, ctype, fname = get_mail_attachment_data(
+                creds.get("username", ""),
+                creds.get("password", ""),
+                message_id=mid,
+                attachment_index=att_idx,
+                folder=folder,
+            )
+            if payload is None:
+                self.send_error(404, "Anhang nicht gefunden")
+                return
+            self.send_response(200)
+            self.send_header("Content-Type", ctype or "application/octet-stream")
+            self.send_header("Content-Length", str(len(payload)))
+            self.send_header("Content-Disposition", f'attachment; filename="{fname}"')
+            self.end_headers()
+            self.wfile.write(payload)
+            return
+
         return super().do_GET()
 
     def do_POST(self):
+        if not self._is_local_request():
+            self.send_error(403, "Forbidden: UNIBODY only accepts local connections")
+            return
+
         parsed = urlparse(self.path)
         path = parsed.path
         body = self._read_json_body()
+
+        if path == "/api/mail/flag":
+            mid = str(body.get("id", ""))
+            folder = str(body.get("folder", "INBOX"))
+            seen = body.get("seen")
+            flagged = body.get("flagged")
+            creds = session_mgr.load_credentials(include_secret=True)
+            res = set_mail_flags(
+                creds.get("username", ""),
+                creds.get("password", ""),
+                message_id=mid,
+                folder=folder,
+                seen=seen,
+                flagged=flagged,
+            )
+            self._send_json(res)
+            return
 
         if path == "/api/schedule/update":
             with STATE_LOCK:
@@ -1212,11 +1335,9 @@ class CAUBotRequestHandler(SimpleHTTPRequestHandler):
 
 
 def run_server(port: int = 8765):
-    try:
-        # Bind to 0.0.0.0 to support 127.0.0.1, localhost, and all local interfaces
-        server = ThreadingHTTPServer(("0.0.0.0", port), CAUBotRequestHandler)
-    except Exception:
-        server = ThreadingHTTPServer(("127.0.0.1", port), CAUBotRequestHandler)
+    # Bind exclusively to 127.0.0.1 (localhost) for maximum privacy and security.
+    # Prevents any other device on the same local network / WiFi from accessing UNIBODY.
+    server = ThreadingHTTPServer(("127.0.0.1", port), CAUBotRequestHandler)
     server.daemon_threads = True
     print(f"CAU Kiel LMS Sniper & Schedule Optimizer running on http://127.0.0.1:{port} and http://localhost:{port}")
     try:

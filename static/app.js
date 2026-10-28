@@ -242,6 +242,7 @@ async function fetchInitialState() {
   renderFutureCalendar();
   renderLogs(data.logs || []);
   updateBrowserBadge(data.browser_status);
+  updateMailBadgeAndStatus();
 
   // Mark existing completed and locked jobs as already acknowledged so no old popup shows on initial load
   if (data.jobs && Array.isArray(data.jobs)) {
@@ -2239,14 +2240,26 @@ function initTurnusEvents() {
   });
 }
 
-/* PAGE ROUTING (STUNDENPLAN & KURSE, KALENDER, EINSTELLUNGEN) */
+/* PAGE ROUTING (STUNDENPLAN & KURSE, KALENDER, E-MAIL, EINSTELLUNGEN) */
 function switchAppPage(pageName, updateHash = true) {
   const pageCalendar = document.getElementById("pageCalendar");
   const pageTimetable = document.getElementById("pageTimetable");
   const pageSettings = document.getElementById("pageSettings");
+  const pageMail = document.getElementById("pageMail");
   if (!pageCalendar || !pageSettings || !pageTimetable) return;
 
-  if (pageName === "settings") {
+  if (pageName === "mail" && pageMail) {
+    pageCalendar.style.display = "none";
+    pageTimetable.style.display = "none";
+    pageSettings.style.display = "none";
+    pageMail.style.display = "flex";
+    if (updateHash && window.location.hash !== "#mail") {
+      window.location.hash = "mail";
+    }
+    initMailClient();
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  } else if (pageName === "settings") {
+    if (pageMail) pageMail.style.display = "none";
     pageCalendar.style.display = "none";
     pageTimetable.style.display = "none";
     pageSettings.style.display = "block";
@@ -2255,6 +2268,7 @@ function switchAppPage(pageName, updateHash = true) {
     }
     window.scrollTo({ top: 0, behavior: "smooth" });
   } else if (pageName === "calendar") {
+    if (pageMail) pageMail.style.display = "none";
     pageTimetable.style.display = "none";
     pageSettings.style.display = "none";
     pageCalendar.style.display = "flex";
@@ -2267,6 +2281,7 @@ function switchAppPage(pageName, updateHash = true) {
     window.scrollTo({ top: 0, behavior: "smooth" });
   } else {
     // Default: "timetable" (Stundenplan & Kurse)
+    if (pageMail) pageMail.style.display = "none";
     pageCalendar.style.display = "none";
     pageSettings.style.display = "none";
     pageTimetable.style.display = "grid";
@@ -2297,6 +2312,7 @@ function initDrawerMenu() {
     backdrop.classList.add("open");
     drawer.classList.add("open");
     document.body.style.overflow = "hidden";
+    updateMailBadgeAndStatus();
   }
 
   function closeDrawer() {
@@ -2341,7 +2357,7 @@ function initDrawerMenu() {
     }
   });
 
-  // Nav item handlers: Kalender (8-Wochen-Vorschau), Stundenplan & Kurse, Einstellungen
+  // Nav item handlers: Kalender (8-Wochen-Vorschau), Stundenplan & Kurse, E-Mail, Einstellungen
   document.getElementById("drawerBtnCalendar")?.addEventListener("click", () => {
     closeDrawer();
     switchAppPage("calendar");
@@ -2352,16 +2368,24 @@ function initDrawerMenu() {
     switchAppPage("timetable");
   });
 
+  document.getElementById("drawerBtnMail")?.addEventListener("click", () => {
+    closeDrawer();
+    switchAppPage("mail");
+  });
+
   document.getElementById("drawerBtnSettings")?.addEventListener("click", () => {
     closeDrawer();
     switchAppPage("settings");
   });
 
-  // Settings page back buttons
+  // Page back buttons
   document.getElementById("btnBackToCalendar")?.addEventListener("click", () => {
     switchAppPage("timetable");
   });
   document.getElementById("btnBackToCalendarBottom")?.addEventListener("click", () => {
+    switchAppPage("timetable");
+  });
+  document.getElementById("btnBackFromMail")?.addEventListener("click", () => {
     switchAppPage("timetable");
   });
 
@@ -2371,6 +2395,8 @@ function initDrawerMenu() {
       switchAppPage("settings", false);
     } else if (window.location.hash === "#calendar") {
       switchAppPage("calendar", false);
+    } else if (window.location.hash === "#mail") {
+      switchAppPage("mail", false);
     } else {
       switchAppPage("timetable", false);
     }
@@ -2380,6 +2406,8 @@ function initDrawerMenu() {
     switchAppPage("settings", false);
   } else if (window.location.hash === "#calendar") {
     switchAppPage("calendar", false);
+  } else if (window.location.hash === "#mail") {
+    switchAppPage("mail", false);
   } else {
     switchAppPage("timetable", false);
   }
@@ -3212,4 +3240,497 @@ function renderLogs(logs) {
   if (wasAtBottom) {
     container.scrollTop = container.scrollHeight;
   }
+}
+
+/* ==========================================================================
+   CAU WEBMAIL CLIENT (IMAP + ROUNDCUBE INTEGRATION)
+   ========================================================================== */
+
+function escapeHtml(str) {
+  if (str == null) return "";
+  return String(str)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+}
+
+const mailState = {
+  currentFolder: "INBOX",
+  messages: [],
+  currentMessageId: null,
+  currentMessageData: null,
+  filterUnreadOnly: false,
+  searchQuery: "",
+  total: 0,
+  unread: 0,
+  isInitialized: false,
+  isLoading: false,
+  currentViewMode: "html",
+};
+
+async function initMailClient() {
+  if (!mailState.isInitialized) {
+    bindMailUIEvents();
+    mailState.isInitialized = true;
+  }
+  await updateMailBadgeAndStatus();
+  await loadMailbox(mailState.currentFolder, false);
+}
+
+async function updateMailBadgeAndStatus() {
+  try {
+    const res = await apiGet("/api/mail/status");
+    if (!res || !res.ok) {
+      if (res && res.needs_login) {
+        showMailNeedsLogin();
+      }
+      return;
+    }
+    mailState.total = res.total_inbox || 0;
+    mailState.unread = res.unread_inbox || 0;
+
+    // Update email subtitle
+    const accEmailEl = document.getElementById("mailAccountEmail");
+    if (accEmailEl && res.email) {
+      accEmailEl.textContent = res.email;
+    }
+
+    // Update roundcube link with username
+    const roundcubeBtn = document.getElementById("btnOpenRoundcubeExternal");
+    if (roundcubeBtn && res.username) {
+      roundcubeBtn.href = "https://webmail.mail.uni-kiel.de/roundcube/";
+    }
+
+    // Update drawer badge
+    updateDrawerMailBadge();
+
+    // Update folder badge
+    const inboxBadge = document.getElementById("badgeInboxCount");
+    if (inboxBadge) {
+      inboxBadge.textContent = mailState.unread > 0 ? `${mailState.unread} neu` : `${mailState.total}`;
+    }
+  } catch (err) {
+    console.debug("Error fetching mail status:", err);
+  }
+}
+
+async function loadMailbox(folder = "INBOX", forceRefresh = false) {
+  mailState.currentFolder = folder;
+  const loadingEl = document.getElementById("mailListLoading");
+  const emptyEl = document.getElementById("mailListEmpty");
+  const loginEl = document.getElementById("mailNeedsLoginBox");
+  const itemsContainer = document.getElementById("mailItemsContainer");
+
+  if (loginEl) loginEl.classList.add("hidden");
+  if (emptyEl) emptyEl.classList.add("hidden");
+  if (loadingEl) loadingEl.classList.remove("hidden");
+
+  try {
+    mailState.isLoading = true;
+    let url = `/api/mail/list?folder=${encodeURIComponent(folder)}&limit=60`;
+    if (mailState.searchQuery && mailState.searchQuery.trim()) {
+      url += `&q=${encodeURIComponent(mailState.searchQuery.trim())}`;
+    }
+
+    const res = await apiGet(url);
+    if (!res || !res.ok) {
+      if (res && res.needs_login) {
+        showMailNeedsLogin();
+        return;
+      }
+      console.warn("Mail list error:", res ? res.error : "Unknown");
+      return;
+    }
+
+    mailState.messages = res.messages || [];
+    mailState.total = res.total || 0;
+
+    renderMailList();
+
+    // If messages exist and none selected, or selected not in list, select first
+    if (mailState.messages.length > 0) {
+      const match = mailState.messages.find((m) => m.id === mailState.currentMessageId);
+      if (!match) {
+        selectMailMessage(mailState.messages[0].id);
+      }
+    } else {
+      showMailReaderEmpty();
+    }
+  } catch (e) {
+    console.error("Failed to load mailbox:", e);
+  } finally {
+    mailState.isLoading = false;
+    if (loadingEl) loadingEl.classList.add("hidden");
+  }
+}
+
+function renderMailList() {
+  const itemsContainer = document.getElementById("mailItemsContainer");
+  const emptyEl = document.getElementById("mailListEmpty");
+  const totalCountEl = document.getElementById("mailTotalCountText");
+  if (!itemsContainer) return;
+
+  itemsContainer.innerHTML = "";
+
+  let list = mailState.messages;
+  if (mailState.filterUnreadOnly) {
+    list = list.filter((m) => !m.is_seen);
+  }
+
+  if (totalCountEl) {
+    totalCountEl.textContent = `${list.length} ${list.length === 1 ? "Mail" : "Mails"}`;
+  }
+
+  if (list.length === 0) {
+    if (emptyEl) emptyEl.classList.remove("hidden");
+    return;
+  } else {
+    if (emptyEl) emptyEl.classList.add("hidden");
+  }
+
+  list.forEach((m) => {
+    const card = document.createElement("div");
+    card.className = `mail-card ${!m.is_seen ? "unread" : ""} ${m.id === mailState.currentMessageId ? "selected" : ""}`;
+    card.dataset.id = m.id;
+
+    card.innerHTML = `
+      <div class="mail-card-top-row">
+        <span class="mail-card-from">
+          ${!m.is_seen ? '<span class="mail-unread-dot" title="Ungelesen"></span>' : ""}
+          ${escapeHtml(m.from_name || m.from)}
+        </span>
+        <span class="mail-card-date">${escapeHtml(m.date_human || "")}</span>
+      </div>
+      <div class="mail-card-subject">${escapeHtml(m.subject || "(Kein Betreff)")}</div>
+      <div class="mail-card-snippet">${escapeHtml(m.snippet || "")}</div>
+      ${m.has_attachment ? '<div class="mail-card-icons"><span class="att-icon-pill">📎 Anhang</span></div>' : ""}
+    `;
+
+    card.addEventListener("click", () => {
+      selectMailMessage(m.id);
+    });
+
+    itemsContainer.appendChild(card);
+  });
+}
+
+async function selectMailMessage(messageId) {
+  mailState.currentMessageId = messageId;
+
+  // Highlight in list
+  document.querySelectorAll(".mail-card").forEach((el) => {
+    if (el.dataset.id === String(messageId)) {
+      el.classList.add("selected");
+    } else {
+      el.classList.remove("selected");
+    }
+  });
+
+  const placeholderEl = document.getElementById("mailReaderPlaceholder");
+  const loadingEl = document.getElementById("mailReaderLoading");
+  const detailEl = document.getElementById("mailReaderDetail");
+
+  if (placeholderEl) placeholderEl.classList.add("hidden");
+  if (detailEl) detailEl.classList.add("hidden");
+  if (loadingEl) loadingEl.classList.remove("hidden");
+
+  try {
+    const res = await apiGet(`/api/mail/message?id=${messageId}&folder=${encodeURIComponent(mailState.currentFolder)}&mark_seen=true`);
+    if (!res || !res.ok || !res.message) {
+      console.warn("Could not load message:", res ? res.error : "Unknown");
+      return;
+    }
+
+    const msg = res.message;
+    mailState.currentMessageData = msg;
+
+    // Mark as read in local list
+    const localMatch = mailState.messages.find((m) => m.id === String(messageId));
+    if (localMatch && !localMatch.is_seen) {
+      localMatch.is_seen = true;
+      if (mailState.unread > 0) mailState.unread--;
+      updateDrawerMailBadge();
+      const card = document.querySelector(`.mail-card[data-id="${messageId}"]`);
+      if (card) {
+        card.classList.remove("unread");
+        const dot = card.querySelector(".mail-unread-dot");
+        if (dot) dot.remove();
+      }
+    }
+
+    // Render detail
+    renderMailDetail(msg);
+
+    if (loadingEl) loadingEl.classList.add("hidden");
+    if (detailEl) detailEl.classList.remove("hidden");
+  } catch (err) {
+    console.error("Error loading email detail:", err);
+  } finally {
+    if (loadingEl) loadingEl.classList.add("hidden");
+  }
+}
+
+function renderMailDetail(msg) {
+  const subjEl = document.getElementById("mailDetailSubject");
+  const fromNameEl = document.getElementById("mailDetailFromName");
+  const fromEmailEl = document.getElementById("mailDetailFromEmail");
+  const toEl = document.getElementById("mailDetailTo");
+  const dateEl = document.getElementById("mailDetailDate");
+  const avatarEl = document.getElementById("mailDetailAvatar");
+  const btnToggle = document.getElementById("btnToggleReadStatus");
+
+  if (subjEl) subjEl.textContent = msg.subject || "(Kein Betreff)";
+  if (fromNameEl) fromNameEl.textContent = msg.from_name || msg.from;
+  if (fromEmailEl) fromEmailEl.textContent = msg.from_email ? `<${msg.from_email}>` : "";
+  if (toEl) toEl.textContent = msg.to || "";
+  if (dateEl) dateEl.textContent = msg.date_human || msg.date || "";
+
+  if (avatarEl) {
+    const initial = (msg.from_name || msg.from || "U").trim().charAt(0).toUpperCase();
+    avatarEl.textContent = initial;
+  }
+
+  if (btnToggle) {
+    btnToggle.textContent = msg.is_seen ? "✉️ Als ungelesen markieren" : "✓ Als gelesen markieren";
+  }
+
+  // Attachments
+  const attBox = document.getElementById("mailAttachmentsBar");
+  const attList = document.getElementById("mailAttachmentsList");
+  if (attBox && attList) {
+    if (msg.attachments && msg.attachments.length > 0) {
+      attBox.classList.remove("hidden");
+      attList.innerHTML = "";
+      msg.attachments.forEach((att) => {
+        const chip = document.createElement("a");
+        chip.className = "mail-att-chip";
+        chip.href = `/api/mail/attachment?id=${msg.id}&index=${att.index}&folder=${encodeURIComponent(msg.folder || "INBOX")}`;
+        chip.target = "_blank";
+        chip.download = att.filename;
+        chip.innerHTML = `<span>📎 ${escapeHtml(att.filename)}</span> <span class="mail-att-size">(${att.size_human})</span>`;
+        attList.appendChild(chip);
+      });
+    } else {
+      attBox.classList.add("hidden");
+      attList.innerHTML = "";
+    }
+  }
+
+  // View mode bar
+  const modeBar = document.getElementById("mailViewModeBar");
+  const htmlFrame = document.getElementById("mailHtmlFrame");
+  const textContent = document.getElementById("mailTextContent");
+
+  if (msg.has_html && msg.has_text) {
+    if (modeBar) modeBar.style.display = "flex";
+  } else {
+    if (modeBar) modeBar.style.display = "none";
+  }
+
+  // Prefer HTML if available, otherwise Text
+  if (msg.has_html) {
+    setMailViewMode("html");
+    if (htmlFrame) {
+      const isDark = document.body.classList.contains("dark-mode");
+      const isMatte = document.body.dataset.theme === "matte";
+      const bg = isDark ? (isMatte ? "#18181b" : "#06182c") : "#ffffff";
+      const fg = isDark ? (isMatte ? "#f4f4f5" : "#e0f2fe") : "#18181b";
+      const fontCSS = `
+        <style>
+          body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            font-size: 14px;
+            line-height: 1.6;
+            color: ${fg};
+            background-color: ${bg};
+            padding: 22px 24px;
+            margin: 0;
+            word-wrap: break-word;
+          }
+          a { color: #0284c7; }
+          img { max-width: 100%; height: auto; }
+          p { margin: 0 0 12px; }
+        </style>
+      `;
+      htmlFrame.srcdoc = `${fontCSS}${msg.body_html}`;
+    }
+  } else {
+    setMailViewMode("text");
+    if (textContent) {
+      textContent.textContent = msg.body_text || "(Kein Nachrichteninhalt)";
+    }
+  }
+}
+
+function setMailViewMode(mode) {
+  mailState.currentViewMode = mode;
+  const btnHtml = document.getElementById("btnModeHtml");
+  const btnText = document.getElementById("btnModeText");
+  const htmlWrapper = document.getElementById("mailHtmlWrapper");
+  const textWrapper = document.getElementById("mailTextWrapper");
+
+  if (mode === "html") {
+    if (btnHtml) btnHtml.classList.add("active");
+    if (btnText) btnText.classList.remove("active");
+    if (htmlWrapper) htmlWrapper.classList.remove("hidden");
+    if (textWrapper) textWrapper.classList.add("hidden");
+  } else {
+    if (btnText) btnText.classList.add("active");
+    if (btnHtml) btnHtml.classList.remove("active");
+    if (textWrapper) textWrapper.classList.remove("hidden");
+    if (htmlWrapper) htmlWrapper.classList.add("hidden");
+    if (mailState.currentMessageData) {
+      const textContent = document.getElementById("mailTextContent");
+      if (textContent) {
+        textContent.textContent = mailState.currentMessageData.body_text || "(Kein Text-Inhalt)";
+      }
+    }
+  }
+}
+
+function showMailReaderEmpty() {
+  const placeholderEl = document.getElementById("mailReaderPlaceholder");
+  const loadingEl = document.getElementById("mailReaderLoading");
+  const detailEl = document.getElementById("mailReaderDetail");
+  if (loadingEl) loadingEl.classList.add("hidden");
+  if (detailEl) detailEl.classList.add("hidden");
+  if (placeholderEl) placeholderEl.classList.remove("hidden");
+}
+
+function showMailNeedsLogin() {
+  const loginEl = document.getElementById("mailNeedsLoginBox");
+  const itemsContainer = document.getElementById("mailItemsContainer");
+  const emptyEl = document.getElementById("mailListEmpty");
+  const loadingEl = document.getElementById("mailListLoading");
+  if (loadingEl) loadingEl.classList.add("hidden");
+  if (emptyEl) emptyEl.classList.add("hidden");
+  if (itemsContainer) itemsContainer.innerHTML = "";
+  if (loginEl) loginEl.classList.remove("hidden");
+  showMailReaderEmpty();
+}
+
+function updateDrawerMailBadge() {
+  const badgeEl = document.getElementById("drawerMailBadge");
+  if (badgeEl) {
+    if (mailState.unread > 0) {
+      badgeEl.textContent = mailState.unread;
+      badgeEl.style.display = "inline-block";
+    } else {
+      badgeEl.style.display = "none";
+    }
+  }
+}
+
+function bindMailUIEvents() {
+  // Refresh button
+  document.getElementById("btnMailRefresh")?.addEventListener("click", () => {
+    updateMailBadgeAndStatus();
+    loadMailbox(mailState.currentFolder, true);
+  });
+
+  // Folder pills
+  document.querySelectorAll(".mail-folder-pill").forEach((pill) => {
+    pill.addEventListener("click", () => {
+      document.querySelectorAll(".mail-folder-pill").forEach((p) => p.classList.remove("active"));
+      pill.classList.add("active");
+      const f = pill.dataset.folder || "INBOX";
+      loadMailbox(f, false);
+    });
+  });
+
+  // Filter buttons: All / Unread
+  const btnAll = document.getElementById("filterAllMails");
+  const btnUnread = document.getElementById("filterUnreadMails");
+  btnAll?.addEventListener("click", () => {
+    btnAll.classList.add("active");
+    btnUnread?.classList.remove("active");
+    mailState.filterUnreadOnly = false;
+    renderMailList();
+  });
+  btnUnread?.addEventListener("click", () => {
+    btnUnread.classList.add("active");
+    btnAll?.classList.remove("active");
+    mailState.filterUnreadOnly = true;
+    renderMailList();
+  });
+
+  // Search input
+  const searchInput = document.getElementById("mailSearchInput");
+  const clearBtn = document.getElementById("btnMailSearchClear");
+  let searchTimeout = null;
+
+  searchInput?.addEventListener("input", (e) => {
+    const val = e.target.value;
+    if (clearBtn) {
+      if (val) clearBtn.classList.remove("hidden");
+      else clearBtn.classList.add("hidden");
+    }
+    clearTimeout(searchTimeout);
+    searchTimeout = setTimeout(() => {
+      mailState.searchQuery = val;
+      loadMailbox(mailState.currentFolder, false);
+    }, 300);
+  });
+
+  clearBtn?.addEventListener("click", () => {
+    if (searchInput) searchInput.value = "";
+    clearBtn.classList.add("hidden");
+    mailState.searchQuery = "";
+    loadMailbox(mailState.currentFolder, false);
+  });
+
+  // View mode toggle
+  document.getElementById("btnModeHtml")?.addEventListener("click", () => setMailViewMode("html"));
+  document.getElementById("btnModeText")?.addEventListener("click", () => setMailViewMode("text"));
+
+  // Toggle Read Status
+  document.getElementById("btnToggleReadStatus")?.addEventListener("click", async () => {
+    if (!mailState.currentMessageId) return;
+    const msg = mailState.currentMessageData;
+    if (!msg) return;
+    const newSeen = !msg.is_seen;
+    msg.is_seen = newSeen;
+
+    const btnToggle = document.getElementById("btnToggleReadStatus");
+    if (btnToggle) {
+      btnToggle.textContent = newSeen ? "✉️ Als ungelesen markieren" : "✓ Als gelesen markieren";
+    }
+
+    const card = document.querySelector(`.mail-card[data-id="${msg.id}"]`);
+    if (card) {
+      if (newSeen) {
+        card.classList.remove("unread");
+        card.querySelector(".mail-unread-dot")?.remove();
+      } else {
+        card.classList.add("unread");
+        const fromEl = card.querySelector(".mail-card-from");
+        if (fromEl && !fromEl.querySelector(".mail-unread-dot")) {
+          const dot = document.createElement("span");
+          dot.className = "mail-unread-dot";
+          dot.title = "Ungelesen";
+          fromEl.prepend(dot);
+        }
+      }
+    }
+
+    if (newSeen) {
+      if (mailState.unread > 0) mailState.unread--;
+    } else {
+      mailState.unread++;
+    }
+    updateDrawerMailBadge();
+
+    await apiPost("/api/mail/flag", {
+      id: msg.id,
+      folder: mailState.currentFolder,
+      seen: newSeen,
+    });
+  });
+
+  // Go to settings from mail login box
+  document.getElementById("btnGoToSettingsFromMail")?.addEventListener("click", () => {
+    switchAppPage("settings");
+  });
 }
