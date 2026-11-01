@@ -34,6 +34,12 @@ from cau_mail import (
     get_mail_attachment_data,
     set_mail_flags,
 )
+from cau_materials import (
+    get_materials_overview,
+    get_course_detail,
+    toggle_assignment_status,
+    get_material_file_bytes,
+)
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DATA_DIR = os.path.join(BASE_DIR, "data")
@@ -398,6 +404,14 @@ class CAUBotRequestHandler(SimpleHTTPRequestHandler):
         host = self.headers.get("Host", "").split(":")[0].strip().lower()
         return host in ("127.0.0.1", "localhost", "")
 
+    def _is_valid_origin(self) -> bool:
+        """Validates that mutating requests (POST) originate strictly from localhost to prevent CSRF."""
+        origin = self.headers.get("Origin") or self.headers.get("Referer") or ""
+        if not origin:
+            return True
+        allowed = ("http://127.0.0.1", "http://localhost", "https://127.0.0.1", "https://localhost")
+        return any(origin.startswith(ao) for ao in allowed)
+
     def _set_cors_headers(self):
         origin = self.headers.get("Origin", "")
         allowed_origins = (
@@ -574,16 +588,64 @@ class CAUBotRequestHandler(SimpleHTTPRequestHandler):
             self.wfile.write(payload)
             return
 
+        # ----------------------------------------------------
+        # CAU Materials & Assignments (Moodle + OpenOLAT)
+        # ----------------------------------------------------
+        if path == "/api/materials/overview":
+            res = get_materials_overview()
+            self._send_json(res)
+            return
+
+        if path == "/api/materials/course":
+            qs = parse_qs(parsed.query)
+            cid = qs.get("id", [""])[0]
+            res = get_course_detail(cid)
+            self._send_json(res)
+            return
+
+        if path == "/api/materials/download":
+            qs = parse_qs(parsed.query)
+            cid = qs.get("course_id", [""])[0] or qs.get("course", [""])[0] or qs.get("id", [""])[0]
+            fname = qs.get("file", [""])[0] or qs.get("filename", [""])[0] or qs.get("name", [""])[0]
+            if not cid or not fname:
+                self.send_error(400, "course_id und file Parameter erforderlich")
+                return
+
+            payload, safe_name, ctype = get_material_file_bytes(cid, fname)
+            if payload is None:
+                self.send_error(404, f"Datei '{fname}' nicht gefunden")
+                return
+
+            self.send_response(200)
+            self.send_header("Content-Type", ctype or "application/pdf")
+            self.send_header("Content-Length", str(len(payload)))
+            self.send_header("Content-Disposition", f'attachment; filename="{safe_name}"')
+            self._set_cors_headers()
+            self.end_headers()
+            self.wfile.write(payload)
+            return
+
         return super().do_GET()
 
+    def do_HEAD(self):
+        return self.do_GET()
+
     def do_POST(self):
-        if not self._is_local_request():
-            self.send_error(403, "Forbidden: UNIBODY only accepts local connections")
+        if not self._is_local_request() or not self._is_valid_origin():
+            self.send_error(403, "Forbidden: Cross-Origin Request Blocked")
             return
 
         parsed = urlparse(self.path)
         path = parsed.path
         body = self._read_json_body()
+
+        if path == "/api/materials/toggle-status":
+            cid = str(body.get("course_id", ""))
+            aid = str(body.get("assignment_id", ""))
+            new_status = body.get("status")
+            res = toggle_assignment_status(cid, aid, new_status)
+            self._send_json(res)
+            return
 
         if path == "/api/mail/flag":
             mid = str(body.get("id", ""))
@@ -623,6 +685,8 @@ class CAUBotRequestHandler(SimpleHTTPRequestHandler):
                 wt = None
             new_ev = {
                 "id": ev.get("id") or f"manual-{uuid.uuid4().hex[:8]}",
+                "course_id": ev.get("course_id"),
+                "univis_id": ev.get("univis_id"),
                 "title": ev.get("title", "Veranstaltung").strip() or "Veranstaltung",
                 "day": day_idx,
                 "day_name": DAY_NAMES_DE[day_idx],
@@ -631,7 +695,7 @@ class CAUBotRequestHandler(SimpleHTTPRequestHandler):
                 "room": ev.get("room", ""),
                 "type": ev.get("type", "lecture"),
                 "week_type": wt,
-                "enabled": True,
+                "enabled": ev.get("enabled", True),
             }
             with STATE_LOCK:
                 APP_STATE["schedule"].append(new_ev)

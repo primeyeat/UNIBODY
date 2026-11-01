@@ -53,20 +53,40 @@ def decode_mime(header_val: Optional[str]) -> str:
         return str(header_val).strip()
 
 
+def sanitize_imap_folder(folder: str) -> str:
+    """Sanitizes IMAP folder names to prevent command injection and CRLF escapes."""
+    if not folder:
+        return "INBOX"
+    cleaned = re.sub(r'[\r\n"\\]', '', str(folder).strip())
+    return cleaned or "INBOX"
+
+
 def sanitize_html(html_str: str) -> str:
     """
     Sanitizes HTML content to remove scripts, iframes, inline event handlers,
     while preserving styling, layout, typography and links.
+    Hardened against nested tags and javascript: URIs.
     """
     if not html_str:
         return ""
-    # Strip script tags
-    s = re.sub(r"(?is)<script.*?>.*?</script>", "", html_str)
-    # Strip dangerous tags
-    s = re.sub(r"(?is)<(iframe|embed|object|base).*?>", "", s)
-    # Strip on* event handlers (e.g. onerror=..., onclick=...)
-    s = re.sub(r"(?i)\s+on[a-z]+\s*=\s*(\"[^\"]*\"|'[^']*'|[^\s>]+)", "", s)
-    # Add target="_blank" and rel="noopener noreferrer" to links
+    s = html_str
+    # 1. Strip script tags iteratively to defeat nested tag evasion (<scr<script>ipt>)
+    prev = ""
+    while prev != s:
+        prev = s
+        s = re.sub(r"(?is)<script.*?>.*?</script>", "", s)
+
+    # 2. Strip dangerous embedding and redirect tags
+    s = re.sub(r"(?is)<(script|iframe|embed|object|base|meta|link).*?>", "", s)
+
+    # 3. Strip on* event handlers (including SVG/HTML5 event triggers)
+    s = re.sub(r'(?i)\s+on[a-z0-9_\-]+\s*=\s*("[^"]*"|\'[^\']*\'|[^\s>]+)', "", s)
+
+    # 4. Neutralize javascript: and data: pseudo-protocols in links/attributes
+    s = re.sub(r'(?i)\b(href|src|action)\s*=\s*([\'"]?)\s*javascript:', r'\1=\2#blocked-js:', s)
+    s = re.sub(r'(?i)\b(href|src|action)\s*=\s*([\'"]?)\s*data:text/html', r'\1=\2#blocked-data:', s)
+
+    # 5. Add target="_blank" and rel="noopener noreferrer" to external links
     s = re.sub(r"(?i)<a\s+href=", '<a target="_blank" rel="noopener noreferrer" href=', s)
     return s
 
@@ -220,6 +240,7 @@ def get_mail_list(
         return {"ok": False, "error": "Keine CAU-Zugangsdaten konfiguriert", "needs_login": True}
 
     client = None
+    folder = sanitize_imap_folder(folder)
     try:
         client = create_imap_client(username, password, timeout=12)
         sel_stat, sel_data = client.select(f'"{folder}"', readonly=True)
@@ -383,6 +404,7 @@ def get_mail_message(
         return {"ok": False, "error": "Keine CAU-Zugangsdaten konfiguriert", "needs_login": True}
 
     client = None
+    folder = sanitize_imap_folder(folder)
     try:
         client = create_imap_client(username, password, timeout=15)
         sel_stat, sel_data = client.select(f'"{folder}"', readonly=False)
@@ -527,6 +549,7 @@ def get_mail_attachment_data(
 ) -> Tuple[Optional[bytes], str, str]:
     """Retrieves raw attachment bytes, content type and filename for download."""
     client = None
+    folder = sanitize_imap_folder(folder)
     try:
         client = create_imap_client(username, password, timeout=20)
         client.select(f'"{folder}"', readonly=True)
@@ -576,6 +599,7 @@ def set_mail_flags(
 ) -> Dict[str, Any]:
     """Updates seen or flagged status for a message."""
     client = None
+    folder = sanitize_imap_folder(folder)
     try:
         client = create_imap_client(username, password, timeout=8)
         client.select(f'"{folder}"', readonly=False)

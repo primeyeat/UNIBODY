@@ -41,6 +41,16 @@ function timeToMinutes(tStr) {
   return h * 60 + (m || 0);
 }
 
+function escapeHtml(str) {
+  if (str == null) return "";
+  return String(str)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+}
+
 async function apiGet(path) {
   const res = await fetch(path);
   return res.json();
@@ -243,6 +253,7 @@ async function fetchInitialState() {
   renderLogs(data.logs || []);
   updateBrowserBadge(data.browser_status);
   updateMailBadgeAndStatus();
+  updateMaterialsBadgeAndStatus();
 
   // Mark existing completed and locked jobs as already acknowledged so no old popup shows on initial load
   if (data.jobs && Array.isArray(data.jobs)) {
@@ -363,7 +374,7 @@ async function verifyAndRankCourse(queryId) {
     appState.currentEnrolledGroupId = null;
     appState.rankedGroups = [];
     banner.className = "verification-banner error";
-    banner.innerHTML = `<div>🛡️ <strong>${res.error}</strong></div>`;
+    banner.innerHTML = `<div>🛡️ <strong>${escapeHtml(res.error)}</strong></div>`;
     renderRankedGroups();
     renderTimetable();
     renderCatalogChips();
@@ -908,8 +919,8 @@ function renderTimetable() {
       }
 
       el.innerHTML = `
-        <div class="tt-ev-title">${isSelectedCourse ? "🎯 " : ""}${ev.title}</div>
-        <div class="tt-ev-time">${ev.start_time}–${ev.end_time} ${ev.room ? `· ${ev.room}` : ""}</div>
+        <div class="tt-ev-title">${isSelectedCourse ? "🎯 " : ""}${escapeHtml(ev.title)}</div>
+        <div class="tt-ev-time">${escapeHtml(ev.start_time)}–${escapeHtml(ev.end_time)} ${ev.room ? `· ${escapeHtml(ev.room)}` : ""}</div>
         <div style="display:flex;align-items:center;gap:4px;margin-top:3px;">
           <button type="button" class="tt-turnus-pill ${turnusCls}" title="Klick = Turnus ändern (Jede Woche / Woche A / Woche B)">
             ${turnusLabel}
@@ -947,19 +958,10 @@ function renderTimetable() {
         }
       });
 
-      el.addEventListener("contextmenu", async (e) => {
+      el.addEventListener("contextmenu", (e) => {
         e.preventDefault();
-        const res = await apiPost("/api/schedule/delete", { id: ev.id });
-        if (res.ok) {
-          appState.schedule = res.schedule;
-          if (res.enrolled_groups) appState.enrolledGroups = res.enrolled_groups;
-          if (appState.currentCourse) {
-            await verifyAndRankCourse(appState.currentCourse.course_id);
-          } else {
-            renderCatalogChips();
-            renderTimetable();
-          }
-        }
+        e.stopPropagation();
+        openConfirmDeleteModal(ev);
       });
 
       dayCols[dayIdx].appendChild(el);
@@ -1105,8 +1107,8 @@ function renderTimetable() {
       const displayName = bucket.length > 1 ? formatShortGroupName(g.name) : g.name;
 
       el.innerHTML = `
-        <div class="tt-ev-title">${badge}: ${displayName}</div>
-        <div class="tt-ev-time">${g.start_time}–${g.end_time} · ${subText}</div>
+        <div class="tt-ev-title">${escapeHtml(badge)}: ${escapeHtml(displayName)}</div>
+        <div class="tt-ev-time">${escapeHtml(g.start_time)}–${escapeHtml(g.end_time)} · ${escapeHtml(subText)}</div>
       `;
 
       if (!g.is_conflict) {
@@ -1436,10 +1438,10 @@ function renderFutureCalWeek(currentWeek) {
         : (ev.type === "enrolled_exercise" ? "Übung" : "VL");
 
       card.innerHTML = `
-        <div class="cal-ev-time">${ev.start_time} – ${ev.end_time}</div>
-        <div class="cal-ev-title" title="${ev.title}">${ev.title}</div>
-        <div class="cal-ev-room" title="${ev.room || 'Kein Raum'}">📍 ${ev.room || 'Online / Hörsaal'}</div>
-        <span class="cal-ev-badge">${badgeText}</span>
+        <div class="cal-ev-time">${escapeHtml(ev.start_time)} – ${escapeHtml(ev.end_time)}</div>
+        <div class="cal-ev-title" title="${escapeHtml(ev.title)}">${escapeHtml(ev.title)}</div>
+        <div class="cal-ev-room" title="${escapeHtml(ev.room || 'Kein Raum')}">📍 ${escapeHtml(ev.room || 'Online / Hörsaal')}</div>
+        <span class="cal-ev-badge">${escapeHtml(badgeText)}</span>
       `;
 
       card.addEventListener("click", (e) => {
@@ -2177,10 +2179,10 @@ function renderTurnusManagerList() {
 
     row.innerHTML = `
       <div class="turnus-row-info">
-        <div class="turnus-row-title" title="${ev.title}">${ev.title}</div>
+        <div class="turnus-row-title" title="${escapeHtml(ev.title)}">${escapeHtml(ev.title)}</div>
         <div class="turnus-row-sub">
-          <span>📅 ${dayStr} ${ev.start_time}–${ev.end_time}</span>
-          ${ev.room ? `<span>· 📍 ${ev.room}</span>` : ""}
+          <span>📅 ${escapeHtml(dayStr)} ${escapeHtml(ev.start_time)}–${escapeHtml(ev.end_time)}</span>
+          ${ev.room ? `<span>· 📍 ${escapeHtml(ev.room)}</span>` : ""}
         </div>
       </div>
       <div class="turnus-segmented-control">
@@ -2240,15 +2242,97 @@ function initTurnusEvents() {
   });
 }
 
-/* PAGE ROUTING (STUNDENPLAN & KURSE, KALENDER, E-MAIL, EINSTELLUNGEN) */
+/* ==========================================================================
+   SCHEDULE ITEM DELETION CONFIRMATION MODAL (POPUP IN THE CENTER)
+   ========================================================================== */
+let eventPendingDelete = null;
+
+function openConfirmDeleteModal(ev) {
+  if (!ev) return;
+  eventPendingDelete = ev;
+  const modal = document.getElementById("modalConfirmDelete");
+  if (!modal) return;
+
+  const titleEl = document.getElementById("confirmDeleteTitle");
+  const timeEl = document.getElementById("confirmDeleteTime");
+  const roomEl = document.getElementById("confirmDeleteRoom");
+
+  if (titleEl) titleEl.textContent = ev.title || "Termin";
+  if (timeEl) {
+    const turnusLabel = ev.week_type ? ` · Woche ${ev.week_type}` : "";
+    timeEl.textContent = `📅 ${ev.day_name || "Tag"}, ${ev.start_time || ""} – ${ev.end_time || ""} Uhr${turnusLabel}`;
+  }
+  if (roomEl) {
+    roomEl.textContent = ev.room ? `📍 ${ev.room}` : "📍 Kein Raum angegeben";
+  }
+
+  modal.classList.remove("hidden");
+}
+
+function initConfirmDeleteModal() {
+  const modal = document.getElementById("modalConfirmDelete");
+  const btnExecute = document.getElementById("btnExecuteDeleteEvent");
+  const btnEvDetailDelete = document.getElementById("btnEvDetailDelete");
+
+  if (modal) {
+    modal.addEventListener("click", (e) => {
+      if (e.target === modal) modal.classList.add("hidden");
+    });
+  }
+
+  if (btnEvDetailDelete) {
+    btnEvDetailDelete.addEventListener("click", () => {
+      if (currentTurnusEditingEv) {
+        document.getElementById("modalEventDetail")?.classList.add("hidden");
+        openConfirmDeleteModal(currentTurnusEditingEv);
+      }
+    });
+  }
+
+  if (btnExecute) {
+    btnExecute.addEventListener("click", async () => {
+      if (!eventPendingDelete) return;
+      const evToDelete = eventPendingDelete;
+      eventPendingDelete = null;
+      if (modal) modal.classList.add("hidden");
+
+      const res = await apiPost("/api/schedule/delete", { id: evToDelete.id });
+      if (res.ok) {
+        appState.schedule = res.schedule;
+        if (res.enrolled_groups) appState.enrolledGroups = res.enrolled_groups;
+        if (appState.currentCourse) {
+          await verifyAndRankCourse(appState.currentCourse.course_id);
+        } else {
+          renderCatalogChips();
+          renderTimetable();
+        }
+      }
+    });
+  }
+}
+
+/* PAGE ROUTING (STUNDENPLAN & KURSE, KALENDER, E-MAIL, MATERIALIEN, EINSTELLUNGEN) */
 function switchAppPage(pageName, updateHash = true) {
   const pageCalendar = document.getElementById("pageCalendar");
   const pageTimetable = document.getElementById("pageTimetable");
   const pageSettings = document.getElementById("pageSettings");
   const pageMail = document.getElementById("pageMail");
+  const pageMaterials = document.getElementById("pageMaterials");
   if (!pageCalendar || !pageSettings || !pageTimetable) return;
 
-  if (pageName === "mail" && pageMail) {
+  if (pageName === "materials" && pageMaterials) {
+    if (pageMail) pageMail.style.display = "none";
+    pageCalendar.style.display = "none";
+    pageTimetable.style.display = "none";
+    pageSettings.style.display = "none";
+    pageMaterials.style.display = "flex";
+    if (updateHash && window.location.hash !== "#materials") {
+      window.location.hash = "materials";
+    }
+    initMaterialsClient();
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  } else if (pageName === "mail" && pageMail) {
+    if (pageMaterials) pageMaterials.style.display = "none";
     pageCalendar.style.display = "none";
     pageTimetable.style.display = "none";
     pageSettings.style.display = "none";
@@ -2260,6 +2344,7 @@ function switchAppPage(pageName, updateHash = true) {
     window.scrollTo({ top: 0, behavior: "smooth" });
   } else if (pageName === "settings") {
     if (pageMail) pageMail.style.display = "none";
+    if (pageMaterials) pageMaterials.style.display = "none";
     pageCalendar.style.display = "none";
     pageTimetable.style.display = "none";
     pageSettings.style.display = "block";
@@ -2269,6 +2354,7 @@ function switchAppPage(pageName, updateHash = true) {
     window.scrollTo({ top: 0, behavior: "smooth" });
   } else if (pageName === "calendar") {
     if (pageMail) pageMail.style.display = "none";
+    if (pageMaterials) pageMaterials.style.display = "none";
     pageTimetable.style.display = "none";
     pageSettings.style.display = "none";
     pageCalendar.style.display = "flex";
@@ -2282,6 +2368,7 @@ function switchAppPage(pageName, updateHash = true) {
   } else {
     // Default: "timetable" (Stundenplan & Kurse)
     if (pageMail) pageMail.style.display = "none";
+    if (pageMaterials) pageMaterials.style.display = "none";
     pageCalendar.style.display = "none";
     pageSettings.style.display = "none";
     pageTimetable.style.display = "grid";
@@ -2313,6 +2400,7 @@ function initDrawerMenu() {
     drawer.classList.add("open");
     document.body.style.overflow = "hidden";
     updateMailBadgeAndStatus();
+    updateMaterialsBadgeAndStatus();
   }
 
   function closeDrawer() {
@@ -2357,7 +2445,7 @@ function initDrawerMenu() {
     }
   });
 
-  // Nav item handlers: Kalender (8-Wochen-Vorschau), Stundenplan & Kurse, E-Mail, Einstellungen
+  // Nav item handlers: Kalender (8-Wochen-Vorschau), Stundenplan & Kurse, Materialien, E-Mail, Einstellungen
   document.getElementById("drawerBtnCalendar")?.addEventListener("click", () => {
     closeDrawer();
     switchAppPage("calendar");
@@ -2366,6 +2454,11 @@ function initDrawerMenu() {
   document.getElementById("drawerBtnTimetable")?.addEventListener("click", () => {
     closeDrawer();
     switchAppPage("timetable");
+  });
+
+  document.getElementById("drawerBtnMaterials")?.addEventListener("click", () => {
+    closeDrawer();
+    switchAppPage("materials");
   });
 
   document.getElementById("drawerBtnMail")?.addEventListener("click", () => {
@@ -2388,6 +2481,9 @@ function initDrawerMenu() {
   document.getElementById("btnBackFromMail")?.addEventListener("click", () => {
     switchAppPage("timetable");
   });
+  document.getElementById("btnBackFromMaterials")?.addEventListener("click", () => {
+    switchAppPage("timetable");
+  });
 
   // Hash-based routing (Default landing page: Stundenplan & Kurse)
   window.addEventListener("hashchange", () => {
@@ -2397,6 +2493,8 @@ function initDrawerMenu() {
       switchAppPage("calendar", false);
     } else if (window.location.hash === "#mail") {
       switchAppPage("mail", false);
+    } else if (window.location.hash === "#materials") {
+      switchAppPage("materials", false);
     } else {
       switchAppPage("timetable", false);
     }
@@ -2408,6 +2506,8 @@ function initDrawerMenu() {
     switchAppPage("calendar", false);
   } else if (window.location.hash === "#mail") {
     switchAppPage("mail", false);
+  } else if (window.location.hash === "#materials") {
+    switchAppPage("materials", false);
   } else {
     switchAppPage("timetable", false);
   }
@@ -2418,6 +2518,7 @@ function bindUIEvents() {
   initDrawerMenu();
   initFutureCalEvents();
   initTurnusEvents();
+  initConfirmDeleteModal();
 
   // Sync already enrolled groups from open browser tabs
   const syncEnrolledBtn = document.getElementById("btnSyncEnrolledGroups");
@@ -2818,13 +2919,13 @@ function renderIcsPreviewList() {
       <label class="checkbox-label" style="flex:1;">
         <input type="checkbox" data-ics-idx="${idx}" ${ev.enabled ? "checked" : ""} />
         <div>
-          <strong>${ev.title}</strong>
+          <strong>${escapeHtml(ev.title)}</strong>
           <div style="font-size:0.75rem;color:#94a3b8;">
-            ${ev.day_name}, ${ev.start_time} – ${ev.end_time} Uhr ${ev.room ? `· ${ev.room}` : ""}
+            ${escapeHtml(ev.day_name)}, ${escapeHtml(ev.start_time)} – ${escapeHtml(ev.end_time)} Uhr ${ev.room ? `· ${escapeHtml(ev.room)}` : ""}
           </div>
         </div>
       </label>
-      ${ev.univis_warning ? `<span class="ics-warn-badge">🧹 ${ev.univis_warning}</span>` : `<span style="font-size:0.72rem;color:#34d399;">✓ Feste Vorlesung</span>`}
+      ${ev.univis_warning ? `<span class="ics-warn-badge">🧹 ${escapeHtml(ev.univis_warning)}</span>` : `<span style="font-size:0.72rem;color:#34d399;">✓ Feste Vorlesung</span>`}
     `;
 
     row.querySelector("input").addEventListener("change", (e) => {
@@ -3231,9 +3332,9 @@ function renderLogs(logs) {
     .map(
       (l) => `
       <div class="log-line">
-        <span class="log-time">[${l.timestamp}]</span>
-        <span class="log-lvl ${l.level}">${l.level}</span>
-        <span class="log-msg">${l.message}</span>
+        <span class="log-time">[${escapeHtml(l.timestamp)}]</span>
+        <span class="log-lvl ${escapeHtml(l.level)}">${escapeHtml(l.level)}</span>
+        <span class="log-msg">${escapeHtml(l.message)}</span>
       </div>`
     )
     .join("");
@@ -3734,3 +3835,884 @@ function bindMailUIEvents() {
     switchAppPage("settings");
   });
 }
+
+/* ==========================================================================
+   CAU MATERIALS & HOMEWORK - MACOS FINDER FOLDER EXPERIENCE
+   ========================================================================== */
+
+const finderState = {
+  isInitialized: false,
+  overview: null,
+  currentPath: [], // [] = root; [courseId] = inside course; [courseId, subfolderId] = inside subfolder; ["smart-deadlines"] = smart deadlines
+  courseDetailsCache: {},
+  viewMode: "grid", // "grid" | "list"
+  currentTag: "all", // "all" | "deadlines" | "moodle" | "openolat"
+  searchQuery: "",
+};
+
+function getMacFolderSvg(colorName) {
+  const colorMap = {
+    blue: { back: "#0070d6", front: "#0a84ff", flap: "#40a5ff" },
+    purple: { back: "#9430c9", front: "#bf5af2", flap: "#d27bff" },
+    orange: { back: "#d97706", front: "#ff9f0a", flap: "#ffb740" },
+    green: { back: "#1f873b", front: "#30d158", flap: "#5fe080" },
+    teal: { back: "#158b9e", front: "#64d2ff", flap: "#8be0ff" },
+    red: { back: "#cc2a20", front: "#ff453a", flap: "#ff7066" },
+  };
+  const c = colorMap[colorName] || colorMap.blue;
+
+  return `
+    <svg class="mac-folder-svg" viewBox="0 0 100 80" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <linearGradient id="fbg-${colorName}" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="${c.flap}"/>
+          <stop offset="100%" stop-color="${c.back}"/>
+        </linearGradient>
+        <linearGradient id="ffg-${colorName}" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="${c.flap}"/>
+          <stop offset="12%" stop-color="${c.front}"/>
+          <stop offset="100%" stop-color="${c.back}"/>
+        </linearGradient>
+      </defs>
+      <!-- Back flap with tab -->
+      <path d="M6 14C6 9.58 9.58 6 14 6H38C40.6 6 43.1 7.05 45 8.93L49 13H86C90.4 13 94 16.58 94 21V66C94 70.4 90.4 74 86 74H14C9.58 74 6 70.4 6 66V14Z" fill="url(#fbg-${colorName})" />
+      <!-- Front body flap -->
+      <path d="M6 26C6 21.58 9.58 18 14 18H86C90.4 18 94 21.58 94 26V66C94 70.4 90.4 74 86 74H14C9.58 74 6 70.4 6 66V26Z" fill="url(#ffg-${colorName})" />
+      <!-- Top edge glossy line -->
+      <path d="M14 19H86C89.9 19 93 22.1 93 26V27H7V26C7 22.1 10.1 19 14 19Z" fill="white" fill-opacity="0.35" />
+      <!-- Subtle embossed bottom border -->
+      <path d="M6 64H94V66C94 70.4 90.4 74 86 74H14C9.58 74 6 70.4 6 66V64Z" fill="black" fill-opacity="0.12" />
+    </svg>
+  `;
+}
+
+async function initMaterialsClient() {
+  if (!finderState.isInitialized) {
+    bindMaterialsUIEvents();
+    finderState.isInitialized = true;
+  }
+  await updateMaterialsBadgeAndStatus();
+  await renderFinder();
+}
+
+async function updateMaterialsBadgeAndStatus() {
+  try {
+    const res = await apiGet("/api/materials/overview");
+    if (!res || !res.ok) return;
+
+    finderState.overview = res;
+    updateDrawerMaterialsBadge(res.stats ? res.stats.total_open_assignments : 0);
+  } catch (err) {
+    console.error("[Finder] Fehler beim Laden der Übersicht:", err);
+  }
+}
+
+function updateDrawerMaterialsBadge(openCount) {
+  const badgeEl = document.getElementById("drawerMaterialsBadge");
+  if (!badgeEl) return;
+
+  if (openCount > 0) {
+    badgeEl.textContent = String(openCount);
+    badgeEl.style.display = "inline-block";
+  } else {
+    badgeEl.style.display = "none";
+  }
+}
+
+async function navigateFinder(newPath) {
+  finderState.currentPath = newPath || [];
+  await renderFinder();
+  const bodyEl = document.getElementById("finderBrowserBody");
+  if (bodyEl) bodyEl.scrollTop = 0;
+}
+
+function renderFinderBreadcrumbs() {
+  const barEl = document.getElementById("finderPathBar");
+  const backBtn = document.getElementById("btnFinderBack");
+  if (!barEl) return;
+
+  if (backBtn) {
+    backBtn.disabled = finderState.currentPath.length === 0;
+  }
+
+  const crumbs = [
+    { title: "📁 Materialien (Beta)", path: [] },
+  ];
+
+  if (finderState.currentPath.length > 0) {
+    const p0 = finderState.currentPath[0];
+    if (p0 === "smart-deadlines") {
+      crumbs.push({ title: "🔥 Fällige Hausaufgaben", path: ["smart-deadlines"] });
+    } else {
+      const cinfo = (finderState.overview?.courses || []).find(
+        (c) => c.course_id.toLowerCase() === p0.toLowerCase()
+      );
+      const ctitle = cinfo ? cinfo.title : p0;
+      crumbs.push({ title: `📁 ${ctitle}`, path: [p0] });
+
+      if (finderState.currentPath.length > 1) {
+        const p1 = finderState.currentPath[1];
+        const subMap = {
+          assignments: "📝 Hausaufgaben & Abgaben",
+          slides: "📊 Vorlesungsfolien",
+          scripts: "📖 Skripte & Notizen",
+          code: "💻 Code & Vorlagen",
+        };
+        crumbs.push({ title: `📂 ${subMap[p1] || p1}`, path: [p0, p1] });
+      }
+    }
+  }
+
+  barEl.innerHTML = crumbs
+    .map((c, idx) => {
+      const isLast = idx === crumbs.length - 1;
+      return `
+        <span class="crumb-item ${isLast ? "active" : ""}" data-crumb-idx="${idx}">
+          ${escapeHtml(c.title)}
+        </span>
+        ${!isLast ? '<span class="crumb-sep">›</span>' : ""}
+      `;
+    })
+    .join("");
+
+  barEl.querySelectorAll(".crumb-item").forEach((el) => {
+    el.addEventListener("click", () => {
+      const idx = Number(el.dataset.crumbIdx);
+      if (!isNaN(idx) && idx < crumbs.length) {
+        navigateFinder(crumbs[idx].path);
+      }
+    });
+  });
+}
+
+async function renderFinder() {
+  renderFinderBreadcrumbs();
+  const bodyEl = document.getElementById("finderBrowserBody");
+  const countStatusEl = document.getElementById("finderStatusItemCount");
+  const quickTagsBar = document.getElementById("finderQuickTagsBar");
+  if (!bodyEl) return;
+
+  if (!finderState.overview) {
+    await updateMaterialsBadgeAndStatus();
+  }
+
+  const path = finderState.currentPath;
+
+  // ----------------------------------------------------
+  // LEVEL 0: ROOT DIRECTORY (All Courses + Smart Folder)
+  // ----------------------------------------------------
+  if (path.length === 0) {
+    if (quickTagsBar) quickTagsBar.style.display = "flex";
+
+    const courses = finderState.overview?.courses || [];
+    const sq = (finderState.searchQuery || "").trim().toLowerCase();
+    const tag = finderState.currentTag || "all";
+
+    let filteredCourses = courses.filter((c) => {
+      if (tag === "moodle" && c.platform_id !== "elearn_inf") return false;
+      if (tag === "openolat" && c.platform_id === "elearn_inf") return false;
+      if (tag === "deadlines" && (!c.open_assignments || c.open_assignments <= 0)) return false;
+      if (sq) {
+        return (
+          (c.title && c.title.toLowerCase().includes(sq)) ||
+          (c.course_id && c.course_id.toLowerCase().includes(sq)) ||
+          (c.lecturer && c.lecturer.toLowerCase().includes(sq))
+        );
+      }
+      return true;
+    });
+
+    const totalOpen = finderState.overview?.stats?.total_open_assignments || 0;
+    if (countStatusEl) {
+      countStatusEl.textContent = `${filteredCourses.length + (tag === "all" ? 1 : 0)} Ordner`;
+    }
+
+    let foldersHtml = "";
+
+    // Show Smart Folder "Fällige Hausaufgaben" if tag is all or deadlines
+    if ((tag === "all" || tag === "deadlines") && !sq) {
+      foldersHtml += `
+        <div class="mac-folder-card" data-nav-target="smart-deadlines">
+          <div class="mac-folder-visual-wrap">
+            ${getMacFolderSvg("red")}
+            <span class="mac-folder-center-icon">⏰</span>
+            <span class="mac-folder-badge badge-urgent">${totalOpen} Fristen</span>
+          </div>
+          <div class="mac-folder-title">Fällige Hausaufgaben</div>
+          <div class="mac-folder-sub">${totalOpen} anstehende Fristen</div>
+          <span class="mac-folder-pill-tag" style="background: rgba(255, 69, 58, 0.18); color: #ff453a; font-weight:700;">
+            🔥 Alle Fächer
+          </span>
+        </div>
+      `;
+    }
+
+    filteredCourses.forEach((c) => {
+      const color = c.folder_color || "blue";
+      const icon = c.folder_icon || "📁";
+      const openCount = c.open_assignments || 0;
+      const matCount = c.total_materials || 0;
+      const isMoodle = c.platform_id === "elearn_inf";
+      const platLabel = isMoodle ? "Moodle" : "OpenOLAT";
+
+      foldersHtml += `
+        <div class="mac-folder-card" data-nav-target="${escapeHtml(c.course_id)}">
+          <div class="mac-folder-visual-wrap">
+            ${getMacFolderSvg(color)}
+            <span class="mac-folder-center-icon">${icon}</span>
+            ${openCount > 0 ? `<span class="mac-folder-badge badge-urgent">${openCount} offen</span>` : ""}
+          </div>
+          <div class="mac-folder-title">${escapeHtml(c.title)}</div>
+          <div class="mac-folder-sub">${openCount > 0 ? `${openCount} Abgabe offen · ` : ""}${matCount} Materialien</div>
+          <span class="mac-folder-pill-tag">
+            ${isMoodle ? "💻" : "🏛️"} ${platLabel}
+          </span>
+        </div>
+      `;
+    });
+
+    bodyEl.innerHTML = `
+      <div class="finder-section-title">
+        <span>📁</span>
+        <span>Meine CAU-Module &amp; Semesterordner</span>
+        <span class="feature-beta-tag">BETA</span>
+      </div>
+      <div class="finder-grid-container">
+        ${foldersHtml}
+      </div>
+    `;
+
+    bodyEl.querySelectorAll(".mac-folder-card").forEach((card) => {
+      card.addEventListener("click", () => {
+        const target = card.dataset.navTarget;
+        if (target === "smart-deadlines") {
+          navigateFinder(["smart-deadlines"]);
+        } else if (target) {
+          navigateFinder([target]);
+        }
+      });
+    });
+    return;
+  }
+
+  // Hide quick tags bar when inside folders
+  if (quickTagsBar) quickTagsBar.style.display = "none";
+
+  // ----------------------------------------------------
+  // LEVEL 1: SMART FOLDER "FÄLLIGE HAUSAUFGABEN"
+  // ----------------------------------------------------
+  if (path.length === 1 && path[0] === "smart-deadlines") {
+    const deadlines = finderState.overview?.upcoming_deadlines || [];
+    if (countStatusEl) countStatusEl.textContent = `${deadlines.length} Fristen`;
+
+    if (deadlines.length === 0) {
+      bodyEl.innerHTML = `
+        <div style="padding: 60px 20px; text-align: center; color: var(--text-muted);">
+          <div style="font-size: 3rem; margin-bottom: 12px;">🎉</div>
+          <h3 style="color: var(--text-primary); margin: 0 0 6px;">Keine anstehenden Fristen!</h3>
+          <p>Alle aktuellen Hausaufgaben wurden bereits abgegeben oder sind erledigt.</p>
+        </div>
+      `;
+      return;
+    }
+
+    bodyEl.innerHTML = `
+      <div class="finder-section-title">
+        <span>🔥</span>
+        <span>Alle fälligen Hausaufgaben nach Dringlichkeit sortiert</span>
+      </div>
+      <div class="finder-assignments-grid">
+        ${deadlines.map((d) => renderAssignmentCardHtml(d, d.course_id)).join("")}
+      </div>
+    `;
+    bindAssignmentCardEvents(bodyEl);
+    return;
+  }
+
+  // ----------------------------------------------------
+  // LEVEL 1: INSIDE A COURSE FOLDER (Subfolders: Aufgaben, Folien, etc.)
+  // ----------------------------------------------------
+  const courseId = path[0];
+  let courseDetail = finderState.courseDetailsCache[courseId.toLowerCase()];
+
+  if (!courseDetail) {
+    bodyEl.innerHTML = `
+      <div style="padding: 60px 20px; text-align: center; color: var(--text-muted);">
+        <div class="spinner" style="margin: 0 auto 14px;"></div>
+        <p>Lade Kursordner...</p>
+      </div>
+    `;
+    try {
+      const res = await apiGet(`/api/materials/course?id=${encodeURIComponent(courseId)}`);
+      if (res && res.ok && res.course) {
+        courseDetail = res.course;
+        finderState.courseDetailsCache[courseId.toLowerCase()] = res.course;
+      }
+    } catch (err) {
+      console.error("[Finder] Fehler beim Laden des Kurses:", err);
+    }
+  }
+
+  if (!courseDetail) {
+    bodyEl.innerHTML = `
+      <div style="padding: 40px; text-align: center; color: var(--text-muted);">
+        <p>Konnte Kursinhalte nicht laden.</p>
+      </div>
+    `;
+    return;
+  }
+
+  if (path.length === 1) {
+    const subfolders = courseDetail.subfolders || [];
+    if (countStatusEl) countStatusEl.textContent = `${subfolders.length} Ordner`;
+
+    const bannerHtml = getCourseBannerHtml(courseDetail);
+
+    const foldersGridHtml = subfolders
+      .map((sf) => `
+        <div class="mac-folder-card" data-subfolder-id="${escapeHtml(sf.id)}">
+          <div class="mac-folder-visual-wrap">
+            ${getMacFolderSvg(sf.folder_color || "blue")}
+            <span class="mac-folder-center-icon">${sf.folder_icon || "📁"}</span>
+            ${sf.badge ? `<span class="mac-folder-badge ${sf.folder_color === "orange" || sf.folder_color === "red" ? "badge-urgent" : "badge-platform"}">${escapeHtml(sf.badge)}</span>` : ""}
+          </div>
+          <div class="mac-folder-title">${escapeHtml(sf.title)}</div>
+          <div class="mac-folder-sub">${escapeHtml(sf.count_label || "")}</div>
+        </div>
+      `)
+      .join("");
+
+    bodyEl.innerHTML = `
+      ${bannerHtml}
+      <div class="finder-section-title">
+        <span>📂</span>
+        <span>Ordnerinhalt: ${escapeHtml(courseDetail.title)}</span>
+      </div>
+      <div class="finder-grid-container">
+        ${foldersGridHtml}
+      </div>
+    `;
+
+    bodyEl.querySelectorAll(".mac-folder-card").forEach((card) => {
+      card.addEventListener("click", () => {
+        const sfId = card.dataset.subfolderId;
+        if (sfId) navigateFinder([courseId, sfId]);
+      });
+    });
+    return;
+  }
+
+  // ----------------------------------------------------
+  // LEVEL 2: INSIDE SUBFOLDER (Assignments or Slides/Scripts/Code)
+  // ----------------------------------------------------
+  if (path.length === 2) {
+    const subId = path[1];
+    const subfolder = (courseDetail.subfolders || []).find((s) => s.id === subId);
+
+    if (!subfolder) {
+      bodyEl.innerHTML = `<div style="padding: 40px; text-align: center;">Ordner nicht gefunden.</div>`;
+      return;
+    }
+
+    const bannerHtml = getCourseBannerHtml(courseDetail, subfolder);
+
+    if (subId === "assignments") {
+      const assignments = subfolder.items || courseDetail.assignments || [];
+      if (countStatusEl) countStatusEl.textContent = `${assignments.length} Aufgaben`;
+
+      bodyEl.innerHTML = `
+        ${bannerHtml}
+        <div class="finder-section-title">
+          <span>📝</span>
+          <span>${escapeHtml(subfolder.title)} (${assignments.length})</span>
+        </div>
+        <div class="finder-assignments-grid">
+          ${assignments.map((a) => renderAssignmentCardHtml(a, courseDetail.course_id)).join("")}
+        </div>
+      `;
+      bindAssignmentCardEvents(bodyEl);
+      bindBannerEvents(bodyEl, courseId);
+      return;
+    }
+
+    // Slides, Scripts, Code View
+    const items = subfolder.items || [];
+    if (countStatusEl) countStatusEl.textContent = `${items.length} Dokumente`;
+
+    const isSlides = subId === "slides";
+    const headerHtml = `
+      <div class="finder-subfolder-header">
+        <div class="fsh-left">
+          <span class="fsh-icon">${subfolder.folder_icon || "📁"}</span>
+          <div class="fsh-text">
+            <h3>${escapeHtml(subfolder.title)}</h3>
+            <span class="fsh-sub">${items.length} ${isSlides ? "Foliensätze verfügbar · Offizielles Vorlesungsmaterial" : "Dokumente"}</span>
+          </div>
+        </div>
+        <div class="fsh-right">
+          ${isSlides && items.length > 0 ? `
+            <button type="button" class="btn btn-outline btn-xs" id="btnDownloadAllSlides">
+              📥 Alle herunterladen (${items.length})
+            </button>
+          ` : ""}
+        </div>
+      </div>
+    `;
+
+    let contentHtml = "";
+    if (finderState.viewMode === "list") {
+      contentHtml = renderSlidesTableHtml(items, courseId, subfolder.type);
+    } else {
+      contentHtml = `
+        <div class="finder-slides-list">
+          ${items.map((it) => renderSlideCardHtml(it, courseId, subfolder.type)).join("")}
+        </div>
+      `;
+    }
+
+    bodyEl.innerHTML = `
+      ${bannerHtml}
+      ${headerHtml}
+      ${contentHtml}
+    `;
+
+    bindBannerEvents(bodyEl, courseId);
+    bindSlideEvents(bodyEl, courseId, items);
+    return;
+  }
+}
+
+function getCourseBannerHtml(courseDetail, currentSubfolder = null) {
+  const isMoodle = courseDetail.platform_id === "elearn_inf";
+  const cid = escapeHtml(courseDetail.course_id || "");
+  return `
+    <div class="finder-course-banner" style="background: linear-gradient(135deg, rgba(10, 132, 255, 0.08) 0%, rgba(191, 90, 242, 0.08) 100%);">
+      <div class="fcb-left">
+        <div class="fcb-title-row">
+          <span class="fcb-platform-badge" style="background: ${isMoodle ? "#0070d6" : "#248a3d"};">
+            ${isMoodle ? "💻 Info-Moodle" : "🏛️ CAU OpenOLAT"}
+          </span>
+          <h3>${escapeHtml(courseDetail.title)}</h3>
+          ${currentSubfolder ? `
+            <span class="fcb-subfolder-crumb">› ${escapeHtml(currentSubfolder.title)}</span>
+          ` : ""}
+        </div>
+        <span class="fcb-lecturer">${escapeHtml(courseDetail.lecturer || "")} · ${cid}</span>
+      </div>
+      <div class="fcb-right-actions">
+        ${currentSubfolder ? `
+          <button type="button" class="btn btn-outline btn-xs btn-back-to-course" data-course-id="${cid}">
+            ‹ Zur Kursübersicht
+          </button>
+        ` : ""}
+        <a href="${escapeHtml(courseDetail.course_url || "#")}" target="_blank" rel="noopener noreferrer" class="btn btn-outline btn-xs">
+          🌐 Im Kursraum öffnen ↗
+        </a>
+      </div>
+    </div>
+  `;
+}
+
+function parseSlideMeta(it) {
+  const rawTitle = it.title || it.file_name || "Vorlesungsfolie";
+  let cleanTitle = rawTitle;
+
+  // Extract folien count, e.g. "(64 Folien)"
+  let slideCount = "Foliensatz";
+  const countMatch = rawTitle.match(/\((\d+\s*Folien)\)/i);
+  if (countMatch) {
+    slideCount = countMatch[1];
+    cleanTitle = cleanTitle.replace(/\s*\(\d+\s*Folien\)\s*/i, "").trim();
+  }
+
+  // Extract chapter / part tag
+  let chapterTag = "";
+  const fn = (it.file_name || "").toLowerCase();
+  const lowerTitle = rawTitle.toLowerCase();
+
+  if (fn.startsWith("kap_01-1") || lowerTitle.includes("grundlagen 1")) {
+    chapterTag = "Kapitel 1.1";
+  } else if (fn.startsWith("kap_01-2") || lowerTitle.includes("konstruktionen")) {
+    chapterTag = "Kapitel 1.2";
+  } else if (fn.startsWith("kap_01-3") || lowerTitle.includes("kardinalitäten")) {
+    chapterTag = "Kapitel 1.3";
+  } else if (fn.startsWith("kap_")) {
+    const km = fn.match(/kap_(\d+)(?:-(\d+))?/);
+    if (km) {
+      chapterTag = `Kapitel ${km[1]}${km[2] ? "." + km[2] : ""}`;
+    }
+  } else if (lowerTitle.includes("teil 0")) {
+    chapterTag = "Teil 0 · Organisation";
+  } else if (lowerTitle.includes("teil 1a")) {
+    chapterTag = "Teil 1a · Information";
+  } else if (lowerTitle.includes("teil p0")) {
+    chapterTag = "Teil P0 · Rechner";
+  } else if (lowerTitle.includes("teil p1")) {
+    chapterTag = "Teil P1 · Programmierung";
+  } else if (it.week_number) {
+    chapterTag = `Woche ${it.week_number}`;
+  }
+
+  return { cleanTitle, slideCount, chapterTag };
+}
+
+function renderSlideCardHtml(it, courseId, folderType = "slides") {
+  const { cleanTitle, slideCount, chapterTag } = parseSlideMeta(it);
+  const dlUrl = `/api/materials/download?course_id=${encodeURIComponent(courseId)}&file=${encodeURIComponent(it.file_name || it.title)}`;
+  const fileName = it.file_name || it.title || "folien.pdf";
+  const size = it.size || "PDF";
+  const date = it.date || "WiSe 2026/27";
+
+  let badgeType = "SLIDES";
+  let symbolIcon = "📊";
+  let gradClass = "gradient-slides";
+  let borderAccent = "#ff9500";
+  let dlLabel = `📥 Foliensatz herunterladen (${escapeHtml(size)})`;
+
+  if (folderType === "script" || it.type === "script") {
+    badgeType = "SKRIPT";
+    symbolIcon = "📖";
+    gradClass = "gradient-scripts";
+    borderAccent = "#34c759";
+    dlLabel = `📥 Skript herunterladen (${escapeHtml(size)})`;
+  } else if (folderType === "code" || it.type === "code") {
+    badgeType = "CODE";
+    symbolIcon = "💻";
+    gradClass = "gradient-code";
+    borderAccent = "#30b0c7";
+    dlLabel = `📥 Code-Archiv herunterladen (${escapeHtml(size)})`;
+  }
+
+  return `
+    <div class="mac-slide-card" style="border-left-color: ${borderAccent};">
+      <div class="apple-slide-icon-wrap ${gradClass}">
+        <div class="asi-topbar">
+          <div class="asi-dots">
+            <span class="asi-dot"></span>
+            <span class="asi-dot"></span>
+            <span class="asi-dot"></span>
+          </div>
+          <span class="asi-badge">${badgeType}</span>
+        </div>
+        <div class="asi-center">${symbolIcon}</div>
+        <div class="asi-footer">${escapeHtml(slideCount)}</div>
+      </div>
+
+      <div class="msc-body">
+        <div class="msc-header">
+          <div class="msc-title-row">
+            ${chapterTag ? `<span class="msc-chapter-badge">${escapeHtml(chapterTag)}</span>` : ""}
+            <h4 class="msc-title">${escapeHtml(cleanTitle)}</h4>
+          </div>
+          <span class="msc-count-badge">${symbolIcon} ${escapeHtml(slideCount)}</span>
+        </div>
+
+        ${it.section_title ? `
+          <div class="msc-section-label">📁 ${escapeHtml(it.section_title)}</div>
+        ` : ""}
+
+        <div class="msc-meta-row">
+          <span class="msc-pill pill-file" title="Dateiname">📄 ${escapeHtml(fileName)}</span>
+          <span class="msc-pill" title="Dateigröße">💾 ${escapeHtml(size)}</span>
+          <span class="msc-pill" title="Upload-Datum">📅 ${escapeHtml(date)}</span>
+          <span class="msc-pill pill-ready">✓ Offline verfügbar</span>
+        </div>
+
+        <div class="msc-actions">
+          <a href="${dlUrl}" download="${escapeHtml(fileName)}" class="btn-slide-download" title="PDF direkt herunterladen">
+            <span>${dlLabel}</span>
+          </a>
+          ${it.url ? `
+            <a href="${escapeHtml(it.url)}" target="_blank" rel="noopener noreferrer" class="btn btn-outline btn-sm btn-slide-lms" title="Im LMS öffnen ↗">
+              <span>🌐 Im LMS öffnen ↗</span>
+            </a>
+          ` : ""}
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function renderSlidesTableHtml(items, courseId, folderType = "slides") {
+  if (!items || items.length === 0) {
+    return `<div style="padding: 40px; text-align: center; color: var(--text-muted);">Keine Dokumente in diesem Ordner.</div>`;
+  }
+
+  let defaultIcon = "📊";
+  if (folderType === "script") defaultIcon = "📖";
+  else if (folderType === "code") defaultIcon = "💻";
+
+  const rows = items
+    .map((it) => {
+      const { cleanTitle, slideCount, chapterTag } = parseSlideMeta(it);
+      const dlUrl = `/api/materials/download?course_id=${encodeURIComponent(courseId)}&file=${encodeURIComponent(it.file_name || it.title)}`;
+
+      return `
+        <tr class="mac-table-row">
+          <td class="mtr-icon">${defaultIcon}</td>
+          <td class="mtr-title">
+            <strong>${escapeHtml(cleanTitle)}</strong>
+            ${chapterTag ? `<span class="msc-chapter-badge" style="margin-left: 6px; font-size: 0.7rem; padding: 2px 6px;">${escapeHtml(chapterTag)}</span>` : ""}
+          </td>
+          <td class="mtr-file font-mono">${escapeHtml(it.file_name || "-")}</td>
+          <td class="mtr-count"><span class="table-pill">${escapeHtml(slideCount)}</span></td>
+          <td class="mtr-size">${escapeHtml(it.size || "-")}</td>
+          <td class="mtr-date">${escapeHtml(it.date || "-")}</td>
+          <td class="mtr-actions">
+            <a href="${dlUrl}" download="${escapeHtml(it.file_name || it.title)}" class="btn btn-primary btn-xs" title="Herunterladen">
+              📥 Download
+            </a>
+            ${it.url ? `
+              <a href="${escapeHtml(it.url)}" target="_blank" rel="noopener noreferrer" class="btn btn-outline btn-xs" title="Im LMS öffnen">
+                ↗
+              </a>
+            ` : ""}
+          </td>
+        </tr>
+      `;
+    })
+    .join("");
+
+  return `
+    <div class="mac-finder-table-wrap">
+      <table class="mac-finder-table">
+        <thead>
+          <tr>
+            <th style="width: 36px;"></th>
+            <th>Titel des Foliensatzes</th>
+            <th>Dateiname</th>
+            <th>Umfang</th>
+            <th>Größe</th>
+            <th>Datum</th>
+            <th style="text-align: right; width: 140px;">Aktionen</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${rows}
+        </tbody>
+      </table>
+    </div>
+  `;
+}
+
+function bindBannerEvents(container, courseId) {
+  container.querySelectorAll(".btn-back-to-course").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      navigateFinder([courseId]);
+    });
+  });
+}
+
+function bindSlideEvents(container, courseId, items) {
+  const btn = container.querySelector("#btnDownloadAllSlides");
+  if (btn && items && items.length > 0) {
+    btn.addEventListener("click", () => {
+      const originalText = btn.textContent;
+      btn.disabled = true;
+      btn.textContent = `⏳ Lade ${items.length} Foliensätze...`;
+
+      items.forEach((it, idx) => {
+        setTimeout(() => {
+          const dlUrl = `/api/materials/download?course_id=${encodeURIComponent(courseId)}&file=${encodeURIComponent(it.file_name || it.title)}`;
+          const a = document.createElement("a");
+          a.href = dlUrl;
+          a.download = it.file_name || it.title;
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+
+          if (idx === items.length - 1) {
+            setTimeout(() => {
+              btn.textContent = "✅ Alle Downloads gestartet!";
+              setTimeout(() => {
+                btn.disabled = false;
+                btn.textContent = originalText;
+              }, 3000);
+            }, 600);
+          }
+        }, idx * 350);
+      });
+    });
+  }
+}
+
+function renderAssignmentCardHtml(a, courseId) {
+  const isSubmitted = a.status === "submitted" || a.status === "graded";
+  const sheetNum = a.sheet_number ? `Blatt ${String(a.sheet_number).padStart(2, "0")}` : "Aufgabe";
+  const maxPts = a.max_points ? `${a.max_points} Pkt.` : "";
+  const countdown = a.deadline?.due_countdown || "Offen";
+  const dueFmt = a.deadline?.due_formatted || "";
+  const urg = isSubmitted ? "submitted" : a.deadline?.urgency || "normal";
+  const aid = escapeHtml(a.id);
+  const cid = escapeHtml(courseId || a.course_id || "");
+
+  let chipClass = "chip-normal";
+  if (isSubmitted) chipClass = "chip-submitted";
+  else if (urg === "critical" || urg === "urgent") chipClass = "chip-urgent";
+  else if (urg === "medium") chipClass = "chip-medium";
+
+  const taskChips = (a.task_files || [])
+    .map((f) => {
+      const dlUrl = `/api/materials/download?course_id=${encodeURIComponent(cid)}&file=${encodeURIComponent(f.name)}`;
+      return `
+        <div class="mdb-file-chip-wrap">
+          <a href="${dlUrl}" download="${escapeHtml(f.name)}" class="mdb-file-pill btn-direct-download" title="Aufgabenblatt '${escapeHtml(f.name)}' direkt herunterladen">
+            <span>📄</span>
+            <span class="mfp-name"><strong>${escapeHtml(f.name)}</strong></span>
+            ${f.size ? `<span class="mfp-size">(${escapeHtml(f.size)})</span>` : ""}
+            <span class="mfp-dl-badge">📥 Download</span>
+          </a>
+          ${f.url && f.url !== "#" ? `
+            <a href="${escapeHtml(f.url)}" target="_blank" rel="noopener noreferrer" class="mdb-file-ext-link" title="Im LMS öffnen ↗">
+              ↗
+            </a>
+          ` : ""}
+        </div>
+      `;
+    })
+    .join("");
+
+  const solChips = (a.solution_files || [])
+    .map((f) => {
+      const dlUrl = `/api/materials/download?course_id=${encodeURIComponent(cid)}&file=${encodeURIComponent(f.name)}`;
+      return `
+        <div class="mdb-file-chip-wrap">
+          <a href="${dlUrl}" download="${escapeHtml(f.name)}" class="mdb-file-pill btn-direct-download" style="border-color: rgba(52, 199, 89, 0.4); background: rgba(52, 199, 89, 0.1);" title="Musterlösung herunterladen">
+            <span>💡</span>
+            <span class="mfp-name">${escapeHtml(f.name)}</span>
+            <span class="mfp-dl-badge">📥 Lösung</span>
+          </a>
+        </div>
+      `;
+    })
+    .join("");
+
+  return `
+    <div class="mac-doc-card ${isSubmitted ? "is-submitted" : (urg === "critical" || urg === "urgent" ? "is-urgent" : (urg === "medium" ? "is-medium" : ""))}">
+      <div class="apple-doc-icon-wrap">
+        <div class="apple-doc-dogear"></div>
+        <div class="apple-doc-badge">PDF</div>
+      </div>
+      <div class="mac-doc-body">
+        <div class="mdb-header">
+          <div class="mdb-title-row">
+            <span class="mdb-sheet-tag">${escapeHtml(sheetNum)}</span>
+            <h4 class="mdb-title">${escapeHtml(a.title)}</h4>
+            ${maxPts ? `<span class="mdb-points">${escapeHtml(maxPts)}</span>` : ""}
+            ${a.course_title ? `<span style="font-size:0.78rem; font-weight:700; color:var(--accent-primary);">${escapeHtml(a.course_title)}</span>` : ""}
+          </div>
+          <span class="mdb-deadline-chip ${chipClass}">
+            ${isSubmitted ? `✅ Abgegeben${a.submitted_at ? ` (${escapeHtml(a.submitted_at)})` : ""}` : `⏰ ${escapeHtml(countdown)}`}
+          </span>
+        </div>
+
+        <p class="mdb-description">${escapeHtml(a.description || "")}</p>
+        <div style="font-size:0.8rem; color:var(--text-muted);">📅 Abgabefrist: <strong>${escapeHtml(dueFmt)}</strong></div>
+
+        ${taskChips || solChips ? `<div class="mdb-files-row">${taskChips}${solChips}</div>` : ""}
+
+        <div class="mdb-footer-row">
+          <button type="button" class="btn btn-outline btn-xs btn-finder-toggle-status" data-aid="${aid}" data-cid="${cid}">
+            <span>${isSubmitted ? "↩️ Als offen markieren" : "✅ Als erledigt markieren"}</span>
+          </button>
+          ${a.submission_url ? `
+            <a href="${escapeHtml(a.submission_url)}" target="_blank" rel="noopener noreferrer" class="btn btn-primary btn-xs">
+              🚀 Zur Abgabe ↗
+            </a>
+          ` : ""}
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function bindAssignmentCardEvents(container) {
+  container.querySelectorAll(".btn-finder-toggle-status").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      const aid = btn.dataset.aid;
+      const cid = btn.dataset.cid;
+      if (!aid || !cid) return;
+
+      btn.disabled = true;
+      btn.textContent = "Wird gespeichert...";
+      await apiPost("/api/materials/toggle-status", {
+        course_id: cid,
+        assignment_id: aid,
+      });
+
+      // Clear course cache to force fresh reload
+      delete finderState.courseDetailsCache[cid.toLowerCase()];
+      await updateMaterialsBadgeAndStatus();
+      await renderFinder();
+    });
+  });
+}
+
+function bindMaterialsUIEvents() {
+  // Back button
+  document.getElementById("btnFinderBack")?.addEventListener("click", () => {
+    if (finderState.currentPath.length > 0) {
+      const nextPath = finderState.currentPath.slice(0, -1);
+      navigateFinder(nextPath);
+    }
+  });
+
+  // Refresh button
+  document.getElementById("btnMaterialsRefresh")?.addEventListener("click", async () => {
+    const btn = document.getElementById("btnMaterialsRefresh");
+    if (btn) btn.textContent = "🔄 Lädt...";
+    finderState.courseDetailsCache = {};
+    await updateMaterialsBadgeAndStatus();
+    await renderFinder();
+    if (btn) btn.textContent = "🔄 Aktualisieren";
+  });
+
+  // View toggle buttons (Grid vs List)
+  document.getElementById("btnViewGrid")?.addEventListener("click", () => {
+    finderState.viewMode = "grid";
+    document.getElementById("btnViewGrid")?.classList.add("active");
+    document.getElementById("btnViewList")?.classList.remove("active");
+    renderFinder();
+  });
+  document.getElementById("btnViewList")?.addEventListener("click", () => {
+    finderState.viewMode = "list";
+    document.getElementById("btnViewList")?.classList.add("active");
+    document.getElementById("btnViewGrid")?.classList.remove("active");
+    renderFinder();
+  });
+
+  // Quick tags filter pills (Alle / Ausstehende / Moodle / OpenOLAT)
+  document.querySelectorAll(".finder-tag-pill").forEach((pill) => {
+    pill.addEventListener("click", () => {
+      document.querySelectorAll(".finder-tag-pill").forEach((p) => p.classList.remove("active"));
+      pill.classList.add("active");
+      finderState.currentTag = pill.dataset.tag || "all";
+      navigateFinder([]);
+    });
+  });
+
+  // Search input filter
+  const searchInput = document.getElementById("materialsSearchInput");
+  const clearBtn = document.getElementById("btnFinderSearchClear");
+
+  if (searchInput) {
+    searchInput.addEventListener("input", (e) => {
+      finderState.searchQuery = e.target.value || "";
+      if (clearBtn) {
+        if (finderState.searchQuery) clearBtn.classList.remove("hidden");
+        else clearBtn.classList.add("hidden");
+      }
+      renderFinder();
+    });
+  }
+
+  if (clearBtn) {
+    clearBtn.addEventListener("click", () => {
+      if (searchInput) searchInput.value = "";
+      finderState.searchQuery = "";
+      clearBtn.classList.add("hidden");
+      renderFinder();
+    });
+  }
+}
+

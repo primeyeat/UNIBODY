@@ -619,6 +619,7 @@ class CAUBrowserSessionManager:
         self.creds_file = os.path.join(self.data_dir, "credentials.json")
         self.ext_dir = os.path.join(self.data_dir, "cau_autofill_ext")
         self.debug_port = 9222
+        self.server_port = 8765
         self.chrome_process: Optional[subprocess.Popen] = None
         self.session_state = {
             "browser_running": False,
@@ -1153,10 +1154,16 @@ class CAUBrowserSessionManager:
     def _write_chrome_extension(self):
         """
         Writes a lightweight Manifest V3 Chrome Extension into `data/cau_autofill_ext`
-        so Chrome also has native content-script Auto-Fill on both `lms.uni-kiel.de` and `elearn.informatik.uni-kiel.de`.
+        so Chrome has native content-script Auto-Fill strictly on verified CAU login portals.
+        Hardened with 0600 file permissions and narrow host permissions.
         """
         try:
             os.makedirs(self.ext_dir, exist_ok=True)
+            try:
+                os.chmod(self.ext_dir, 0o700)
+            except Exception:
+                pass
+
             manifest = {
                 "manifest_version": 3,
                 "name": "CAU Kiel UNIBODY Auto-Login (OpenOlat & eLearn Informatik)",
@@ -1164,13 +1171,17 @@ class CAUBrowserSessionManager:
                 "description": "UNIBODY Auto-Fill & Auto-Login für lms.uni-kiel.de, elearn.informatik.uni-kiel.de und idp.uni-kiel.de",
                 "permissions": ["storage"],
                 "host_permissions": [
-                    "https://*.uni-kiel.de/*",
+                    "https://lms.uni-kiel.de/*",
+                    "https://elearn.informatik.uni-kiel.de/*",
+                    "https://idp.uni-kiel.de/*",
                     "https://*.dfn.de/*"
                 ],
                 "content_scripts": [
                     {
                         "matches": [
-                            "https://*.uni-kiel.de/*",
+                            "https://lms.uni-kiel.de/*",
+                            "https://elearn.informatik.uni-kiel.de/*",
+                            "https://idp.uni-kiel.de/*",
                             "https://*.dfn.de/*"
                         ],
                         "js": ["content.js"],
@@ -1178,8 +1189,13 @@ class CAUBrowserSessionManager:
                     }
                 ]
             }
-            with open(os.path.join(self.ext_dir, "manifest.json"), "w", encoding="utf-8") as f:
+            manifest_path = os.path.join(self.ext_dir, "manifest.json")
+            with open(manifest_path, "w", encoding="utf-8") as f:
                 json.dump(manifest, f, indent=2)
+            try:
+                os.chmod(manifest_path, 0o600)
+            except Exception:
+                pass
 
             creds = self.load_credentials(include_secret=True)
             js_code = self._build_autofill_js(creds, force_submit=False)
@@ -1192,8 +1208,13 @@ setTimeout(runUnibodyAutoFill, 250);
 setTimeout(runUnibodyAutoFill, 1150);
 setTimeout(runUnibodyAutoFill, 2200);
 """
-            with open(os.path.join(self.ext_dir, "content.js"), "w", encoding="utf-8") as f:
+            content_path = os.path.join(self.ext_dir, "content.js")
+            with open(content_path, "w", encoding="utf-8") as f:
                 f.write(content_js)
+            try:
+                os.chmod(content_path, 0o600)
+            except Exception:
+                pass
         except Exception as e:
             self.add_log("WARN", f"Konnte Auto-Fill Extension nicht aktualisieren: {e}")
 
@@ -1434,7 +1455,7 @@ setTimeout(runUnibodyAutoFill, 2200);
             chrome_bin,
             f"--user-data-dir={self.profile_dir}",
             f"--remote-debugging-port={self.debug_port}",
-            "--remote-allow-origins=*",
+            f"--remote-allow-origins=http://127.0.0.1:{self.server_port},http://localhost:{self.server_port}",
             "--disable-features=DisableLoadExtensionCommandLineSwitch",
             f"--load-extension={self.ext_dir}",
             "--no-first-run",

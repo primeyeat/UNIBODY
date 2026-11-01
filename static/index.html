@@ -10,7 +10,7 @@
   <link rel="icon" type="image/png" sizes="192x192" href="/favicon-192.png" />
   <link rel="icon" type="image/x-icon" href="/favicon.ico" />
   <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
-  <link rel="stylesheet" href="/styles.css?v=23" />
+  <link rel="stylesheet" href="/styles.css?v=32" />
 </head>
 <body>
   <!-- TOP HEADER -->
@@ -585,7 +585,7 @@
               <!-- Mail Content Body -->
               <div class="mail-detail-body-container">
                 <div class="mail-html-wrapper" id="mailHtmlWrapper">
-                  <iframe id="mailHtmlFrame" sandbox="allow-same-origin allow-popups" title="E-Mail Inhalt"></iframe>
+                  <iframe id="mailHtmlFrame" sandbox="allow-popups" title="E-Mail Inhalt"></iframe>
                 </div>
                 <div class="mail-text-wrapper hidden" id="mailTextWrapper">
                   <pre id="mailTextContent"></pre>
@@ -593,6 +593,106 @@
               </div>
             </div>
           </section>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- DEDICATED MATERIALS & HOMEWORK PAGE (MACOS FINDER FOLDER EXPERIENCE) -->
+  <main class="materials-app-page" id="pageMaterials" style="display: none;">
+    <div class="materials-container">
+      <!-- 1. Top Navigation Bar (App Header) -->
+      <div class="materials-nav-bar">
+        <div class="materials-nav-left">
+          <button type="button" id="btnBackFromMaterials" class="btn btn-outline">
+            ← Zurück zum Stundenplan
+          </button>
+          <div class="materials-header-title-wrap">
+            <div class="materials-title-row">
+              <span class="step-pill beta-pill">BETA</span>
+              <h2>📁 Aufgaben &amp; Materialien</h2>
+              <span class="live-recalc-tag" id="materialsPlatformSyncBadge">🏛️ OpenOLAT + 💻 Moodle synchronisiert</span>
+            </div>
+            <span class="materials-subtitle">
+              Native Mac-Ordnerstruktur für alle Fächer, Hausaufgaben, Abgabefristen und Vorlesungsfolien · (Beta: In kontinuierlicher Entwicklung)
+            </span>
+          </div>
+        </div>
+
+        <div class="materials-nav-actions">
+          <button type="button" id="btnMaterialsRefresh" class="btn btn-outline" title="Materialien jetzt synchronisieren">
+            🔄 Aktualisieren
+          </button>
+          <a href="https://elearn.informatik.uni-kiel.de/my/" target="_blank" rel="noopener noreferrer" class="btn btn-outline" id="btnOpenMoodleExternal">
+            💻 Moodle ↗
+          </a>
+          <a href="https://lms.uni-kiel.de/" target="_blank" rel="noopener noreferrer" class="btn btn-primary" id="btnOpenOlatExternal">
+            🏛️ OpenOLAT ↗
+          </a>
+        </div>
+      </div>
+
+      <!-- 2. macOS Finder Window Card -->
+      <div class="finder-window-card card">
+        <!-- Finder Window Chrome Toolbar -->
+        <div class="finder-toolbar">
+          <!-- Window traffic lights decorative icons -->
+          <div class="finder-traffic-lights">
+            <span class="traffic-dot traffic-red"></span>
+            <span class="traffic-dot traffic-yellow"></span>
+            <span class="traffic-dot traffic-green"></span>
+          </div>
+
+          <!-- Finder Navigation Controls (Back / Forward / Path) -->
+          <div class="finder-nav-controls">
+            <button type="button" id="btnFinderBack" class="finder-icon-btn" title="Zurück zum übergeordneten Ordner" disabled>
+              ‹
+            </button>
+            <div class="finder-path-breadcrumbs" id="finderPathBar">
+              <!-- Rendered dynamically -->
+            </div>
+          </div>
+
+          <!-- Search & View Mode Switcher -->
+          <div class="finder-toolbar-right">
+            <div class="finder-search-box">
+              <span class="search-icon">🔍</span>
+              <input type="text" id="materialsSearchInput" placeholder="Im Finder suchen..." autocomplete="off" />
+              <button type="button" id="btnFinderSearchClear" class="btn-clear-search hidden">&times;</button>
+            </div>
+
+            <div class="finder-view-segmented">
+              <button type="button" class="finder-view-btn active" id="btnViewGrid" title="Symbolansicht (Raster)">
+                ⊞
+              </button>
+              <button type="button" class="finder-view-btn" id="btnViewList" title="Listenansicht">
+                ☰
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Finder Filter Quick-Bar (Tags: Alle / Moodle / OpenOLAT / Nur Fällige) -->
+        <div class="finder-quick-tags-bar" id="finderQuickTagsBar">
+          <div class="quick-tags-list">
+            <button type="button" class="finder-tag-pill active" data-tag="all">Alle Fächer</button>
+            <button type="button" class="finder-tag-pill" data-tag="deadlines">🔥 Ausstehende Hausaufgaben</button>
+            <button type="button" class="finder-tag-pill" data-tag="moodle">💻 Moodle Kurse</button>
+            <button type="button" class="finder-tag-pill" data-tag="openolat">🏛️ OpenOLAT Kurse</button>
+          </div>
+          <span class="finder-status-summary" id="finderStatusSummary">5 Ordner</span>
+        </div>
+
+        <!-- Finder Main Browsing Area -->
+        <div class="finder-browser-body" id="finderBrowserBody">
+          <!-- Rendered dynamically based on current folder path -->
+        </div>
+
+        <!-- Finder Bottom Status Bar -->
+        <div class="finder-statusbar">
+          <span id="finderStatusItemCount">6 Elemente</span>
+          <span class="finder-statusbar-divider">·</span>
+          <span id="finderStatusDetails">WiSe 2026/27 · Christian-Albrechts-Universität zu Kiel · (Beta-Feature)</span>
         </div>
       </div>
     </div>
@@ -984,7 +1084,10 @@
           </div>
         </div>
       </div>
-      <div class="modal-footer">
+      <div class="modal-footer" style="display:flex; justify-content:space-between; align-items:center;">
+        <button type="button" id="btnEvDetailDelete" class="btn btn-outline" style="color: #ef4444; border-color: rgba(239, 68, 68, 0.35);">
+          🗑️ Termin löschen...
+        </button>
         <button type="button" class="btn btn-primary" data-close="modalEventDetail">Fertig</button>
       </div>
     </div>
@@ -1057,6 +1160,45 @@
     </div>
   </div>
 
+  <!-- MODAL: CONFIRM SCHEDULE ITEM DELETION (CENTER POPUP) -->
+  <div id="modalConfirmDelete" class="modal-backdrop hidden">
+    <div class="modal modal-confirm-delete">
+      <div class="confirm-delete-header">
+        <div class="confirm-delete-title-wrap">
+          <div class="confirm-delete-icon-bubble">🗑️</div>
+          <div>
+            <h3>Termin entfernen?</h3>
+            <div class="confirm-delete-subtitle">Sicherheitsabfrage vor dem Löschen</div>
+          </div>
+        </div>
+        <button class="btn-close" data-close="modalConfirmDelete">&times;</button>
+      </div>
+      <div class="confirm-delete-body">
+        <p style="margin: 0; font-size: 0.92rem; color: var(--text-secondary); line-height: 1.45;">
+          Möchtest du diese Vorlesung bzw. diesen Termin wirklich aus deinem Stundenplan löschen?
+        </p>
+
+        <div class="confirm-delete-card">
+          <strong id="confirmDeleteTitle">Kursname</strong>
+          <div class="confirm-delete-meta">
+            <span id="confirmDeleteTime">📅 Montag, 10:00 – 13:00 Uhr</span>
+            <span id="confirmDeleteRoom">📍 Raum CAP3 - Hörsaal 3</span>
+          </div>
+        </div>
+
+        <p class="confirm-delete-hint">
+          💡 <strong>Tipp:</strong> Wenn du den Termin nur vorübergehend ausblenden möchtest, kannst du ihn im Wochenplan einfach mit 1 normalem Klick deaktivieren, ohne ihn zu löschen.
+        </p>
+      </div>
+      <div class="confirm-delete-footer">
+        <button type="button" class="btn btn-outline" data-close="modalConfirmDelete">Abbrechen</button>
+        <button type="button" class="btn btn-primary btn-confirm-delete-danger" id="btnExecuteDeleteEvent">
+          🗑️ Ja, Termin löschen
+        </button>
+      </div>
+    </div>
+  </div>
+
   <!-- SLIDE-IN HAMBURGER MENU DRAWER (LEFT-TO-RIGHT) -->
   <div id="drawerMenuBackdrop" class="drawer-backdrop" style="display:none;"></div>
   <aside id="drawerMenu" class="drawer-menu" style="display:none;" aria-label="UNIBODY Menü" role="dialog" aria-modal="true">
@@ -1085,6 +1227,12 @@
             <span class="drawer-icon">📅</span>
             <span>Kalender (8-Wochen-Vorschau)</span>
           </button>
+          <button type="button" class="drawer-item" id="drawerBtnMaterials">
+            <span class="drawer-icon">📁</span>
+            <span>Aufgaben &amp; Materialien</span>
+            <span class="feature-beta-tag">BETA</span>
+            <span class="drawer-badge" id="drawerMaterialsBadge" style="display: none;">0</span>
+          </button>
           <button type="button" class="drawer-item" id="drawerBtnMail">
             <span class="drawer-icon">✉️</span>
             <span>E-Mail</span>
@@ -1103,6 +1251,6 @@
     </div>
   </aside>
 
-  <script src="/app.js?v=23"></script>
+  <script src="/app.js?v=32"></script>
 </body>
 </html>
