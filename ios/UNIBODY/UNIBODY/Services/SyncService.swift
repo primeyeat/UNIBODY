@@ -110,9 +110,14 @@ public class SyncService {
         return (parsedEvents, enrolledMap, [])
     }
     
-    /// Fetches direct calendar export from CAU UnivIS URL
+    /// Fetches direct calendar export from CAU UnivIS URL (enforces HTTPS or local loopback — NET-05)
     public func fetchUnivISCalendar(urlStr: String) async throws -> [ScheduleEvent] {
-        guard let url = URL(string: urlStr) else { throw URLError(.badURL) }
+        guard let url = URL(string: urlStr),
+              let scheme = url.scheme?.lowercased(),
+              let host = url.host?.lowercased(),
+              (scheme == "https" || (scheme == "http" && (host == "127.0.0.1" || host == "localhost"))) else {
+            throw URLError(.badURL)
+        }
         let (data, _) = try await URLSession.shared.data(from: url)
         guard let text = String(data: data, encoding: .utf8) ?? String(data: data, encoding: .isoLatin1) else {
             throw URLError(.cannotDecodeContentData)

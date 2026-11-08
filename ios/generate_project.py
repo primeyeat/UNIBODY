@@ -4,19 +4,24 @@ base_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), 'UNIBODY'))
 xcodeproj_dir = os.path.join(base_dir, 'UNIBODY.xcodeproj')
 os.makedirs(xcodeproj_dir, exist_ok=True)
 
-# Collect all swift files relative to UNIBODY/
+# Collect all swift files and bundled PDF resources relative to UNIBODY/
 swift_files = []
+pdf_files = []
 for root, dirs, files in os.walk(os.path.join(base_dir, 'UNIBODY')):
     for f in sorted(files):
+        rel_path = os.path.relpath(os.path.join(root, f), os.path.join(base_dir, 'UNIBODY'))
         if f.endswith('.swift'):
-            rel_path = os.path.relpath(os.path.join(root, f), os.path.join(base_dir, 'UNIBODY'))
             swift_files.append(rel_path)
+        elif f.endswith('.pdf') and 'BundledMaterials' in rel_path:
+            pdf_files.append(rel_path)
 
 def gen_id(prefix, idx):
     return f'{prefix:08X}{idx:016X}'
 
 file_refs = {}
 build_files = {}
+pdf_file_refs = {}
+pdf_build_files = {}
 
 idx = 1
 for f in swift_files:
@@ -24,6 +29,13 @@ for f in swift_files:
     bid = gen_id(0x2000, idx)
     file_refs[f] = fid
     build_files[f] = bid
+    idx += 1
+
+for p in pdf_files:
+    fid = gen_id(0x1100, idx)
+    bid = gen_id(0x2100, idx)
+    pdf_file_refs[p] = fid
+    pdf_build_files[p] = bid
     idx += 1
 
 assets_fid = gen_id(0x1000, 999)
@@ -65,6 +77,9 @@ pbx_lines = [
 for f in swift_files:
     fname = os.path.basename(f)
     pbx_lines.append(f'\t\t{build_files[f]} /* {fname} in Sources */ = {{isa = PBXBuildFile; fileRef = {file_refs[f]} /* {fname} */; }};')
+for p in pdf_files:
+    pname = os.path.basename(p)
+    pbx_lines.append(f'\t\t{pdf_build_files[p]} /* {pname} in Resources */ = {{isa = PBXBuildFile; fileRef = {pdf_file_refs[p]} /* {pname} */; }};')
 pbx_lines.append(f'\t\t{assets_bid} /* Assets.xcassets in Resources */ = {{isa = PBXBuildFile; fileRef = {assets_fid} /* Assets.xcassets */; }};')
 pbx_lines.append('/* End PBXBuildFile section */')
 pbx_lines.append('')
@@ -74,6 +89,9 @@ pbx_lines.append(f'\t\t{app_product_id} /* UNIBODY.app */ = {{isa = PBXFileRefer
 for f in swift_files:
     fname = os.path.basename(f)
     pbx_lines.append(f'\t\t{file_refs[f]} /* {fname} */ = {{isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "{f}"; sourceTree = "<group>"; }};')
+for p in pdf_files:
+    pname = os.path.basename(p)
+    pbx_lines.append(f'\t\t{pdf_file_refs[p]} /* {pname} */ = {{isa = PBXFileReference; lastKnownFileType = image.pdf; path = "{p}"; sourceTree = "<group>"; }};')
 pbx_lines.append(f'\t\t{assets_fid} /* Assets.xcassets */ = {{isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; }};')
 pbx_lines.append(f'\t\t{plist_fid} /* Info.plist */ = {{isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; }};')
 pbx_lines.append('/* End PBXFileReference section */')
@@ -106,6 +124,9 @@ pbx_lines.append('\t\t\tchildren = (')
 for f in swift_files:
     fname = os.path.basename(f)
     pbx_lines.append(f'\t\t\t\t{file_refs[f]} /* {fname} */,')
+for p in pdf_files:
+    pname = os.path.basename(p)
+    pbx_lines.append(f'\t\t\t\t{pdf_file_refs[p]} /* {pname} */,')
 pbx_lines.append(f'\t\t\t\t{assets_fid} /* Assets.xcassets */,')
 pbx_lines.append(f'\t\t\t\t{plist_fid} /* Info.plist */,')
 pbx_lines.append('\t\t\t);')
@@ -182,6 +203,9 @@ pbx_lines.append('\t\t\tisa = PBXResourcesBuildPhase;')
 pbx_lines.append('\t\t\tbuildActionMask = 2147483647;')
 pbx_lines.append('\t\t\tfiles = (')
 pbx_lines.append(f'\t\t\t\t{assets_bid} /* Assets.xcassets in Resources */,')
+for p in pdf_files:
+    pname = os.path.basename(p)
+    pbx_lines.append(f'\t\t\t\t{pdf_build_files[p]} /* {pname} in Resources */,')
 pbx_lines.append('\t\t\t);')
 pbx_lines.append('\t\t\trunOnlyForDeploymentPostprocessing = 0;')
 pbx_lines.append('\t\t};')
@@ -267,7 +291,7 @@ pbx_lines.append('\t\t\t\t\t"$(inherited)",')
 pbx_lines.append('\t\t\t\t\t"@executable_path/Frameworks",')
 pbx_lines.append('\t\t\t\t);')
 pbx_lines.append('\t\t\t\tMARKETING_VERSION = 1.0.0;')
-pbx_lines.append('\t\t\t\tPRODUCT_BUNDLE_IDENTIFIER = de.uni-kiel.unibody;')
+pbx_lines.append('\t\t\t\tPRODUCT_BUNDLE_IDENTIFIER = app.unibody.student;')
 pbx_lines.append('\t\t\t\tPRODUCT_NAME = "$(TARGET_NAME)";')
 pbx_lines.append('\t\t\t\tSWIFT_EMIT_LOC_STRINGS = YES;')
 pbx_lines.append('\t\t\t\tSWIFT_VERSION = 5.0;')
@@ -293,7 +317,7 @@ pbx_lines.append('\t\t\t\t\t"$(inherited)",')
 pbx_lines.append('\t\t\t\t\t"@executable_path/Frameworks",')
 pbx_lines.append('\t\t\t\t);')
 pbx_lines.append('\t\t\t\tMARKETING_VERSION = 1.0.0;')
-pbx_lines.append('\t\t\t\tPRODUCT_BUNDLE_IDENTIFIER = de.uni-kiel.unibody;')
+pbx_lines.append('\t\t\t\tPRODUCT_BUNDLE_IDENTIFIER = app.unibody.student;')
 pbx_lines.append('\t\t\t\tPRODUCT_NAME = "$(TARGET_NAME)";')
 pbx_lines.append('\t\t\t\tSWIFT_EMIT_LOC_STRINGS = YES;')
 pbx_lines.append('\t\t\t\tSWIFT_VERSION = 5.0;')

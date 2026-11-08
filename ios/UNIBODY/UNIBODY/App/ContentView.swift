@@ -2,6 +2,7 @@ import SwiftUI
 
 public struct ContentView: View {
     @StateObject private var appState = AppState()
+    @ObservedObject private var mailService = CAUMailService.shared
     
     public init() {}
     
@@ -16,6 +17,17 @@ public struct ContentView: View {
                 .tabItem {
                     Label("Module", systemImage: "books.vertical.fill")
                 }
+            
+            MaterialsFinderView()
+                .tabItem {
+                    Label("Materialien", systemImage: "folder.fill")
+                }
+            
+            CAUMailView()
+                .tabItem {
+                    Label("Uni-Mail", systemImage: "envelope.fill")
+                }
+                .badge(mailService.unreadCount)
             
             SettingsLoginView()
                 .tabItem {

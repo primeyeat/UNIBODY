@@ -66,13 +66,33 @@ public class AppState: ObservableObject {
     
     public func loadCredentialsFromStorage() {
         let defaults = UserDefaults.standard
-        if let savedUser = defaults.string(forKey: kUsernameKey), !savedUser.isEmpty {
+        let keychainUser = KeychainHelper.string(forKey: kUsernameKey)
+        let keychainPass = KeychainHelper.string(forKey: kPasswordKey)
+        let legacyUser = defaults.string(forKey: kUsernameKey)
+        let legacyPass = defaults.string(forKey: kPasswordKey)
+        
+        let resolvedUser = (keychainUser?.isEmpty == false) ? keychainUser : legacyUser
+        let resolvedPass = (keychainPass?.isEmpty == false) ? keychainPass : legacyPass
+        
+        if let savedUser = resolvedUser, !savedUser.isEmpty {
+            let finalPass = resolvedPass ?? ""
             self.username = savedUser
-            self.password = defaults.string(forKey: kPasswordKey) ?? ""
+            self.password = finalPass
             self.defaultPlatform = defaults.string(forKey: kPlatformKey) ?? "unibody"
             self.isAutoFillActive = defaults.object(forKey: kAutoFillKey) as? Bool ?? true
             self.isAutoSubmitActive = defaults.object(forKey: kAutoSubmitKey) as? Bool ?? true
             self.isVaultSaved = true
+            
+            // Attempt Keychain storage; only keep UserDefaults fallback if unsigned build lacks Keychain entitlements (NET-03)
+            _ = KeychainHelper.setString(savedUser, forKey: kUsernameKey)
+            if !finalPass.isEmpty {
+                let kcOk = KeychainHelper.setString(finalPass, forKey: kPasswordKey)
+                if kcOk {
+                    defaults.removeObject(forKey: kPasswordKey)
+                } else {
+                    defaults.set(finalPass, forKey: kPasswordKey)
+                }
+            }
         } else {
             self.username = ""
             self.password = ""
@@ -89,9 +109,17 @@ public class AppState: ObservableObject {
         self.isAutoSubmitActive = autoSubmit
         self.isVaultSaved = !trimmedUser.isEmpty
         
+        // Save to Keychain; only fall back to UserDefaults if Keychain fails on unsigned builds (NET-03)
+        _ = KeychainHelper.setString(trimmedUser, forKey: kUsernameKey)
+        let kcPassOk = KeychainHelper.setString(password, forKey: kPasswordKey)
+        
         let defaults = UserDefaults.standard
         defaults.set(trimmedUser, forKey: kUsernameKey)
-        defaults.set(password, forKey: kPasswordKey)
+        if kcPassOk {
+            defaults.removeObject(forKey: kPasswordKey)
+        } else {
+            defaults.set(password, forKey: kPasswordKey)
+        }
         defaults.set(defaultPlatform, forKey: kPlatformKey)
         defaults.set(autoFill, forKey: kAutoFillKey)
         defaults.set(autoSubmit, forKey: kAutoSubmitKey)
@@ -101,6 +129,9 @@ public class AppState: ObservableObject {
         self.username = ""
         self.password = ""
         self.isVaultSaved = false
+        
+        KeychainHelper.removeValue(forKey: kUsernameKey)
+        KeychainHelper.removeValue(forKey: kPasswordKey)
         
         let defaults = UserDefaults.standard
         defaults.removeObject(forKey: kUsernameKey)
@@ -250,13 +281,14 @@ public class AppState: ObservableObject {
                 enrollmentMode: "sniper",
                 enrollmentOpensAt: "2026-10-19T09:00:00",
                 groups: [
-                    ExerciseGroup(groupId: "060098", name: "Ü:MathInfA (Di 16:15–17:45 · HHP6)", day: 1, dayName: "Dienstag", startTime: "16:15", endTime: "17:45", room: "HHP6 - R.EG.004", tutor: "UnivIS 060098", spotsFree: 13, spotsTotal: 40),
-                    ExerciseGroup(groupId: "060103", name: "Ü:MathInfA (Di 16:15–17:45 · LMS4)", day: 1, dayName: "Dienstag", startTime: "16:15", endTime: "17:45", room: "LMS4 - R.424", tutor: "UnivIS 060103", spotsFree: 17, spotsTotal: 40),
-                    ExerciseGroup(groupId: "060397", name: "Ü:MathInfA (Mi 14:15–15:45 · HHP6)", day: 2, dayName: "Mittwoch", startTime: "14:15", endTime: "15:45", room: "HHP6 - R.EG.004", tutor: "UnivIS 060397", spotsFree: 0, spotsTotal: 40),
-                    ExerciseGroup(groupId: "060102", name: "Ü:MathInfA (Mi 16:15–17:45 · HHP6)", day: 2, dayName: "Mittwoch", startTime: "16:15", endTime: "17:45", room: "HHP6 - R.EG.004", tutor: "UnivIS 060102", spotsFree: 9, spotsTotal: 40),
-                    ExerciseGroup(groupId: "060577-a", name: "Ü:MathInfA (Do 10:15–11:45 · Woche A)", day: 3, dayName: "Donnerstag", startTime: "10:15", endTime: "11:45", room: "LMS8 - R.01.025", tutor: "UnivIS 060577", spotsFree: 12, spotsTotal: 30, weekType: "A"),
-                    ExerciseGroup(groupId: "060577-b", name: "Ü:MathInfA (Do 10:15–11:45 · Woche B)", day: 3, dayName: "Donnerstag", startTime: "10:15", endTime: "11:45", room: "LMS8 - R.01.025", tutor: "UnivIS 060577", spotsFree: 18, spotsTotal: 30, weekType: "B"),
-                    ExerciseGroup(groupId: "060574", name: "Ü:MathInfA (Fr 12:15–13:45 · LMS8)", day: 4, dayName: "Freitag", startTime: "12:15", endTime: "13:45", room: "LMS8 - R.01.011", tutor: "UnivIS 060574", spotsFree: 15, spotsTotal: 30)
+                    ExerciseGroup(groupId: "060098", name: "Ü:MathInfA Gr. 01 (Di 16:15–17:45 · HHP6)", day: 1, dayName: "Dienstag", startTime: "16:15", endTime: "17:45", room: "HHP6 - R.EG.004", tutor: "UnivIS 060098", spotsFree: 13, spotsTotal: 40),
+                    ExerciseGroup(groupId: "060103", name: "Ü:MathInfA Gr. 02 (Di 16:15–17:45 · LMS4)", day: 1, dayName: "Dienstag", startTime: "16:15", endTime: "17:45", room: "LMS4 - R.424", tutor: "UnivIS 060103", spotsFree: 17, spotsTotal: 40),
+                    ExerciseGroup(groupId: "060105", name: "Ü:MathInfA Gr. 03 (Di 18:15–19:45 · HHP6)", day: 1, dayName: "Dienstag", startTime: "18:15", endTime: "19:45", room: "HHP6 - R.EG.004", tutor: "UnivIS 060105", spotsFree: 26, spotsTotal: 40),
+                    ExerciseGroup(groupId: "060397", name: "Ü:MathInfA Gr. 04 (Mi 14:15–15:45 · HHP6)", day: 2, dayName: "Mittwoch", startTime: "14:15", endTime: "15:45", room: "HHP6 - R.EG.004", tutor: "UnivIS 060397", spotsFree: 0, spotsTotal: 40),
+                    ExerciseGroup(groupId: "060102", name: "Ü:MathInfA Gr. 05 (Mi 16:15–17:45 · HHP6)", day: 2, dayName: "Mittwoch", startTime: "16:15", endTime: "17:45", room: "HHP6 - R.EG.004", tutor: "UnivIS 060102", spotsFree: 9, spotsTotal: 40),
+                    ExerciseGroup(groupId: "060577-a", name: "Ü:MathInfA Gr. 06 (Do 10:15–11:45 · Woche A)", day: 3, dayName: "Donnerstag", startTime: "10:15", endTime: "11:45", room: "LMS8 - R.01.025", tutor: "UnivIS 060577", spotsFree: 12, spotsTotal: 30, weekType: "A"),
+                    ExerciseGroup(groupId: "060577-b", name: "Ü:MathInfA Gr. 07 (Do 10:15–11:45 · Woche B)", day: 3, dayName: "Donnerstag", startTime: "10:15", endTime: "11:45", room: "LMS8 - R.01.025", tutor: "UnivIS 060577", spotsFree: 18, spotsTotal: 30, weekType: "B"),
+                    ExerciseGroup(groupId: "060574", name: "Ü:MathInfA Gr. 08 (Fr 12:15–13:45 · LMS8)", day: 4, dayName: "Freitag", startTime: "12:15", endTime: "13:45", room: "LMS8 - R.01.011", tutor: "UnivIS 060574", spotsFree: 15, spotsTotal: 30)
                 ]
             ),
             Course(

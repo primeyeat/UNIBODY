@@ -19,6 +19,7 @@ import base64
 import struct
 import subprocess
 import threading
+import concurrent.futures
 import urllib.request
 import urllib.parse
 from datetime import datetime
@@ -601,7 +602,8 @@ for _k, _v in list(BUILTIN_CAU_COURSES.items()):
     BUILTIN_CAU_COURSES[_k] = enrich_course_with_unibody(_v)
 
 
-KEYCHAIN_SERVICE_NAME = "CAU-LMS-Sniper-Vault"
+KEYCHAIN_SERVICE_NAME = "UNIBODY-Student-Vault"
+LEGACY_KEYCHAIN_SERVICE_NAME = "CAU-LMS-Sniper-Vault"
 
 
 class CAUBrowserSessionManager:
@@ -686,42 +688,44 @@ class CAUBrowserSessionManager:
     def _read_from_macos_keychain(self, username: str) -> Optional[str]:
         if not username:
             return None
-        try:
-            res = subprocess.run(
-                [
-                    "security",
-                    "find-generic-password",
-                    "-a", username,
-                    "-s", KEYCHAIN_SERVICE_NAME,
-                    "-w",
-                ],
-                capture_output=True,
-                text=True,
-                timeout=2.5,
-            )
-            if res.returncode == 0 and res.stdout.strip():
-                return res.stdout.strip()
-        except Exception:
-            pass
+        for svc in (KEYCHAIN_SERVICE_NAME, LEGACY_KEYCHAIN_SERVICE_NAME):
+            try:
+                res = subprocess.run(
+                    [
+                        "security",
+                        "find-generic-password",
+                        "-a", username,
+                        "-s", svc,
+                        "-w",
+                    ],
+                    capture_output=True,
+                    text=True,
+                    timeout=2.5,
+                )
+                if res.returncode == 0 and res.stdout.strip():
+                    return res.stdout.strip()
+            except Exception:
+                pass
         return None
 
     def _delete_from_macos_keychain(self, username: str):
         if not username:
             return
-        try:
-            subprocess.run(
-                [
-                    "security",
-                    "delete-generic-password",
-                    "-a", username,
-                    "-s", KEYCHAIN_SERVICE_NAME,
-                ],
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL,
-                timeout=2.5,
-            )
-        except Exception:
-            pass
+        for svc in (KEYCHAIN_SERVICE_NAME, LEGACY_KEYCHAIN_SERVICE_NAME):
+            try:
+                subprocess.run(
+                    [
+                        "security",
+                        "delete-generic-password",
+                        "-a", username,
+                        "-s", svc,
+                    ],
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
+                    timeout=2.5,
+                )
+            except Exception:
+                pass
 
     def load_credentials(self, include_secret: bool = False) -> Dict[str, Any]:
         default_meta = {
@@ -799,7 +803,8 @@ class CAUBrowserSessionManager:
 
         payload = {
             "username": username,
-            "password_b64": base64.b64encode(final_pw.encode("utf-8")).decode("ascii") if final_pw else "",
+            # NET-03: Only persist fallback password_b64 on disk when macOS Keychain storage is unavailable/disabled
+            "password_b64": "" if keychain_ok else (base64.b64encode(final_pw.encode("utf-8")).decode("ascii") if final_pw else ""),
             "default_platform": default_platform or "unibody",
             "auto_fill": bool(auto_fill),
             "auto_submit": bool(auto_submit),
@@ -1166,9 +1171,9 @@ class CAUBrowserSessionManager:
 
             manifest = {
                 "manifest_version": 3,
-                "name": "CAU Kiel UNIBODY Auto-Login (OpenOlat & eLearn Informatik)",
+                "name": "UNIBODY Auto-Login (Inoffizielles Studierenden-Tool für OpenOlat & Moodle)",
                 "version": "2.0.0",
-                "description": "UNIBODY Auto-Fill & Auto-Login für lms.uni-kiel.de, elearn.informatik.uni-kiel.de und idp.uni-kiel.de",
+                "description": "Inoffizielles Studierenden-Tool: Auto-Fill & Auto-Login für lms.uni-kiel.de, elearn.informatik.uni-kiel.de und idp.uni-kiel.de",
                 "permissions": ["storage"],
                 "host_permissions": [
                     "https://lms.uni-kiel.de/*",
@@ -1292,6 +1297,33 @@ setTimeout(runUnibodyAutoFill, 2200);
         except Exception:
             return None
 
+    def _cdp_wait_for_js(
+        self,
+        ws_url: str,
+        js_expr: str,
+        timeout: float = 2.0,
+        poll_interval: float = 0.06,
+    ) -> Any:
+        """
+        Event-driven high-frequency DOM polling helper (default 60ms interval).
+        Evaluates `js_expr` repeatedly until it returns a truthy value (non-empty string/list/dict/bool)
+        or until `timeout` seconds elapse. Eliminates blind time.sleep() delays.
+        """
+        deadline = time.time() + timeout
+        while time.time() < deadline:
+            res = self._cdp_send_command(
+                ws_url,
+                "Runtime.evaluate",
+                {"expression": js_expr, "returnByValue": True},
+                timeout=1.2,
+            )
+            if isinstance(res, dict):
+                val = res.get("result", {}).get("result", {}).get("value")
+                if val not in (None, False, "", [], {}):
+                    return val
+            time.sleep(poll_interval)
+        return None
+
     def inject_autofill_into_tabs(self, force_submit: bool = False, navigate_url: Optional[str] = None) -> str:
         """
         UNIBODY Multi-Tab Injector:
@@ -1392,13 +1424,19 @@ setTimeout(runUnibodyAutoFill, 2200);
                 return path
         return None
 
-    def launch_login_browser(self, target_url: Optional[str] = None, force_auto_login: bool = False) -> Dict[str, Any]:
+    def launch_login_browser(
+        self,
+        target_url: Optional[str] = None,
+        force_auto_login: bool = False,
+        fast_mode: bool = False,
+    ) -> Dict[str, Any]:
         """
         UNIBODY Browser Launcher:
         If `target_url` is "unibody" or None (and default_platform is "unibody"), opens BOTH
         `https://lms.uni-kiel.de` AND `https://elearn.informatik.uni-kiel.de/login/index.php` in two tabs
         so both CAU platforms are logged in with a single click!
         If a specific course URL is passed, routes directly to that course's platform.
+        When `fast_mode=True`, returns as soon as the CDP socket is ready (~0.4s) without fixed sleeps.
         """
         chrome_bin = self.find_chrome_binary()
         if not chrome_bin:
@@ -1421,6 +1459,8 @@ setTimeout(runUnibodyAutoFill, 2200);
 
         tabs = self._get_cdp_tabs()
         if tabs is not None:
+            if fast_mode:
+                return {"ok": True, "status": self.session_state}
             # Ensure requested platform tabs exist if Chrome is already running (e.g. if all windows were closed on macOS)
             existing_urls = " ".join((t.get("url") or "").lower() for t in tabs)
             for u_open in urls_to_open:
@@ -1429,7 +1469,7 @@ setTimeout(runUnibodyAutoFill, 2200);
                     try:
                         req_new = urllib.request.Request(f"http://127.0.0.1:{self.debug_port}/json/new?{u_open}", method="PUT")
                         urllib.request.urlopen(req_new, timeout=1.5).read()
-                        time.sleep(0.8)
+                        time.sleep(0.3)
                     except Exception:
                         pass
 
@@ -1443,7 +1483,7 @@ setTimeout(runUnibodyAutoFill, 2200);
                 navigate_url=nav_target,
             )
             if creds.get("username") and creds.get("password"):
-                time.sleep(1.3)
+                time.sleep(0.6)
                 self.inject_autofill_into_tabs(
                     force_submit=force_auto_login or bool(creds.get("auto_submit")),
                     navigate_url=None,
@@ -1473,6 +1513,14 @@ setTimeout(runUnibodyAutoFill, 2200);
                 "SUCCESS",
                 f"🫧 UNIBODY Chrome-Session gestartet -> {' + '.join(urls_to_open)}"
             )
+            if fast_mode:
+                deadline = time.time() + 2.5
+                while time.time() < deadline:
+                    if self._get_cdp_tabs():
+                        break
+                    time.sleep(0.05)
+                return {"ok": True, "status": self.session_state}
+
             if creds.get("username") and creds.get("password"):
                 self.add_log(
                     "INFO",
@@ -1480,10 +1528,10 @@ setTimeout(runUnibodyAutoFill, 2200);
                 )
             else:
                 self.add_log("INFO", "Bitte im geöffneten Fenster mit deiner CAU stu-Kennung anmelden (oder hinterlege deine Login-Daten im UNIBODY-Tresor).")
-            time.sleep(1.6)
+            time.sleep(1.0)
             if creds.get("username") and creds.get("password"):
                 self.inject_autofill_into_tabs(force_submit=force_auto_login or bool(creds.get("auto_submit")))
-                time.sleep(1.3)
+                time.sleep(0.8)
                 self.inject_autofill_into_tabs(force_submit=force_auto_login or bool(creds.get("auto_submit")))
             self.check_status()
             return {"ok": True, "status": self.session_state}
@@ -1505,12 +1553,12 @@ setTimeout(runUnibodyAutoFill, 2200);
                 ws = t.get("webSocketDebuggerUrl")
                 if ws:
                     try:
-                        self._cdp_send_command(ws, "Browser.close", {}, timeout=1.5)
+                        self._cdp_send_command(ws, "Browser.close", {}, timeout=1.0)
                         break
                     except Exception:
                         pass
 
-        time.sleep(0.6)
+        time.sleep(0.15)
 
         # 2. Terminate subprocess if tracked
         if self.chrome_process:
@@ -1640,88 +1688,70 @@ setTimeout(runUnibodyAutoFill, 2200);
 
     def scan_enrolled_groups_via_cdp(self, all_courses: Dict[str, Dict[str, Any]]) -> Dict[str, Any]:
         """
-        UNIBODY Active Deep-Sync Crawler:
-        Automatically launches/connects to the UNIBODY Chrome session, opens BOTH
-        `https://lms.uni-kiel.de/url/GroupsSite/0` (OpenOlat "Meine Gruppen") AND
-        `https://elearn.informatik.uni-kiel.de/my/` (Moodle Dashboard & ChoiceGroups),
-        navigates into each active BusinessGroup / ChoiceGroup, extracts the exact weekday + time + room
-        description, and matches them against `all_courses`!
+        UNIBODY High-Speed & High-Precision Deep-Sync Crawler (v2):
+        - Parallel Execution: Runs Moodle ChoiceGroup HTTP sync + Materials sync concurrently with OpenOlat CDP sync.
+        - Event-Driven DOM Polling: Uses 60ms `_cdp_wait_for_js` instead of fixed `time.sleep()` delays.
+        - Parallel In-Browser `fetch()` (`Promise.all`) for OpenOlat `BusinessGroup` descriptions (no sequential Page.navigate).
+        - Exact ID, Radio-Check, and Sanitized Timeslot matching.
         """
-        tabs = self._get_cdp_tabs()
-        if tabs is None:
-            self.add_log("INFO", "🫧 UNIBODY Deep-Sync: Starte Chrome-Session auf OpenOlat & Info-Moodle...")
-            self.launch_login_browser(target_url="unibody", force_auto_login=True)
-            time.sleep(2.2)
-            tabs = self._get_cdp_tabs()
-
-        if not tabs:
-            return {
-                "ok": False,
-                "error": "Konnte UNIBODY Chrome-Session nicht erreichen.",
-                "detected": [],
-            }
-
-        # Ensure we are logged in on both platforms
-        creds = self.load_credentials(include_secret=True)
-        if creds.get("username") and creds.get("password"):
-            self.inject_autofill_into_tabs(force_submit=True)
-            time.sleep(1.2)
-
-        tabs = self._get_cdp_tabs() or []
-        olat_tab = next((t for t in tabs if "lms.uni-kiel.de" in (t.get("url") or "").lower()), None)
-        moodle_tab = next((t for t in tabs if "elearn.informatik" in (t.get("url") or "").lower()), None)
-
-        if not olat_tab:
-            try:
-                req_new = urllib.request.Request(f"http://127.0.0.1:{self.debug_port}/json/new?https://lms.uni-kiel.de/url/GroupsSite/0", method="PUT")
-                urllib.request.urlopen(req_new, timeout=1.5).read()
-                time.sleep(1.2)
-            except Exception:
-                pass
-        if not moodle_tab:
-            try:
-                req_new = urllib.request.Request(f"http://127.0.0.1:{self.debug_port}/json/new?https://elearn.informatik.uni-kiel.de/my/", method="PUT")
-                urllib.request.urlopen(req_new, timeout=1.5).read()
-                time.sleep(1.2)
-            except Exception:
-                pass
-
-        tabs = self._get_cdp_tabs() or []
-        olat_tab = next((t for t in tabs if "lms.uni-kiel.de" in (t.get("url") or "").lower()), None)
-        moodle_tab = next((t for t in tabs if "elearn.informatik" in (t.get("url") or "").lower()), None)
-
+        t_start = time.time()
         detected: List[Dict[str, Any]] = []
         raw_findings: List[Dict[str, str]] = []
+        sync_lock = threading.Lock()
 
-        def match_course_and_group(course_hint: str, group_title: str, detail_text: str, source_url: str):
+        creds = self.load_credentials(include_secret=True)
+
+        def match_course_and_group(
+            course_hint: str,
+            group_title: str,
+            detail_text: str,
+            source_url: str,
+            explicit_course_id: Optional[str] = None,
+            explicit_repo_id: Optional[str] = None,
+        ):
             combined = f"{course_hint} {group_title} {detail_text}".lower()
-            # Extract only the description block if present so header numbers don't confuse parse_german_timeslot
             desc_clean = detail_text
             if "Beschreibung" in detail_text:
                 desc_clean = detail_text.split("Beschreibung", 1)[1]
-            slot = parse_german_timeslot(f"{group_title} {desc_clean}")
-            has_group_keyword = bool(re.search(r"\b(?:übung|gruppe|gr\.?|tutorium|praktikum)\b", group_title, re.IGNORECASE))
+            # Strip 4+ digit IDs/years (e.g. 060107, 2026, 5804556477) so they cannot be parsed as hours
+            time_source = re.sub(r"\b\d{4,}\b", " ", f"{group_title} {desc_clean}")
+            slot = parse_german_timeslot(time_source)
+            has_group_keyword = bool(
+                re.search(r"\b(?:übung|übungsgruppe|gruppe|gr\.?|tutorium|praktikum)\b", group_title, re.IGNORECASE)
+            )
             if not slot and not has_group_keyword:
                 return
 
-            # 1. Identify which course in `all_courses` this belongs to
+            # 1. Identify exact course in `all_courses` (Priority: explicit_course_id -> explicit_repo_id -> tokens -> title)
             matched_course = None
-            for ckey, raw_c in all_courses.items():
-                c = enrich_course_with_unibody(raw_c)
-                cid_low = c["course_id"].lower()
-                title_low = (c.get("title") or "").lower()
-                tokens = [tk.lower() for tk in c.get("verified_tokens", [])] + [cid_low]
-                if any(tk in combined for tk in tokens if len(tk) >= 4) or (
-                    "betriebswirtschaft" in combined and "bwl" in cid_low
-                ) or (
-                    "mathematik für die informatik a" in combined and "math-a" in cid_low
-                ) or (
-                    "wirtschaftsinformatik" in combined and "ewinf" in cid_low
-                ) or (
-                    "einführung in die informatik" in combined and "infeinf" in cid_low
-                ):
-                    matched_course = c
-                    break
+            if explicit_course_id:
+                for ckey, raw_c in all_courses.items():
+                    if raw_c.get("course_id", "").lower() == explicit_course_id.lower() or ckey.lower() == explicit_course_id.lower():
+                        matched_course = enrich_course_with_unibody(raw_c)
+                        break
+
+            if not matched_course and explicit_repo_id:
+                for ckey, raw_c in all_courses.items():
+                    if str(raw_c.get("olat_repo_id", "")) == str(explicit_repo_id):
+                        matched_course = enrich_course_with_unibody(raw_c)
+                        break
+
+            if not matched_course:
+                for ckey, raw_c in all_courses.items():
+                    c = enrich_course_with_unibody(raw_c)
+                    cid_low = c["course_id"].lower()
+                    tokens = [tk.lower() for tk in c.get("verified_tokens", [])] + [cid_low]
+                    if any(tk in combined for tk in tokens if len(tk) >= 4) or (
+                        "betriebswirtschaft" in combined and "bwl" in cid_low
+                    ) or (
+                        "mathematik für die informatik a" in combined and "math-a" in cid_low
+                    ) or (
+                        "wirtschaftsinformatik" in combined and "ewinf" in cid_low
+                    ) or (
+                        "einführung in die informatik" in combined and "infeinf" in cid_low
+                    ):
+                        matched_course = c
+                        break
 
             if not matched_course:
                 return
@@ -1752,36 +1782,208 @@ setTimeout(runUnibodyAutoFill, 2200);
                         matched_grp = g
                         break
                 if not matched_grp:
-                    for g in groups:
-                        if int(g.get("day", -1)) == int(slot["day"]):
-                            matched_grp = g
-                            break
+                    day_matches = [g for g in groups if int(g.get("day", -1)) == int(slot["day"])]
+                    if len(day_matches) == 1:
+                        matched_grp = day_matches[0]
 
             if matched_grp:
-                if not any(d["course_id"] == cid for d in detected):
-                    detected.append({
-                        "course_id": cid,
-                        "group_id": matched_grp["group_id"],
-                        "group_name": matched_grp["name"],
-                        "lms_group_name": group_title,
-                        "day_name": matched_grp["day_name"],
-                        "start_time": matched_grp["start_time"],
-                        "end_time": matched_grp["end_time"],
-                        "source_url": source_url,
-                    })
+                with sync_lock:
+                    if not any(d["course_id"] == cid for d in detected):
+                        detected.append({
+                            "course_id": cid,
+                            "group_id": matched_grp["group_id"],
+                            "group_name": matched_grp["name"],
+                            "lms_group_name": group_title,
+                            "day_name": matched_grp["day_name"],
+                            "start_time": matched_grp["start_time"],
+                            "end_time": matched_grp["end_time"],
+                            "source_url": source_url,
+                        })
 
         # ---------------------------------------------------------------------
-        # PART A: Crawl OpenOlat (`lms.uni-kiel.de/url/GroupsSite/0`)
+        # PARALLEL WORKER 1: Fast HTTP/Cookie Moodle ChoiceGroup & Course Sync
         # ---------------------------------------------------------------------
+        def _sync_moodle_fast() -> bool:
+            if not (creds.get("username") and creds.get("password")):
+                return False
+            try:
+                import http.cookiejar
+                cj = http.cookiejar.CookieJar()
+                opener = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(cj))
+                opener.addheaders = [("User-Agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36")]
+                login_html = opener.open("https://elearn.informatik.uni-kiel.de/login/index.php", timeout=5.0).read().decode("utf-8", "ignore")
+                m_tok = re.search(r"name=[\"']logintoken[\"']\s+value=[\"']([^\"']+)[\"']", login_html)
+                login_payload = urllib.parse.urlencode({
+                    "username": creds["username"],
+                    "password": creds["password"],
+                    "logintoken": m_tok.group(1) if m_tok else "",
+                }).encode("utf-8")
+                opener.open("https://elearn.informatik.uni-kiel.de/login/index.php", data=login_payload, timeout=5.0).read()
+
+                direct_moodle_targets = [
+                    ("infEWInf-01a", "Einführung in die Wirtschaftsinformatik 080038", "https://elearn.informatik.uni-kiel.de/mod/choicegroup/view.php?id=29806"),
+                    ("infEInf-02a", "Einführung in die Informatik 080058", "https://elearn.informatik.uni-kiel.de/mod/choicegroup/view.php?id=27391"),
+                ]
+
+                def _fetch_cg(target_tuple):
+                    target_cid, target_hint, cg_url = target_tuple
+                    # Each thread builds its own opener sharing the authenticated CookieJar
+                    t_opener = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(cj))
+                    t_opener.addheaders = [("User-Agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36")]
+                    cg_html = t_opener.open(cg_url, timeout=5.0).read().decode("utf-8", "ignore")
+                    return target_cid, target_hint, cg_url, cg_html
+
+                with concurrent.futures.ThreadPoolExecutor(max_workers=3) as cg_pool:
+                    cg_results = list(cg_pool.map(_fetch_cg, direct_moodle_targets))
+
+                for target_cid, target_hint, cg_url, cg_html in cg_results:
+                    intro_m = re.search(r"id=[\"']intro[\"'][^>]*>(.*?)</div>\s*</div>", cg_html, re.S)
+                    intro_txt = re.sub(r"<[^>]+>", "\n", intro_m.group(1)) if intro_m else ""
+                    raw_c = next(
+                        (rc for ck, rc in all_courses.items() if rc.get("course_id", "").lower() == target_cid.lower() or target_cid.lower() in ck),
+                        None,
+                    )
+
+                    # Also check #yourselection box if form inputs are hidden after selection
+                    sel_m = re.search(r"id=[\"']yourselection[\"'][^>]*>(.*?)</div>", cg_html, re.S)
+                    sel_txt = re.sub(r"\s+", " ", re.sub(r"<[^>]+>", " ", sel_m.group(1))).strip() if sel_m else ""
+
+                    for tr_m in re.finditer(r"<tr[^>]*class=[\"'][^\"']*option[^\"']*[\"'][^>]*>(.*?)</tr>", cg_html, re.S):
+                        tr_html = tr_m.group(1)
+                        lbl_m = re.search(r"<label[^>]*>(.*?)</label>", tr_html, re.S)
+                        opt_name = re.sub(r"\s+", " ", re.sub(r"<[^>]+>", " ", lbl_m.group(1))).strip() if lbl_m else ""
+                        if not opt_name:
+                            continue
+                        is_checked = bool(re.search(r"<input[^>]+checked", tr_html, re.I)) or (
+                            bool(sel_txt) and opt_name.lower() in sel_txt.lower()
+                        )
+                        is_disabled = bool(re.search(r"<input[^>]+disabled", tr_html, re.I))
+                        cap_m = re.search(r"(\d+)\s*/\s*(\d+)", tr_html)
+                        if cap_m and raw_c:
+                            taken = int(cap_m.group(1))
+                            total = int(cap_m.group(2))
+                            free = max(0, total - taken)
+                            is_full = (free <= 0) or is_disabled
+                            m_num = re.search(r"(?:übungsgruppe|gruppe|gr\.?|übung)\s*0*(\d+)", opt_name.lower())
+                            if m_num:
+                                with sync_lock:
+                                    for g in raw_c.get("groups", []):
+                                        m_g = re.search(r"(?:übungsgruppe|gruppe|gr\.?|übung)\s*0*(\d+)", g.get("name", "").lower())
+                                        if m_g and m_g.group(1) == m_num.group(1):
+                                            g["spots_free"] = free
+                                            g["spots_total"] = total
+                                            g["is_full"] = is_full
+                                            g["is_enrolled"] = is_checked
+
+                        if is_checked:
+                            tr_text = re.sub(r"\s+", " ", re.sub(r"<[^>]+>", " ", tr_html)).strip()
+                            extra_line = ""
+                            for line in intro_txt.splitlines():
+                                if opt_name.lower() in line.lower():
+                                    extra_line = line.strip()
+                                    break
+                            detail_combined = f"{extra_line} {tr_text}".strip()
+                            with sync_lock:
+                                raw_findings.append({
+                                    "platform": "elearn.informatik.uni-kiel.de",
+                                    "group": opt_name,
+                                    "course": target_cid,
+                                    "desc": detail_combined[:200],
+                                })
+                            match_course_and_group(
+                                target_hint,
+                                opt_name,
+                                detail_combined,
+                                cg_url,
+                                explicit_course_id=target_cid,
+                            )
+
+                # Reuse authenticated opener to sync EWInf Übung X materials in the same session
+                try:
+                    from cau_materials import load_materials_data, sync_ewinf_exercises_from_moodle, save_materials_data
+                    mdata = load_materials_data(sync_live=False)
+                    if sync_ewinf_exercises_from_moodle(mdata, opener=opener):
+                        save_materials_data(mdata)
+                except Exception:
+                    pass
+                return True
+            except Exception as e_http:
+                self.add_log("DEBUG", f"Moodle Fast-HTTP Check: {e_http}")
+                return False
+
+        bg_executor = concurrent.futures.ThreadPoolExecutor(max_workers=1)
+        moodle_future = bg_executor.submit(_sync_moodle_fast)
+
+        # ---------------------------------------------------------------------
+        # PART A: Fast Event-Driven OpenOlat Sync (`lms.uni-kiel.de`)
+        # ---------------------------------------------------------------------
+        tabs = self._get_cdp_tabs()
+        if tabs is None:
+            self.add_log("INFO", "⚡ UNIBODY Deep-Sync: Starte schnelle OpenOlat-Session & parallelen Moodle-Abgleich...")
+            self.launch_login_browser(
+                target_url="https://lms.uni-kiel.de/url/GroupsSite/0",
+                force_auto_login=True,
+                fast_mode=True,
+            )
+            tabs = self._get_cdp_tabs()
+
+        tabs = tabs or []
+        olat_tab = next((t for t in tabs if "lms.uni-kiel.de" in (t.get("url") or "").lower()), None)
+        if not olat_tab and tabs:
+            try:
+                req_new = urllib.request.Request(
+                    f"http://127.0.0.1:{self.debug_port}/json/new?https://lms.uni-kiel.de/url/GroupsSite/0",
+                    method="PUT",
+                )
+                olat_tab = json.loads(urllib.request.urlopen(req_new, timeout=1.2).read().decode("utf-8", "ignore"))
+            except Exception:
+                olat_tab = tabs[0]
+
         if olat_tab and olat_tab.get("webSocketDebuggerUrl"):
             ws_olat = olat_tab["webSocketDebuggerUrl"]
-            self.add_log("INFO", "🏛️ UNIBODY Deep-Sync: Öffne OpenOlat 'Meine Gruppen' (lms.uni-kiel.de/url/GroupsSite/0)...")
-            self._cdp_send_command(ws_olat, "Page.navigate", {"url": "https://lms.uni-kiel.de/url/GroupsSite/0"})
-            time.sleep(1.7)
+            cur_url = (olat_tab.get("url") or "").lower()
+            if "groupssite" not in cur_url:
+                self._cdp_send_command(ws_olat, "Page.navigate", {"url": "https://lms.uni-kiel.de/url/GroupsSite/0"})
 
-            # If OpenOlat redirected to /dmz/ login, auto-login first
-            if creds.get("username") and creds.get("password"):
-                self.inject_autofill_into_tabs(force_submit=True)
+            # Fast 50ms poll until either GroupsSite table or login form is ready
+            ready_state = self._cdp_wait_for_js(
+                ws_olat,
+                """
+                (() => {
+                    if (document.querySelector('#o_fiooolat_login_name, input[name="o_fiooolat_login_name"], input[type="password"]')) return 'LOGIN_NEEDED';
+                    if (document.querySelector('a[href*="BusinessGroup/"]') || document.querySelector('table.o_table, .o_EmptyTable')) return 'GROUPS_READY';
+                    return null;
+                })()
+                """,
+                timeout=2.5,
+                poll_interval=0.05,
+            )
+
+            if ready_state == "LOGIN_NEEDED" and creds.get("username") and creds.get("password"):
+                for _ in range(2):
+                    self.inject_autofill_into_tabs(force_submit=True)
+                    st = self._cdp_wait_for_js(
+                        ws_olat,
+                        """
+                        (() => {
+                            if (document.querySelector('a[href*="BusinessGroup/"]') || document.querySelector('table.o_table, .o_EmptyTable')) return 'READY';
+                            if (document.querySelector('input[type="password"]')) return 'PASS_STEP';
+                            return null;
+                        })()
+                        """,
+                        timeout=2.5,
+                        poll_interval=0.06,
+                    )
+                    if st == "READY":
+                        break
+                # Ensure we are back on GroupsSite/0 after login redirect
+                self._cdp_send_command(ws_olat, "Page.navigate", {"url": "https://lms.uni-kiel.de/url/GroupsSite/0"})
+                self._cdp_wait_for_js(
+                    ws_olat,
+                    "document.querySelector('a[href*=\"BusinessGroup/\"]') || document.querySelector('table.o_table, .o_EmptyTable') ? 'READY' : null",
+                    timeout=2.5,
+                    poll_interval=0.06,
+                )
 
             extract_olat_groups_js = """
             (function() {
@@ -1791,10 +1993,13 @@ setTimeout(runUnibodyAutoFill, 2200);
                 const bgLink = tr.querySelector('a[href*="BusinessGroup/"]');
                 const courseLink = tr.querySelector('a[href*="Repository/"], a[href*="RepositoryEntry/"]');
                 if (bgLink) {
+                  const chref = courseLink ? courseLink.href : '';
+                  const mRepo = chref.match(/Repository(?:Entry)?\\/(\\d+)/i);
                   items.push({
                     groupName: (bgLink.innerText || '').trim(),
                     bgUrl: bgLink.href,
-                    courseName: courseLink ? (courseLink.innerText || '').trim() : (tr.innerText || '').trim()
+                    courseName: courseLink ? (courseLink.innerText || '').trim() : (tr.innerText || '').trim(),
+                    repoId: mRepo ? mRepo[1] : ''
                   });
                 }
               }
@@ -1810,53 +2015,116 @@ setTimeout(runUnibodyAutoFill, 2200);
                 except Exception:
                     olat_groups = []
 
+            # Pass 1: Instant 0ms match from GroupsSite table columns (groupName + courseName + repoId)
+            unmatched_items = []
             for item in olat_groups:
                 g_name = item.get("groupName") or ""
                 c_name = item.get("courseName") or ""
                 bg_url = item.get("bgUrl") or ""
+                repo_id = item.get("repoId") or ""
                 if not bg_url:
                     continue
-                # Skip pure lecture main groups like "EBWL 26/27" if there's no "Übung" / "Gr" / "Tutorium", though we still check description
-                self._cdp_send_command(ws_olat, "Page.navigate", {"url": bg_url})
-                time.sleep(1.1)
-                res_bg = self._cdp_send_command(
-                    ws_olat,
-                    "Runtime.evaluate",
-                    {
-                        "expression": "JSON.stringify({desc: document.querySelector('#o_main_container')?.innerText || document.body?.innerText || ''})",
-                        "returnByValue": True,
-                    },
+                before_cnt = len(detected)
+                match_course_and_group(
+                    c_name,
+                    g_name,
+                    "",
+                    bg_url,
+                    explicit_repo_id=repo_id if repo_id else None,
                 )
-                val_bg = res_bg.get("result", {}).get("result", {}).get("value") if isinstance(res_bg, dict) else None
-                desc_text = ""
-                if val_bg:
-                    try:
-                        desc_text = json.loads(val_bg).get("desc", "")
-                    except Exception:
-                        pass
-                raw_findings.append({"platform": "lms.uni-kiel.de", "group": g_name, "course": c_name, "desc": desc_text[:200]})
-                match_course_and_group(c_name, g_name, desc_text, bg_url)
+                if len(detected) > before_cnt:
+                    with sync_lock:
+                        raw_findings.append({
+                            "platform": "lms.uni-kiel.de",
+                            "group": g_name,
+                            "course": c_name,
+                            "desc": "Direct Table Match",
+                        })
+                elif re.search(r"\b(?:übung|gruppe|gr\.?|tutorium|praktikum)\b", g_name, re.I):
+                    unmatched_items.append(item)
 
-            # Live-Scrape real-time exercise capacities from active OpenOlat courses
+            # Pass 2: Parallel In-Browser fetch() ONLY for unmatched exercise group rows
+            bg_urls_to_fetch = [it.get("bgUrl") for it in unmatched_items if it.get("bgUrl")]
+            bg_desc_map: Dict[str, str] = {}
+            if bg_urls_to_fetch:
+                parallel_fetch_js = f"""
+                (() => {{
+                    const urls = {json.dumps(bg_urls_to_fetch)};
+                    window.__unibody_bg_cache = {{ done: false, results: {{}} }};
+                    Promise.all(urls.map(u =>
+                        fetch(u, {{ credentials: 'include' }})
+                            .then(r => r.text())
+                            .then(html => {{
+                                const doc = new DOMParser().parseFromString(html, 'text/html');
+                                const main = doc.querySelector('#o_main_container') || doc.body;
+                                window.__unibody_bg_cache.results[u] = main ? (main.innerText || '') : '';
+                            }})
+                            .catch(() => {{ window.__unibody_bg_cache.results[u] = ''; }})
+                    )).then(() => {{ window.__unibody_bg_cache.done = true; }});
+                    return 'STARTED';
+                }})()
+                """
+                self._cdp_send_command(ws_olat, "Runtime.evaluate", {"expression": parallel_fetch_js, "returnByValue": True})
+                bg_cache_json = self._cdp_wait_for_js(
+                    ws_olat,
+                    "window.__unibody_bg_cache && window.__unibody_bg_cache.done ? JSON.stringify(window.__unibody_bg_cache.results) : null",
+                    timeout=1.8,
+                    poll_interval=0.05,
+                )
+                if bg_cache_json:
+                    try:
+                        bg_desc_map = json.loads(bg_cache_json)
+                    except Exception:
+                        bg_desc_map = {}
+
+            for item in unmatched_items:
+                g_name = item.get("groupName") or ""
+                c_name = item.get("courseName") or ""
+                bg_url = item.get("bgUrl") or ""
+                repo_id = item.get("repoId") or ""
+                desc_text = bg_desc_map.get(bg_url, "")
+                with sync_lock:
+                    raw_findings.append({
+                        "platform": "lms.uni-kiel.de",
+                        "group": g_name,
+                        "course": c_name,
+                        "desc": desc_text[:200],
+                    })
+                match_course_and_group(
+                    c_name,
+                    g_name,
+                    desc_text,
+                    bg_url,
+                    explicit_repo_id=repo_id if repo_id else None,
+                )
+
+            # Only visit RepositoryEntry tree if an OpenOlat course with exercise groups wasn't already resolved from GroupsSite
+            detected_cids_low = {d["course_id"].lower() for d in detected}
             for ckey, raw_c in all_courses.items():
+                if not raw_c.get("groups") or raw_c.get("enrollment_mode") == "lecture_only":
+                    continue
                 c = enrich_course_with_unibody(raw_c)
+                if c["course_id"].lower() in detected_cids_low:
+                    continue
                 repo_id = str(c.get("olat_repo_id") or "")
                 if repo_id.isdigit() and len(repo_id) > 6:
                     course_url = f"https://lms.uni-kiel.de/auth/RepositoryEntry/{repo_id}"
-                    self.add_log("INFO", f"🏛️ UNIBODY Live-Sync: Lese Echtzeit-Belegung für '{c['course_id']}' ({repo_id})...")
                     self._cdp_send_command(ws_olat, "Page.navigate", {"url": course_url})
-                    time.sleep(1.8)
 
-                    # Robust navigation in OpenOlat tree: handles both direct Einschreibung and nested Übung -> Anmeldung
+                    # Fast-poll until course tree or table is rendered (replaces fixed 1.8s sleep)
+                    self._cdp_wait_for_js(
+                        ws_olat,
+                        "document.querySelector('.o_tree, table.o_table') ? 'TREE_READY' : null",
+                        timeout=1.8,
+                        poll_interval=0.05,
+                    )
+
                     click_tree_js = """
                     (() => {
-                        // Dismiss any modal/dialog that might be overlaying the screen
                         const closeBtn = document.querySelector('.modal-header .close, button.close, .o_modal_close');
                         if (closeBtn) closeBtn.click();
 
                         const allLinks = Array.from(document.querySelectorAll('a, span.o_tree_item, .o_tree_link'));
-                        
-                        // Expand Übung tree section if present
                         const ubOpener = allLinks.find(el => /(?:unterelemente von übung|übung)/i.test(el.getAttribute('title') || el.innerText || ''));
                         if (ubOpener && ubOpener.closest('a')) {
                             const a = ubOpener.closest('a');
@@ -1864,7 +2132,6 @@ setTimeout(runUnibodyAutoFill, 2200);
                             try { (new Function(code)).call(a); } catch(e) {}
                         }
 
-                        // Target Anmeldung or Einschreibung
                         const target = allLinks.find(el => /(?:anmeldung\\s*zur\\s*übung|anmeldung|einschreibung)/i.test((el.innerText || '').trim()));
                         if (target && target.closest('a')) {
                             const a = target.closest('a');
@@ -1878,14 +2145,21 @@ setTimeout(runUnibodyAutoFill, 2200);
                         return 'NOT_FOUND';
                     })()
                     """
-                    self._cdp_send_command(ws_olat, "Runtime.evaluate", {"expression": click_tree_js, "returnByValue": True})
-                    time.sleep(2.0)
+                    click_res = self._cdp_send_command(ws_olat, "Runtime.evaluate", {"expression": click_tree_js, "returnByValue": True})
+                    click_val = click_res.get("result", {}).get("result", {}).get("value") if isinstance(click_res, dict) else None
+
+                    # If Übung node just expanded via AJAX, check once more for nested Anmeldung link after 150ms
+                    if click_val == "NOT_FOUND":
+                        time.sleep(0.15)
+                        self._cdp_send_command(ws_olat, "Runtime.evaluate", {"expression": click_tree_js, "returnByValue": True})
 
                     scrape_table_js = """
                     (() => {
                         const table = document.querySelector('table.o_table, table.table');
-                        if (!table) return [];
-                        return Array.from(table.querySelectorAll('tbody tr')).map(tr => {
+                        if (!table) return null;
+                        const rows = Array.from(table.querySelectorAll('tbody tr'));
+                        if (!rows.length) return null;
+                        return rows.map(tr => {
                             const tds = Array.from(tr.querySelectorAll('td, th')).map(td => (td.innerText || '').replace(/\\s+/g, ' ').trim());
                             return {
                                 name: tds[0] || '',
@@ -1896,8 +2170,8 @@ setTimeout(runUnibodyAutoFill, 2200);
                         });
                     })()
                     """
-                    res_cap = self._cdp_send_command(ws_olat, "Runtime.evaluate", {"expression": scrape_table_js, "returnByValue": True})
-                    cap_rows = res_cap.get("result", {}).get("result", {}).get("value") if isinstance(res_cap, dict) else None
+                    # Fast-poll until table rows appear (replaces fixed 2.0s sleep)
+                    cap_rows = self._cdp_wait_for_js(ws_olat, scrape_table_js, timeout=1.6, poll_interval=0.05)
                     if isinstance(cap_rows, list) and cap_rows:
                         matched_count = 0
                         for r in cap_rows:
@@ -1906,16 +2180,25 @@ setTimeout(runUnibodyAutoFill, 2200);
                                 taken = int(m_cap.group(1))
                                 total = int(m_cap.group(2))
                                 free = max(0, total - taken)
-                                is_full = (free <= 0) or ("voll" in (r.get("status") or "").lower())
-                                is_enrolled_row = "eingeschrieben" in (r.get("status") or "").lower() and "nicht" not in (r.get("status") or "").lower()
+                                status_low = (r.get("status") or "").lower()
+                                is_full = (free <= 0) or ("voll" in status_low)
+                                is_enrolled_row = (
+                                    ("eingeschrieben" in status_low or "eingetragen" in status_low or "austragen" in status_low)
+                                    and "nicht" not in status_low
+                                )
+
+                                clean_desc = re.sub(r"\b\d{4,}\b", " ", f"{r['name']} {r['desc']}")
+                                slot = parse_german_timeslot(clean_desc)
+                                m_gnum = re.search(r"(?:übungsgruppe|gruppe|gr\.?|übung|tutorium)\s*0*(\d+)", r["name"].lower())
 
                                 for grp in raw_c.get("groups", []):
-                                    slot = parse_german_timeslot(f"{r['name']} {r['desc']}")
-                                    m_gnum = re.search(r"(?:gruppe|gr\.?|übung)\s*0*(\d+)", r['name'].lower())
                                     matched = False
                                     if m_gnum:
                                         g_num = m_gnum.group(1)
-                                        m_target_num = re.search(r"(?:gruppe|gr\.?|übung)\s*0*(\d+)", grp.get("name", "").lower())
+                                        m_target_num = re.search(
+                                            r"(?:übungsgruppe|gruppe|gr\.?|übung|tutorium)\s*0*(\d+)",
+                                            grp.get("name", "").lower(),
+                                        )
                                         if m_target_num and m_target_num.group(1) == g_num:
                                             matched = True
                                         elif re.search(rf"\b0*{g_num}\b", grp.get("name", "").lower()):
@@ -1930,255 +2213,39 @@ setTimeout(runUnibodyAutoFill, 2200);
                                         grp["waitlist_available"] = False if is_full else grp.get("waitlist_available", True)
                                         if is_enrolled_row:
                                             grp["is_enrolled"] = True
-                                            match_course_and_group(c.get("title") or c["course_id"], r["name"], r["desc"], course_url)
+                                            match_course_and_group(
+                                                c.get("title") or c["course_id"],
+                                                r["name"],
+                                                r["desc"],
+                                                course_url,
+                                                explicit_course_id=c["course_id"],
+                                                explicit_repo_id=repo_id,
+                                            )
                                         matched_count += 1
                         if matched_count > 0:
-                            self.add_log("INFO", f"📊 OpenOlat: {matched_count} Übungsgruppen von '{c['course_id']}' mit Echtzeit-Kapazitäten synchronisiert.")
+                            self.add_log(
+                                "INFO",
+                                f"📊 OpenOlat: {matched_count} Übungsgruppen von '{c['course_id']}' mit Echtzeit-Kapazitäten synchronisiert.",
+                            )
 
-            # Navigate back to GroupsSite overview so user sees a clean table
-            if olat_groups:
-                self._cdp_send_command(ws_olat, "Page.navigate", {"url": "https://lms.uni-kiel.de/url/GroupsSite/0"})
+        # Wait for parallel Moodle & Materials task to complete
+        try:
+            moodle_future.result(timeout=6.0)
+        except Exception:
+            pass
+        bg_executor.shutdown(wait=False)
 
-        # ---------------------------------------------------------------------
-        # PART B: Crawl Moodle (`elearn.informatik.uni-kiel.de`)
-        # ---------------------------------------------------------------------
-        # B1: Direct fast HTTP/Cookie verification of Moodle ChoiceGroups (id=29806 & id=27391)
-        if creds.get("username") and creds.get("password"):
-            try:
-                import http.cookiejar
-                cj = http.cookiejar.CookieJar()
-                opener = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(cj))
-                opener.addheaders = [("User-Agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36")]
-                login_html = opener.open("https://elearn.informatik.uni-kiel.de/login/index.php", timeout=6.0).read().decode("utf-8", "ignore")
-                m_tok = re.search(r"name=[\"']logintoken[\"']\s+value=[\"']([^\"']+)[\"']", login_html)
-                login_payload = urllib.parse.urlencode({
-                    "username": creds["username"],
-                    "password": creds["password"],
-                    "logintoken": m_tok.group(1) if m_tok else "",
-                }).encode("utf-8")
-                opener.open("https://elearn.informatik.uni-kiel.de/login/index.php", data=login_payload, timeout=6.0).read()
-
-                direct_moodle_targets = [
-                    ("infEWInf-01a", "Einführung in die Wirtschaftsinformatik 080038", "https://elearn.informatik.uni-kiel.de/mod/choicegroup/view.php?id=29806"),
-                    ("infEInf-02a", "Einführung in die Informatik 080058", "https://elearn.informatik.uni-kiel.de/mod/choicegroup/view.php?id=27391"),
-                ]
-                for target_cid, target_hint, cg_url in direct_moodle_targets:
-                    try:
-                        cg_html = opener.open(cg_url, timeout=6.0).read().decode("utf-8", "ignore")
-                        intro_m = re.search(r"id=[\"']intro[\"'][^>]*>(.*?)</div>\s*</div>", cg_html, re.S)
-                        intro_txt = re.sub(r"<[^>]+>", "\n", intro_m.group(1)) if intro_m else ""
-
-                        raw_c = next((rc for ck, rc in all_courses.items() if rc.get("course_id", "").lower() == target_cid.lower() or target_cid.lower() in ck), None)
-
-                        for tr_m in re.finditer(r"<tr[^>]*class=[\"'][^\"']*option[^\"']*[\"'][^>]*>(.*?)</tr>", cg_html, re.S):
-                            tr_html = tr_m.group(1)
-                            lbl_m = re.search(r"<label[^>]*>(.*?)</label>", tr_html, re.S)
-                            opt_name = re.sub(r"\s+", " ", re.sub(r"<[^>]+>", " ", lbl_m.group(1))).strip() if lbl_m else ""
-                            if not opt_name:
-                                continue
-                            is_checked = bool(re.search(r"<input[^>]+checked", tr_html, re.I))
-                            is_disabled = bool(re.search(r"<input[^>]+disabled", tr_html, re.I))
-                            cap_m = re.search(r"(\d+)\s*/\s*(\d+)", tr_html)
-                            if cap_m and raw_c:
-                                taken = int(cap_m.group(1))
-                                total = int(cap_m.group(2))
-                                free = max(0, total - taken)
-                                is_full = (free <= 0) or is_disabled
-                                m_num = re.search(r"(?:übungsgruppe|gruppe|gr\.?|übung)\s*0*(\d+)", opt_name.lower())
-                                if m_num:
-                                    for g in raw_c.get("groups", []):
-                                        m_g = re.search(r"(?:übungsgruppe|gruppe|gr\.?|übung)\s*0*(\d+)", g.get("name", "").lower())
-                                        if m_g and m_g.group(1) == m_num.group(1):
-                                            g["spots_free"] = free
-                                            g["spots_total"] = total
-                                            g["is_full"] = is_full
-                                            if is_checked:
-                                                g["is_enrolled"] = True
-
-                            if is_checked:
-                                tr_text = re.sub(r"\s+", " ", re.sub(r"<[^>]+>", " ", tr_html)).strip()
-                                extra_line = ""
-                                for line in intro_txt.splitlines():
-                                    if opt_name.lower() in line.lower():
-                                        extra_line = line.strip()
-                                        break
-                                detail_combined = f"{extra_line} {tr_text}".strip()
-                                raw_findings.append({"platform": "elearn.informatik.uni-kiel.de", "group": opt_name, "course": target_cid, "desc": detail_combined[:200]})
-                                match_course_and_group(target_hint, opt_name, detail_combined, cg_url)
-                    except Exception:
-                        pass
-            except Exception as e_http:
-                self.add_log("DEBUG", f"Moodle Direct-HTTP Check: {e_http}")
-
-        # B2: Browser CDP check on Moodle (`elearn.informatik.uni-kiel.de`)
-        if moodle_tab and moodle_tab.get("webSocketDebuggerUrl"):
-            ws_moodle = moodle_tab["webSocketDebuggerUrl"]
-            self.add_log("INFO", "💻 UNIBODY Deep-Sync: Prüfe eingeschriebene Kurse & Gruppenwahl auf elearn.informatik.uni-kiel.de...")
-            self._cdp_send_command(ws_moodle, "Page.navigate", {"url": "https://elearn.informatik.uni-kiel.de/my/"})
-            time.sleep(1.5)
-
-            extract_moodle_courses_js = """
-            (function() {
-              const links = Array.from(document.querySelectorAll('a[href*="course/view.php?id="]'));
-              const seen = new Set();
-              const out = [];
-              for (const a of links) {
-                if (!seen.has(a.href)) {
-                  seen.add(a.href);
-                  out.push({ title: (a.innerText || '').replace(/\\s+/g, ' ').trim(), url: a.href });
-                }
-              }
-              return JSON.stringify(out);
-            })();
-            """
-            res_mc = self._cdp_send_command(ws_moodle, "Runtime.evaluate", {"expression": extract_moodle_courses_js, "returnByValue": True})
-            val_mc = res_mc.get("result", {}).get("result", {}).get("value") if isinstance(res_mc, dict) else None
-            moodle_courses = []
-            if val_mc:
-                try:
-                    moodle_courses = json.loads(val_mc)
-                except Exception:
-                    moodle_courses = []
-
-            # Ensure both infEWInf-01a (id=472) and infEInf-02a (id=470) are always checked
-            if not any("id=472" in mc.get("url", "") for mc in moodle_courses):
-                moodle_courses.append({
-                    "title": "infEWInf-01a: Einführung in die Wirtschaftsinformatik 080038",
-                    "url": "https://elearn.informatik.uni-kiel.de/course/view.php?id=472"
-                })
-            if not any("id=470" in mc.get("url", "") for mc in moodle_courses):
-                moodle_courses.append({
-                    "title": "infEInf-02a / infEInf-01a: Einführung in die Informatik 080058",
-                    "url": "https://elearn.informatik.uni-kiel.de/course/view.php?id=470"
-                })
-
-            for mc in moodle_courses[:6]:
-                c_url = mc.get("url")
-                c_title = mc.get("title") or ""
-                if not c_url or "fachschaft" in c_title.lower():
-                    continue
-                self._cdp_send_command(ws_moodle, "Page.navigate", {"url": c_url})
-                time.sleep(1.3)
-                extract_cg_js = """
-                (function() {
-                  const links = Array.from(document.querySelectorAll('a[href*="mod/choicegroup/view.php"], a[href*="mod/choice/view.php"]'));
-                  return JSON.stringify(links.map(a => ({ title: (a.innerText || '').trim(), url: a.href })));
-                })();
-                """
-                res_cg = self._cdp_send_command(ws_moodle, "Runtime.evaluate", {"expression": extract_cg_js, "returnByValue": True})
-                val_cg = res_cg.get("result", {}).get("result", {}).get("value") if isinstance(res_cg, dict) else None
-                cg_links = []
-                if val_cg:
-                    try:
-                        cg_links = json.loads(val_cg)
-                    except Exception:
-                        cg_links = []
-
-                for cg in cg_links:
-                    cg_url = cg.get("url")
-                    cg_title = cg.get("title") or ""
-                    if not cg_url or "übung" not in cg_title.lower():
-                        continue
-                    self._cdp_send_command(ws_moodle, "Page.navigate", {"url": cg_url})
-                    time.sleep(1.3)
-
-                    check_cg_details_js = """
-                    (function() {
-                        const mainEl = document.querySelector('#region-main, [role="main"], main') || document.body;
-                        const bodyTxt = (mainEl ? mainEl.innerText : '').replace(/\\s+/g, ' ');
-                        const introEl = document.querySelector('#intro, .activity-description');
-                        const introTxt = introEl ? (introEl.innerText || '') : '';
-                        const isLocked = bodyTxt.includes('not available until') || bodyTxt.includes('gesperrt') || bodyTxt.includes('noch nicht geöffnet') || bodyTxt.includes('Verfügbar ab');
-                        const mOpen = bodyTxt.match(/Opens?:\\s*([^\\n\\.]+)/i) || bodyTxt.match(/available until\\s*([^\\n\\.]+)/i);
-                        const openDate = mOpen ? mOpen[1].trim() : '';
-
-                        const checked = document.querySelector('form input[type="radio"]:checked, form input[type="checkbox"]:checked');
-                        let chosen = '';
-                        let chosenLabel = '';
-                        if (checked) {
-                            const row = checked.closest('tr, .fitem, li, div');
-                            const lbl = row ? row.querySelector('label') : null;
-                            chosenLabel = lbl ? (lbl.innerText || '').trim() : '';
-                            chosen = row ? row.innerText.replace(/\\s+/g, ' ').trim() : checked.value;
-                        } else {
-                            const selBox = document.getElementById('yourselection');
-                            if (selBox) {
-                                chosen = (selBox.innerText || '').replace(/^(?:Ihre Auswahl|Your selection|Your choice)[:\\s]*/i, '').trim();
-                                chosenLabel = chosen;
-                            }
-                        }
-
-                        let introMatchLine = '';
-                        if (chosenLabel && introTxt) {
-                            const lines = introTxt.split(/\\r?\\n/);
-                            for (const l of lines) {
-                                if (l.toLowerCase().includes(chosenLabel.toLowerCase())) {
-                                    introMatchLine = l.trim();
-                                    break;
-                                }
-                            }
-                        }
-
-                        const rows = Array.from(document.querySelectorAll('table.choicegroups tr.option, #region-main table tr.option, table tr.option, form table tr'));
-                        const options = rows.map(tr => {
-                            const tds = Array.from(tr.querySelectorAll('td')).map(td => (td.innerText || '').replace(/\\s+/g, ' ').trim());
-                            const input = tr.querySelector('input');
-                            return {
-                                name: (tds[1] || tr.innerText || '').replace(/\\s+/g, ' ').trim(),
-                                capacity: tds[2] || '',
-                                checked: input ? input.checked : false,
-                                disabled: input ? input.disabled : false
-                            };
-                        });
-
-                        return JSON.stringify({ isLocked, openDate, chosen: chosenLabel || chosen, detail: (introMatchLine + ' ' + chosen).trim(), options });
-                    })();
-                    """
-                    res_cg_det = self._cdp_send_command(ws_moodle, "Runtime.evaluate", {"expression": check_cg_details_js, "returnByValue": True})
-                    val_cg_det = res_cg_det.get("result", {}).get("result", {}).get("value") if isinstance(res_cg_det, dict) else None
-                    if val_cg_det:
-                        try:
-                            cg_info = json.loads(val_cg_det)
-                            is_ewinf = "472" in str(c_url) or "29806" in str(cg_url) or "wirtschaftsinformatik" in c_title.lower() or "80038" in c_title
-                            target_key_sub = "infewinf" if is_ewinf else "infeinf"
-                            moodle_course = next((raw_c for ckey, raw_c in all_courses.items() if target_key_sub in ckey), None)
-                            if moodle_course:
-                                if cg_info.get("isLocked"):
-                                    open_d = cg_info.get("openDate") or "23. Oktober 2026, 14:00 Uhr"
-                                    self.add_log("INFO", f"⏳ [elearn.informatik] Übungsgruppen noch nicht freigeschaltet: Gesperrt bis {open_d} (Dozenten-Freischaltung ausstehend).")
-                                    for g in moodle_course.get("groups", []):
-                                        g["is_locked"] = True
-                                elif cg_info.get("options"):
-                                    for opt in cg_info["options"]:
-                                        m_cap = re.search(r"(\d+)\s*/\s*(\d+)", opt.get("capacity", ""))
-                                        if m_cap:
-                                            taken = int(m_cap.group(1))
-                                            total = int(m_cap.group(2))
-                                            free = max(0, total - taken)
-                                            is_full = (free <= 0) or opt.get("disabled", False)
-                                            for g in moodle_course.get("groups", []):
-                                                m_num = re.search(r"(?:übungsgruppe|gruppe|gr\.?|übung)\s*0*(\d+)", opt.get("name", "").lower())
-                                                m_gnum = re.search(r"(?:übungsgruppe|gruppe|gr\.?|übung)\s*0*(\d+)", g.get("name", "").lower())
-                                                if m_num and m_gnum and m_num.group(1) == m_gnum.group(1):
-                                                    g["spots_free"] = free
-                                                    g["spots_total"] = total
-                                                    g["is_full"] = is_full
-
-                            if cg_info.get("chosen"):
-                                match_course_and_group(c_title, cg_info["chosen"], cg_info.get("detail") or cg_info["chosen"], cg_url)
-                        except Exception:
-                            pass
-
+        elapsed_s = round(time.time() - t_start, 2)
         if detected:
             for d in detected:
                 self.add_log(
                     "SUCCESS",
-                    f"✅ UNIBODY Deep-Sync: Gebuchte Übung gefunden für '{d['course_id']}' ({d.get('lms_group_name')}) -> {d['group_name']}!"
+                    f"✅ UNIBODY Deep-Sync ({elapsed_s}s): Gebuchte Übung verifiziert für '{d['course_id']}' ({d.get('lms_group_name')}) -> {d['group_name']}!",
                 )
         else:
             self.add_log(
                 "INFO",
-                "🔍 UNIBODY Deep-Sync abgeschlossen: Keine aktiven Übungsgruppen-Buchungen auf OpenOlat / Moodle gefunden."
+                f"🔍 UNIBODY Deep-Sync abgeschlossen in {elapsed_s}s: Keine aktiven Übungsgruppen-Buchungen gefunden.",
             )
 
         # Close Chrome automatically after UNIBODY Deep-Sync completes
@@ -2189,6 +2256,7 @@ setTimeout(runUnibodyAutoFill, 2200);
 
         return {
             "ok": True,
+            "elapsed_seconds": elapsed_s,
             "scanned_tabs": len(tabs),
             "detected": detected,
             "raw_findings": raw_findings,

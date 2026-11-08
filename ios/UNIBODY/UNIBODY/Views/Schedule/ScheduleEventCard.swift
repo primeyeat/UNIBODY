@@ -6,6 +6,8 @@ public struct ScheduleEventCard: View {
     public var onToggle: () -> Void = {}
     public var onDelete: () -> Void = {}
     
+    @State private var showDeleteConfirmation: Bool = false
+    
     private var isEnrolled: Bool {
         event.type == "enrolled_exercise"
     }
@@ -65,12 +67,23 @@ public struct ScheduleEventCard: View {
                 
                 Spacer()
                 
-                Button(action: onToggle) {
-                    Image(systemName: event.enabled ? "checkmark.circle.fill" : "circle")
-                        .foregroundColor(event.enabled ? (isEnrolled ? AeroTheme.emerald : AeroTheme.skyBlue) : .secondary)
-                        .font(.title3)
+                HStack(spacing: 10) {
+                    Button(action: onToggle) {
+                        Image(systemName: event.enabled ? "checkmark.circle.fill" : "circle")
+                            .foregroundColor(event.enabled ? (isEnrolled ? AeroTheme.emerald : AeroTheme.skyBlue) : .secondary)
+                            .font(.title3)
+                    }
+                    .buttonStyle(.plain)
+                    
+                    Button {
+                        showDeleteConfirmation = true
+                    } label: {
+                        Image(systemName: "trash")
+                            .font(.subheadline)
+                            .foregroundColor(.secondary.opacity(0.75))
+                    }
+                    .buttonStyle(.plain)
                 }
-                .buttonStyle(.plain)
             }
             
             HStack(spacing: 12) {
@@ -208,24 +221,37 @@ public struct ScheduleEventCard: View {
             
             Divider()
             
-            // 5. Löschen / Austragen
+            // 5. Löschen / Austragen (mit Sicherheits-Bestätigungs-Dialog)
             if isEnrolled {
                 Button(role: .destructive) {
-                    if let cid = event.courseId {
-                        appState.clearEnrollment(courseId: cid)
-                    } else {
-                        onDelete()
-                    }
+                    showDeleteConfirmation = true
                 } label: {
                     Label("Aus Übung austragen", systemImage: "xmark.seal.fill")
                 }
             } else {
-                Button(role: .destructive, action: onDelete) {
+                Button(role: .destructive) {
+                    showDeleteConfirmation = true
+                } label: {
                     Label("Aus Plan entfernen", systemImage: "trash")
                 }
             }
         } preview: {
             EventPreviewCard(event: event)
+        }
+        .alert(
+            isEnrolled ? "Übungsgruppe wirklich entfernen?" : "Termin wirklich löschen?",
+            isPresented: $showDeleteConfirmation
+        ) {
+            Button("Abbrechen", role: .cancel) { }
+            Button(isEnrolled ? "Austragen & Entfernen" : "Endgültig löschen", role: .destructive) {
+                if isEnrolled, let cid = event.courseId {
+                    appState.clearEnrollment(courseId: cid)
+                } else {
+                    onDelete()
+                }
+            }
+        } message: {
+            Text("Möchtest du „\(event.title)“ (\(event.dayName), \(event.startTime)–\(event.endTime)) wirklich aus deinem Wochenplan entfernen?")
         }
     }
 }

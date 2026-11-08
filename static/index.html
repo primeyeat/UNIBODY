@@ -10,7 +10,7 @@
   <link rel="icon" type="image/png" sizes="192x192" href="/favicon-192.png" />
   <link rel="icon" type="image/x-icon" href="/favicon.ico" />
   <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
-  <link rel="stylesheet" href="/styles.css?v=32" />
+  <link rel="stylesheet" href="/styles.css?v=33" />
 </head>
 <body>
   <!-- TOP HEADER -->
@@ -26,6 +26,7 @@
       </div>
       <div class="brand-title" id="titleClickable" role="button" tabindex="0" title="Menü öffnen">
         <h1>UNIBODY</h1>
+        <span style="font-size:0.68rem; opacity:0.78; font-weight:600; display:block; margin-top:-2px;">Inoffizielles Studierenden-Tool · Keine offizielle App der CAU Kiel</span>
       </div>
     </div>
 
@@ -210,7 +211,7 @@
         </button>
         <div class="settings-title-wrap">
           <h2>⚙️ Einstellungen</h2>
-          <span class="settings-subtitle">Design-Themen, CAU Account, Optimierungs-Präferenzen &amp; Telemetrie</span>
+          <span class="settings-subtitle">Inoffizielles Studierenden-Tool · Design-Themen, Uni-Login, Optimierungs-Präferenzen &amp; Telemetrie</span>
         </div>
       </div>
 
@@ -248,12 +249,12 @@
         </div>
       </div>
 
-      <!-- 1. CAU ACCOUNT & AUTO-LOGIN VAULT CARD -->
+      <!-- 1. UNI ACCOUNT & AUTO-LOGIN VAULT CARD -->
       <div class="card account-vault-card" id="accountVaultCard">
         <div class="card-header">
           <div>
             <span class="step-pill" id="vaultStatusPill">🫧 UNIBODY TRESOR</span>
-            <h2>🔐 CAU Account &amp; UNIBODY Auto-Login (OpenOlat + Informatik eLearn)</h2>
+            <h2>🔐 Uni-Login &amp; UNIBODY Auto-Login (Inoffizielles Tool für OpenOlat &amp; Moodle)</h2>
           </div>
           <div style="display:flex;gap:6px;align-items:center;">
             <span id="vaultSavedBadge" class="vault-badge unsaved">Noch kein Account gespeichert</span>
@@ -265,12 +266,12 @@
 
         <form id="formCredentials" class="vault-form-body">
           <p class="helper-text">
-            Einmal eingeben, überall eingeloggt: Unsere <strong>UNIBODY-Engine</strong> nutzt deine gespeicherte <strong>CAU-Kennung (<code>stu...</code>)</strong> gleichzeitig für <strong>1. <code>lms.uni-kiel.de</code> (OpenOlat)</strong> und <strong>2. <code>elearn.informatik.uni-kiel.de</code> (Informatik-Moodle für <code>infEInf-02a</code>)</strong> und entscheidet bei jedem Kurs automatisch, welche der beiden Seiten angesteuert werden muss!
+            <strong>Hinweis (Inoffizielles Studierenden-Projekt):</strong> UNIBODY steht in keiner offiziellen Verbindung zur CAU Kiel. Deine gespeicherte <strong>Studierenden-Kennung (<code>stu...</code>)</strong> bleibt lokal auf deinem Gerät und loggt dich bei Bedarf auf <strong><code>lms.uni-kiel.de</code> (OpenOlat)</strong> und <strong><code>elearn.informatik.uni-kiel.de</code> (Moodle)</strong> ein.
           </p>
 
           <div class="vault-grid">
             <div class="form-group">
-              <label for="credUsername">CAU-Kennung / Login-Name *</label>
+              <label for="credUsername">Studierenden-Kennung / Login-Name *</label>
               <input
                 type="text"
                 id="credUsername"
@@ -435,7 +436,7 @@
               <span class="live-recalc-tag" id="mailConnectionStatusBadge">🟢 Verbunden</span>
             </div>
             <span class="mail-subtitle" id="mailAccountSubtitle">
-              CAU Webmail · <code id="mailAccountEmail">Postfach wird verbunden...</code> (imap.mail.uni-kiel.de)
+              Inoffizieller Uni-Mail Client · <code id="mailAccountEmail">Postfach wird verbunden...</code> (imap.mail.uni-kiel.de)
             </span>
           </div>
         </div>
@@ -692,7 +693,7 @@
         <div class="finder-statusbar">
           <span id="finderStatusItemCount">6 Elemente</span>
           <span class="finder-statusbar-divider">·</span>
-          <span id="finderStatusDetails">WiSe 2026/27 · Christian-Albrechts-Universität zu Kiel · (Beta-Feature)</span>
+          <span id="finderStatusDetails">WiSe 2026/27 · Inoffizielles Studierenden-Tool (kompatibel mit Systemen der CAU Kiel) · Beta</span>
         </div>
       </div>
     </div>
@@ -1246,11 +1247,11 @@
       </div>
 
       <div class="drawer-footer-info">
-        <span>UNIBODY · CAU Kiel</span>
+        <span>UNIBODY · Inoffizielles Studierenden-Projekt (keine offizielle App der CAU Kiel)</span>
       </div>
     </div>
   </aside>
 
-  <script src="/app.js?v=32"></script>
+  <script src="/app.js?v=33"></script>
 </body>
 </html>

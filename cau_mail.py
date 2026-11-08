@@ -247,11 +247,13 @@ def get_mail_list(
         if sel_stat != "OK":
             return {"ok": False, "error": f"Ordner '{folder}' konnte nicht geöffnet werden"}
 
-        # Search query or ALL
+        # Search query or ALL (hardened against IMAP quote/CRLF injection — NET-04)
         if search_query and search_query.strip():
-            sq = search_query.strip()
-            # Search subject or from or body
-            status, data = client.search(None, f'(OR SUBJECT "{sq}" FROM "{sq}")')
+            sq = re.sub(r'[\r\n"\\]', '', search_query.strip())[:120]
+            if sq:
+                status, data = client.search(None, f'(OR SUBJECT "{sq}" FROM "{sq}")')
+            else:
+                status, data = client.search(None, "ALL")
         else:
             status, data = client.search(None, "ALL")
 

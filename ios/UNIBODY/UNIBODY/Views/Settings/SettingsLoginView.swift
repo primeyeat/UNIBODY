@@ -26,7 +26,7 @@ public struct SettingsLoginView: View {
                                 Image(systemName: appState.isVaultSaved ? "lock.shield.fill" : "lock.open.trianglebadge.exclamationmark.fill")
                                     .font(.title2)
                                     .foregroundColor(appState.isVaultSaved ? AeroTheme.emerald : AeroTheme.solarOrange)
-                                Text("CAU Login & Auto-Fill Tresor")
+                                Text("Uni-Login & Auto-Fill Tresor")
                                     .font(.system(.title3, design: .rounded).weight(.bold))
                                     .foregroundColor(.primary)
                                 Spacer()
@@ -36,7 +36,7 @@ public struct SettingsLoginView: View {
                                 )
                             }
                             
-                            Text("Hinterlege deine CAU-Kennung (stu-Nummer) einmalig. UNIBODY füllt deine Daten bei lms.uni-kiel.de (OpenOlat) und elearn.informatik.uni-kiel.de (Moodle) automatisch aus.")
+                            Text("Inoffizielles Studierenden-Tool (keine offizielle App der CAU Kiel). Hinterlege deine Studierenden-Kennung (stu-Nummer) lokal im Gerätetresor für lms.uni-kiel.de (OpenOlat) und elearn.informatik.uni-kiel.de (Moodle).")
                                 .font(.caption)
                                 .foregroundColor(.secondary)
                         }
@@ -302,6 +302,22 @@ public struct SettingsLoginView: View {
                         .padding(18)
                         .frutigerGlass(cornerRadius: 18)
                         
+                        // Unofficial Student Project Disclaimer Footer
+                        VStack(alignment: .leading, spacing: 6) {
+                            HStack(spacing: 6) {
+                                Image(systemName: "info.circle.fill")
+                                    .foregroundColor(AeroTheme.skyBlue)
+                                Text("Rechtlicher Hinweis (Inoffizielles Projekt)")
+                                    .font(.caption.weight(.bold))
+                                    .foregroundColor(.primary)
+                            }
+                            Text("UNIBODY ist ein unabhängiges, inoffizielles Programm für Studierende an der CAU Kiel und steht in keiner offiziellen Verbindung zur Christian-Albrechts-Universität zu Kiel, OpenOlat oder Moodle.")
+                                .font(.caption2)
+                                .foregroundColor(.secondary)
+                        }
+                        .padding(14)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .frutigerGlass(cornerRadius: 14)
 
                     }
                     .padding()

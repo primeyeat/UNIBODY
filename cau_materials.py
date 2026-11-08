@@ -17,6 +17,10 @@ import os
 import re
 import json
 import time
+import unicodedata
+import http.cookiejar
+import urllib.request
+import urllib.parse
 from datetime import datetime, timedelta
 from typing import Dict, Any, List, Optional, Tuple
 
@@ -24,6 +28,100 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DATA_DIR = os.path.join(BASE_DIR, "data")
 MATERIALS_DIR = os.path.join(DATA_DIR, "materials")
 MATERIALS_CACHE_FILE = os.path.join(DATA_DIR, "materials_cache.json")
+CREDENTIALS_FILE = os.path.join(DATA_DIR, "credentials.json")
+
+
+def _normalize_fname_key(name: str) -> str:
+    """
+    Normalizes a filename across NFC/NFD (macOS APFS), German umlauts, and
+    course prefixes so 'Übung 1.pdf', 'Uebung_1.pdf', 'EWI Übung 1.pdf',
+    and 'EWInf_Uebung_1.pdf' all resolve to the same canonical key.
+    """
+    s = unicodedata.normalize("NFC", name.strip()).lower()
+    s = (
+        s.replace("ü", "ue")
+        .replace("ä", "ae")
+        .replace("ö", "oe")
+        .replace("ß", "ss")
+    )
+    # Strip optional course prefixes like ewinf_, ewi_, ewi-
+    s = re.sub(r"^(?:ewinf|ewi)[\s_\-]+", "", s)
+    s = re.sub(r"[\s_\-]+", "_", s)
+    if not s.endswith(".pdf") and "." not in s:
+        s += ".pdf"
+    return s
+
+
+def _build_moodle_opener() -> Optional[urllib.request.OpenerDirector]:
+    """Builds an authenticated urllib opener for elearn.informatik.uni-kiel.de using saved credentials (Keychain + fallback)."""
+    if not os.path.exists(CREDENTIALS_FILE):
+        return None
+    try:
+        import base64
+        import subprocess
+        with open(CREDENTIALS_FILE, "r", encoding="utf-8") as f:
+            creds = json.load(f)
+        username = creds.get("username", "").strip()
+        password = ""
+        if username and creds.get("use_keychain", True):
+            for svc in ("UNIBODY-Student-Vault", "CAU-LMS-Sniper-Vault", "app.unibody.vault"):
+                try:
+                    res = subprocess.run(
+                        ["security", "find-generic-password", "-a", username, "-s", svc, "-w"],
+                        capture_output=True,
+                        text=True,
+                        timeout=2.5,
+                    )
+                    if res.returncode == 0 and res.stdout.strip():
+                        password = res.stdout.strip()
+                        break
+                except Exception:
+                    pass
+        if not password and creds.get("password_b64"):
+            try:
+                password = base64.b64decode(creds["password_b64"].encode("ascii")).decode("utf-8")
+            except Exception:
+                password = ""
+        if not password:
+            password = creds.get("password", "")
+        if not username or not password:
+            return None
+
+        cj = http.cookiejar.CookieJar()
+        opener = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(cj))
+        opener.addheaders = [("User-Agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)")]
+
+        login_url = "https://elearn.informatik.uni-kiel.de/login/index.php"
+        login_html = opener.open(login_url, timeout=10).read().decode("utf-8", "ignore")
+        m_tok = re.search(r'name=["\']logintoken["\']\s+value=["\']([^"\']+)["\']', login_html)
+        payload = urllib.parse.urlencode({
+            "username": username,
+            "password": password,
+            "logintoken": m_tok.group(1) if m_tok else "",
+        }).encode("utf-8")
+        opener.open(login_url, data=payload, timeout=10).read()
+        return opener
+    except Exception:
+        return None
+
+
+def _download_moodle_pdf(url: str, opener: Optional[urllib.request.OpenerDirector] = None) -> Optional[bytes]:
+    """Downloads a PDF from an elearn.informatik.uni-kiel.de resource URL and verifies %PDF magic."""
+    if not url or "elearn.informatik.uni-kiel.de" not in url:
+        return None
+    op = opener or _build_moodle_opener()
+    if not op:
+        return None
+    try:
+        fetch_url = url if "redirect=1" in url else (url + ("&redirect=1" if "?" in url else "?redirect=1"))
+        resp = op.open(fetch_url, timeout=15)
+        body = resp.read()
+        if body and body.startswith(b"%PDF-"):
+            return body
+    except Exception:
+        pass
+    return None
+
 
 
 def parse_sheet_number(title: str) -> Optional[int]:
@@ -174,19 +272,21 @@ def get_material_file_bytes(course_id: str, filename: str) -> Tuple[Optional[byt
     Returns (bytes, safe_filename, content_type) for direct download to the user.
     Hardened against path-traversal (CWE-22) via strict identifier whitelisting
     and os.path.commonpath confinement verification.
-    1. Looks in data/materials/<course_id>/<filename>
-    2. Looks case-insensitively across data/materials/
-    3. If missing, dynamically generates a valid CAU PDF so download always succeeds!
+    1. Looks in data/materials/<course_id>/<filename> (exact + NFC/NFD + umlaut-normalized)
+    2. Looks across data/materials/
+    3. Live-fetches the real PDF from Moodle (elearn.informatik.uni-kiel.de) if missing on disk
+    4. If still unavailable, dynamically generates a valid CAU PDF fallback
     """
     # Strict whitelisting: course_id must only contain alphanumeric, dash, and underscore
     cid_clean = re.sub(r'[^a-zA-Z0-9_\-]', '', course_id.lower().strip())
     # Strict basename extraction: strips any leading directories / traversal characters
-    fname_clean = os.path.basename(filename.strip())
+    fname_clean = os.path.basename(unicodedata.normalize("NFC", filename.strip()))
 
     if not cid_clean or not fname_clean:
         return None, "", ""
 
     base_real = os.path.realpath(MATERIALS_DIR)
+    req_norm_key = _normalize_fname_key(fname_clean)
 
     # 1. Direct path check in course subfolder with containment verification
     target_path = os.path.join(MATERIALS_DIR, cid_clean, fname_clean)
@@ -196,30 +296,76 @@ def get_material_file_bytes(course_id: str, filename: str) -> Tuple[Optional[byt
             with open(target_real, "rb") as f:
                 return f.read(), fname_clean, "application/pdf"
 
-    # 2. Case-insensitive search in course subfolder
+    # 2. Case-insensitive & NFC/umlaut-normalized search in course subfolder
     c_dir = os.path.join(MATERIALS_DIR, cid_clean)
     c_dir_real = os.path.realpath(c_dir)
     if os.path.commonpath([base_real, c_dir_real]) == base_real and os.path.exists(c_dir_real):
         for f in os.listdir(c_dir_real):
-            if f.lower() == fname_clean.lower():
+            f_nfc = unicodedata.normalize("NFC", f)
+            if f_nfc.lower() == fname_clean.lower() or _normalize_fname_key(f_nfc) == req_norm_key:
                 full = os.path.join(c_dir_real, f)
                 full_real = os.path.realpath(full)
                 if os.path.commonpath([base_real, full_real]) == base_real and os.path.isfile(full_real):
                     with open(full_real, "rb") as fp:
-                        return fp.read(), f, "application/pdf"
+                        return fp.read(), fname_clean, "application/pdf"
 
     # 3. Global search in all materials subfolders with containment verification
     if os.path.exists(base_real):
         for root, _, files in os.walk(base_real):
             for f in files:
-                if f.lower() == fname_clean.lower():
+                f_nfc = unicodedata.normalize("NFC", f)
+                if f_nfc.lower() == fname_clean.lower() or _normalize_fname_key(f_nfc) == req_norm_key:
                     full = os.path.join(root, f)
                     full_real = os.path.realpath(full)
                     if os.path.commonpath([base_real, full_real]) == base_real and os.path.isfile(full_real):
                         with open(full_real, "rb") as fp:
-                            return fp.read(), f, "application/pdf"
+                            return fp.read(), fname_clean, "application/pdf"
 
-    # 4. Fallback: Synthesize genuine CAU PDF document
+    # 4. Live-fetch from Moodle if resource URL is known or if it's an EWInf Übung X
+    try:
+        data = load_materials_data()
+        cinfo = data.get(cid_clean, {})
+        candidate_url = None
+        for a in cinfo.get("assignments", []):
+            for tf in a.get("task_files", []) + a.get("solution_files", []):
+                if _normalize_fname_key(tf.get("name", "")) == req_norm_key:
+                    candidate_url = tf.get("url")
+                    break
+            if candidate_url:
+                break
+        if not candidate_url:
+            for sec in cinfo.get("sections", []):
+                for it in sec.get("items", []):
+                    if _normalize_fname_key(it.get("file_name", "") or it.get("title", "")) == req_norm_key:
+                        candidate_url = it.get("url")
+                        break
+                if candidate_url:
+                    break
+
+        # If EWInf Übung X was requested and not in cache yet, sync live from course id=472
+        if not candidate_url and cid_clean == "infewinf-01a":
+            if sync_ewinf_exercises_from_moodle(data):
+                save_materials_data(data)
+                for a in data.get("infewinf-01a", {}).get("assignments", []):
+                    for tf in a.get("task_files", []):
+                        if _normalize_fname_key(tf.get("name", "")) == req_norm_key:
+                            candidate_url = tf.get("url")
+                            break
+
+        if candidate_url and "elearn.informatik.uni-kiel.de/mod/resource/view.php" in candidate_url:
+            pdf_bytes = _download_moodle_pdf(candidate_url)
+            if pdf_bytes:
+                os.makedirs(c_dir_real, exist_ok=True)
+                save_name = fname_clean if fname_clean.lower().endswith(".pdf") else f"{fname_clean}.pdf"
+                save_path = os.path.realpath(os.path.join(c_dir_real, save_name))
+                if os.path.commonpath([base_real, save_path]) == base_real:
+                    with open(save_path, "wb") as fp:
+                        fp.write(pdf_bytes)
+                return pdf_bytes, save_name, "application/pdf"
+    except Exception:
+        pass
+
+    # 5. Fallback: Synthesize genuine CAU PDF document
     lines = [
         "Christian-Albrechts-Universitaet zu Kiel",
         f"Kurs / Modul: {course_id}",
@@ -521,27 +667,48 @@ def get_default_course_materials() -> Dict[str, Any]:
             "platform_id": "elearn_inf",
             "platform_host": "elearn.informatik.uni-kiel.de",
             "platform_badge": "💻 elearn.informatik.uni-kiel.de (Info-Moodle)",
-            "course_url": "https://elearn.informatik.uni-kiel.de/course/view.php?id=472",
+            "course_url": "https://elearn.informatik.uni-kiel.de/course/view.php?id=472#module-29808",
             "assignments": [
                 {
-                    "id": "ewinf-assign-01",
-                    "title": "Übung 1: Aufgabenblatt & Vorlesungsorganisation",
+                    "id": "ewinf-uebung-1",
+                    "title": "Übung 1 · Wirtschaftsinformatik, Daten & Informationssysteme (Allianz)",
                     "sheet_number": 1,
+                    "folder_path": "Übungen (#module-29808) / Übung 1",
                     "due_date": "2026-11-05T10:15:00",
                     "max_points": 0,
                     "status": "not_submitted",
-                    "description": "Übungsaufgaben zur Vorlesung: Organisation, Informationssysteme, Digitale Transformation.",
+                    "description": "Aufgabe 1: Vier Disziplinen der Wirtschaftsinformatik · Aufgabe 2: Daten und Informationen (Wettervorhersage & Supermarkt-Verkaufszahlen) · Aufgabe 3: Informationssysteme bei der Allianz (FAZ-Fallstudie).",
                     "task_files": [
                         {
-                            "name": "EWInf_Uebung_1.pdf",
-                            "size": "320 KB",
+                            "name": "Übung 1.pdf",
+                            "size": "883 KB",
                             "ext": "pdf",
                             "url": "https://elearn.informatik.uni-kiel.de/mod/resource/view.php?id=29891",
                         }
                     ],
                     "solution_files": [],
-                    "submission_url": "https://elearn.informatik.uni-kiel.de/course/view.php?id=472",
-                }
+                    "submission_url": "https://elearn.informatik.uni-kiel.de/course/view.php?id=472#module-29808",
+                },
+                {
+                    "id": "ewinf-uebung-2",
+                    "title": "Übung 2 · Industrie 4.0/5.0, AR/VR, Digitaler Zwilling & HCI",
+                    "sheet_number": 2,
+                    "folder_path": "Übungen (#module-29808) / Übung 2",
+                    "due_date": "2026-11-12T10:15:00",
+                    "max_points": 0,
+                    "status": "not_submitted",
+                    "description": "Aufgabe 1: Industrielle Stufen 1.0–5.0 · Aufgabe 2: Herausforderungen bei Industrie 4.0 · Aufgabe 3 & 4: Industrie 5.0 & AR/VR bei FietsPad · Aufgabe 5: Digitaler Zwilling (Sneilheidauto AG) · Aufgabe 6: HCI, UX vs. Usability.",
+                    "task_files": [
+                        {
+                            "name": "Übung 2.pdf",
+                            "size": "178 KB",
+                            "ext": "pdf",
+                            "url": "https://elearn.informatik.uni-kiel.de/mod/resource/view.php?id=30026",
+                        }
+                    ],
+                    "solution_files": [],
+                    "submission_url": "https://elearn.informatik.uni-kiel.de/course/view.php?id=472#module-29813",
+                },
             ],
             "sections": [
                 {
@@ -555,7 +722,7 @@ def get_default_course_materials() -> Dict[str, Any]:
                             "type": "slides",
                             "file_name": "EWInf_VL01_Organisation.pdf",
                             "file_ext": "pdf",
-                            "size": "4.2 MB",
+                            "size": "4.3 MB",
                             "date": "22.10.2026",
                             "url": "https://elearn.informatik.uni-kiel.de/mod/resource/view.php?id=29887",
                         },
@@ -565,7 +732,7 @@ def get_default_course_materials() -> Dict[str, Any]:
                             "type": "slides",
                             "file_name": "EWInf_VL02_Cybersicherheit.pdf",
                             "file_ext": "pdf",
-                            "size": "3.8 MB",
+                            "size": "6.3 MB",
                             "date": "29.10.2026",
                             "url": "https://elearn.informatik.uni-kiel.de/mod/resource/view.php?id=29998",
                         },
@@ -575,7 +742,7 @@ def get_default_course_materials() -> Dict[str, Any]:
                             "type": "slides",
                             "file_name": "EWInf_VL02_Industrie40_AR_VR.pdf",
                             "file_ext": "pdf",
-                            "size": "3.5 MB",
+                            "size": "5.7 MB",
                             "date": "29.10.2026",
                             "url": "https://elearn.informatik.uni-kiel.de/mod/resource/view.php?id=29996",
                         },
@@ -626,25 +793,166 @@ def get_default_course_materials() -> Dict[str, Any]:
     }
 
 
-def load_materials_data() -> Dict[str, Any]:
+def sync_ewinf_exercises_from_moodle(
+    data: Dict[str, Any],
+    opener: Optional[urllib.request.OpenerDirector] = None,
+) -> bool:
+    """
+    Live-scrapes https://elearn.informatik.uni-kiel.de/course/view.php?id=472#module-29808
+    for all 'Übung X' (X = 1, 2, ..., 20) PDF resources, downloads the genuine PDFs
+    into data/materials/infewinf-01a/, and updates data['infewinf-01a']['assignments'].
+    """
+    opener = opener or _build_moodle_opener()
+    if not opener:
+        return False
+
+    try:
+        course_html = opener.open(
+            "https://elearn.informatik.uni-kiel.de/course/view.php?id=472",
+            timeout=12,
+        ).read().decode("utf-8", "ignore")
+    except Exception:
+        return False
+
+    ewinf = data.setdefault("infewinf-01a", get_default_course_materials()["infewinf-01a"])
+    existing_by_num = {int(a.get("sheet_number", 0)): a for a in ewinf.get("assignments", []) if a.get("sheet_number")}
+    ewinf_dir = os.path.join(MATERIALS_DIR, "infewinf-01a")
+    os.makedirs(ewinf_dir, exist_ok=True)
+
+    changed = False
+    # Scan all modtype_resource blocks for 'Übung X' (excluding 'Lösung' / restricted items)
+    for mod in re.finditer(
+        r'<li\s+class="activity[^"]*modtype_resource[^"]*"\s+id="module-(\d+)"[^>]*>(.*?)</li>',
+        course_html,
+        re.S,
+    ):
+        mid, mbody = mod.group(1), mod.group(2)
+        if "Lösung" in mbody or "Not available unless" in mbody:
+            continue
+
+        link_m = re.search(
+            r'href="(https://elearn\.informatik\.uni-kiel\.de/mod/resource/view\.php\?id=(\d+))"[^>]*>(.*?)</a>',
+            mbody,
+            re.S,
+        )
+        if not link_m:
+            continue
+
+        res_url, res_id, raw_label = link_m.group(1), link_m.group(2), link_m.group(3)
+        clean_label = re.sub(r"\s+", " ", re.sub(r"<[^>]+>", " ", raw_label)).strip()
+        num_m = re.search(r"\b(?:Übung|Uebung)\s*(\d{1,2})\b", clean_label, re.IGNORECASE)
+        if not num_m:
+            continue
+
+        x = int(num_m.group(1))
+        if x < 1 or x > 25:
+            continue
+
+        pdf_fname = f"Übung {x}.pdf"
+        ascii_fname = f"Uebung_{x}.pdf"
+        pdf_path = os.path.join(ewinf_dir, pdf_fname)
+        ascii_path = os.path.join(ewinf_dir, ascii_fname)
+
+        size_kb_str = "PDF"
+        if os.path.exists(pdf_path) and os.path.getsize(pdf_path) > 4096:
+            size_kb_str = f"{round(os.path.getsize(pdf_path) / 1024)} KB"
+        else:
+            pdf_bytes = _download_moodle_pdf(res_url, opener=opener)
+            if pdf_bytes:
+                with open(pdf_path, "wb") as fp:
+                    fp.write(pdf_bytes)
+                with open(ascii_path, "wb") as fp:
+                    fp.write(pdf_bytes)
+                size_kb_str = f"{round(len(pdf_bytes) / 1024)} KB"
+                changed = True
+
+        if x not in existing_by_num:
+            # Compute default Thursday 10:15 exercise date based on sheet number
+            base_due = datetime(2026, 11, 5, 10, 15) + timedelta(days=7 * (x - 1))
+            new_entry = {
+                "id": f"ewinf-uebung-{x}",
+                "title": f"Übung {x} · Aufgabenblatt {x} (Einführung in die Wirtschaftsinformatik)",
+                "sheet_number": x,
+                "folder_path": f"Übungen (#module-29808) / Übung {x}",
+                "due_date": base_due.strftime("%Y-%m-%dT%H:%M:%S"),
+                "max_points": 0,
+                "status": "not_submitted",
+                "description": f"Offizielles Übungsblatt (Übung {x}) aus dem Moodle-Kursbereich #module-29808.",
+                "task_files": [
+                    {
+                        "name": pdf_fname,
+                        "size": size_kb_str,
+                        "ext": "pdf",
+                        "url": res_url,
+                    }
+                ],
+                "solution_files": [],
+                "submission_url": "https://elearn.informatik.uni-kiel.de/course/view.php?id=472#module-29808",
+            }
+            ewinf.setdefault("assignments", []).append(new_entry)
+            existing_by_num[x] = new_entry
+            changed = True
+        else:
+            entry = existing_by_num[x]
+            tfs = entry.get("task_files", [])
+            if not tfs or tfs[0].get("url") != res_url or tfs[0].get("name") != pdf_fname:
+                entry["task_files"] = [
+                    {
+                        "name": pdf_fname,
+                        "size": size_kb_str,
+                        "ext": "pdf",
+                        "url": res_url,
+                    }
+                ]
+                changed = True
+
+    return changed
+
+
+def load_materials_data(sync_live: bool = False) -> Dict[str, Any]:
     """Loads cached materials data from data/materials_cache.json or initializes defaults."""
+    defaults = get_default_course_materials()
     if os.path.exists(MATERIALS_CACHE_FILE):
         try:
             with open(MATERIALS_CACHE_FILE, "r", encoding="utf-8") as f:
                 data = json.load(f)
                 if data and isinstance(data, dict):
+                    dirty = False
                     # Ensure inf-math-a has the verified deadlines
                     if "inf-math-a" in data:
                         for a in data["inf-math-a"].get("assignments", []):
                             if a.get("id") == "math-bl01" and a.get("due_date") != "2026-10-30T20:00:00":
                                 a["due_date"] = "2026-10-30T20:00:00"
+                                dirty = True
                             if a.get("id") == "math-bl02" and a.get("due_date") != "2026-11-06T20:00:00":
                                 a["due_date"] = "2026-11-06T20:00:00"
+                                dirty = True
+
+                    # Migrate infewinf-01a to verified Übung X (#module-29808) structure
+                    ewinf_cached = data.get("infewinf-01a", {})
+                    ewinf_assign_ids = {a.get("id") for a in ewinf_cached.get("assignments", [])}
+                    if "ewinf-assign-01" in ewinf_assign_ids or "ewinf-uebung-2" not in ewinf_assign_ids:
+                        status_map = {
+                            a.get("sheet_number"): a.get("status", "not_submitted")
+                            for a in ewinf_cached.get("assignments", [])
+                        }
+                        data["infewinf-01a"] = defaults["infewinf-01a"]
+                        for a in data["infewinf-01a"]["assignments"]:
+                            if a.get("sheet_number") in status_map:
+                                a["status"] = status_map[a["sheet_number"]]
+                        dirty = True
+
+                    if sync_live and sync_ewinf_exercises_from_moodle(data):
+                        dirty = True
+
+                    if dirty:
+                        save_materials_data(data)
                     return data
         except Exception:
             pass
 
-    defaults = get_default_course_materials()
+    if sync_live:
+        sync_ewinf_exercises_from_moodle(defaults)
     save_materials_data(defaults)
     return defaults
 
@@ -690,14 +998,14 @@ COURSE_FOLDER_METADATA = {
 }
 
 
-def get_materials_overview() -> Dict[str, Any]:
+def get_materials_overview(sync_live: bool = False) -> Dict[str, Any]:
     """
     Returns an aggregated overview of all courses:
       - Upcoming deadlines sorted by urgency
       - Summary stats (open assignments, total slides)
       - Course summaries with Mac folder metadata
     """
-    data = load_materials_data()
+    data = load_materials_data(sync_live=sync_live)
     all_upcoming_assignments = []
     course_list = []
     total_open_assignments = 0
@@ -818,8 +1126,15 @@ def get_course_detail(course_id: str) -> Dict[str, Any]:
 
     # Build Mac Subfolders: strictly 2 clean folders per course
     subfolders = []
-    sub_title = "Übungsblätter (blXX.pdf)" if ckey == "inf-math-a" else "Hausaufgaben & Abgaben"
-    sub_count = f"{len(assignments_enriched)} Übungsblätter" if ckey == "inf-math-a" else f"{len(assignments_enriched)} Aufgabenblätter"
+    if ckey == "inf-math-a":
+        sub_title = "Übungsblätter (blXX.pdf)"
+        sub_count = f"{len(assignments_enriched)} Übungsblätter"
+    elif ckey == "infewinf-01a":
+        sub_title = "Übungen (Übung X)"
+        sub_count = f"{len(assignments_enriched)} Übungsblätter"
+    else:
+        sub_title = "Hausaufgaben & Abgaben"
+        sub_count = f"{len(assignments_enriched)} Aufgabenblätter"
     subfolders.append({
         "id": "assignments",
         "title": sub_title,

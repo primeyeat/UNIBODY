@@ -1,6 +1,7 @@
 """
-CAU Kiel LMS Course Sniper & Schedule Optimizer Server.
+UNIBODY – Inoffizieller Kurs-Sniper & Stundenplan-Optimizer (kompatibel mit Systemen der CAU Kiel).
 Zero-dependency Python HTTP + JSON API server with persistent state.
+Keine offizielle Anwendung der Christian-Albrechts-Universität zu Kiel.
 """
 
 import os
@@ -400,12 +401,21 @@ class CAUBotRequestHandler(SimpleHTTPRequestHandler):
     def log_message(self, format, *args):
         print(f"[HTTP] {format % args}", flush=True)
 
+    MAX_BODY_BYTES = 2 * 1024 * 1024  # 2 MB upper bound (NET-04)
+
     def _is_local_request(self) -> bool:
         host = self.headers.get("Host", "").split(":")[0].strip().lower()
         return host in ("127.0.0.1", "localhost", "")
 
     def _is_valid_origin(self) -> bool:
-        """Validates that mutating requests (POST) originate strictly from localhost to prevent CSRF."""
+        """
+        Validates that mutating requests (POST) originate strictly from localhost to prevent CSRF (NET-04).
+        Requires a valid localhost Origin/Referer if present, AND requires Content-Type: application/json
+        so browser <form> posts with referrerpolicy='no-referrer' are rejected.
+        """
+        ctype = (self.headers.get("Content-Type") or "").lower()
+        if not ctype.startswith("application/json"):
+            return False
         origin = self.headers.get("Origin") or self.headers.get("Referer") or ""
         if not origin:
             return True
@@ -446,9 +456,9 @@ class CAUBotRequestHandler(SimpleHTTPRequestHandler):
 
     def _read_json_body(self) -> Dict[str, Any]:
         length = int(self.headers.get("Content-Length", 0))
-        if length <= 0:
+        if length <= 0 or length > self.MAX_BODY_BYTES:
             return {}
-        body = self.rfile.read(length).decode("utf-8")
+        body = self.rfile.read(length).decode("utf-8", errors="replace")
         return json.loads(body) if body else {}
 
     def do_GET(self):
@@ -592,7 +602,9 @@ class CAUBotRequestHandler(SimpleHTTPRequestHandler):
         # CAU Materials & Assignments (Moodle + OpenOLAT)
         # ----------------------------------------------------
         if path == "/api/materials/overview":
-            res = get_materials_overview()
+            qs = parse_qs(parsed.query)
+            sync_live = qs.get("sync", ["0"])[0] in ("1", "true", "yes")
+            res = get_materials_overview(sync_live=sync_live)
             self._send_json(res)
             return
 
@@ -616,10 +628,23 @@ class CAUBotRequestHandler(SimpleHTTPRequestHandler):
                 self.send_error(404, f"Datei '{fname}' nicht gefunden")
                 return
 
+            ascii_name = (
+                safe_name.replace("Ü", "Ue").replace("ü", "ue")
+                .replace("Ä", "Ae").replace("ä", "ae")
+                .replace("Ö", "Oe").replace("ö", "oe")
+                .replace("ß", "ss")
+                .encode("ascii", "ignore").decode("ascii")
+            ) or "document.pdf"
+            from urllib.parse import quote as url_quote
+            utf8_quoted = url_quote(safe_name)
+
             self.send_response(200)
             self.send_header("Content-Type", ctype or "application/pdf")
             self.send_header("Content-Length", str(len(payload)))
-            self.send_header("Content-Disposition", f'attachment; filename="{safe_name}"')
+            self.send_header(
+                "Content-Disposition",
+                f'attachment; filename="{ascii_name}"; filename*=UTF-8\'\'{utf8_quoted}',
+            )
             self._set_cors_headers()
             self.end_headers()
             self.wfile.write(payload)
@@ -1403,7 +1428,7 @@ def run_server(port: int = 8765):
     # Prevents any other device on the same local network / WiFi from accessing UNIBODY.
     server = ThreadingHTTPServer(("127.0.0.1", port), CAUBotRequestHandler)
     server.daemon_threads = True
-    print(f"CAU Kiel LMS Sniper & Schedule Optimizer running on http://127.0.0.1:{port} and http://localhost:{port}")
+    print(f"UNIBODY (Inoffizielles Studierenden-Tool) running on http://127.0.0.1:{port} and http://localhost:{port}")
     try:
         server.serve_forever()
     except KeyboardInterrupt:

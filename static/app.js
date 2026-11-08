@@ -304,7 +304,7 @@ function syncCredentialsUI(creds, isInitial = false) {
   if (topBtn) {
     topBtn.textContent = isSaved
       ? `🔑 Auto-Login: ${creds.username}`
-      : "🔑 CAU Account hinterlegen";
+      : "🔑 Uni-Kennung hinterlegen";
   }
 
   // On initial load, if credentials are already saved, collapse the form so it stays compact
@@ -3895,9 +3895,10 @@ async function initMaterialsClient() {
   await renderFinder();
 }
 
-async function updateMaterialsBadgeAndStatus() {
+async function updateMaterialsBadgeAndStatus(sync = false) {
   try {
-    const res = await apiGet("/api/materials/overview");
+    const url = sync ? "/api/materials/overview?sync=1" : "/api/materials/overview";
+    const res = await apiGet(url);
     if (!res || !res.ok) return;
 
     finderState.overview = res;
@@ -4074,7 +4075,7 @@ async function renderFinder() {
     bodyEl.innerHTML = `
       <div class="finder-section-title">
         <span>📁</span>
-        <span>Meine CAU-Module &amp; Semesterordner</span>
+        <span>Meine Studienmodule &amp; Semesterordner (Inoffizielles Tool)</span>
         <span class="feature-beta-tag">BETA</span>
       </div>
       <div class="finder-grid-container">
@@ -4290,7 +4291,7 @@ function getCourseBannerHtml(courseDetail, currentSubfolder = null) {
       <div class="fcb-left">
         <div class="fcb-title-row">
           <span class="fcb-platform-badge" style="background: ${isMoodle ? "#0070d6" : "#248a3d"};">
-            ${isMoodle ? "💻 Info-Moodle" : "🏛️ CAU OpenOLAT"}
+            ${isMoodle ? "💻 Info-Moodle" : "🏛️ OpenOLAT"}
           </span>
           <h3>${escapeHtml(courseDetail.title)}</h3>
           ${currentSubfolder ? `
@@ -4538,7 +4539,10 @@ function bindSlideEvents(container, courseId, items) {
 
 function renderAssignmentCardHtml(a, courseId) {
   const isSubmitted = a.status === "submitted" || a.status === "graded";
-  const sheetNum = a.sheet_number ? `Blatt ${String(a.sheet_number).padStart(2, "0")}` : "Aufgabe";
+  const rawCid = (courseId || a.course_id || "").toLowerCase();
+  const sheetNum = a.sheet_number
+    ? (rawCid === "infewinf-01a" ? `Übung ${a.sheet_number}` : `Blatt ${String(a.sheet_number).padStart(2, "0")}`)
+    : "Aufgabe";
   const maxPts = a.max_points ? `${a.max_points} Pkt.` : "";
   const countdown = a.deadline?.due_countdown || "Offen";
   const dueFmt = a.deadline?.due_formatted || "";
@@ -4660,9 +4664,9 @@ function bindMaterialsUIEvents() {
   // Refresh button
   document.getElementById("btnMaterialsRefresh")?.addEventListener("click", async () => {
     const btn = document.getElementById("btnMaterialsRefresh");
-    if (btn) btn.textContent = "🔄 Lädt...";
+    if (btn) btn.textContent = "🔄 Synchronisiere...";
     finderState.courseDetailsCache = {};
-    await updateMaterialsBadgeAndStatus();
+    await updateMaterialsBadgeAndStatus(true);
     await renderFinder();
     if (btn) btn.textContent = "🔄 Aktualisieren";
   });

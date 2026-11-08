@@ -368,8 +368,9 @@ private struct LiveDeepSyncWebView: UIViewRepresentable {
         func startDeepSync() {
             guard let wv = webView else { return }
             
-            // Prioritize courses that have exercise groups
-            coursesToScan = parent.courses.filter { !$0.isLectureOnly }
+            // Scan all courses that have exercise groups
+            let allExerciseCourses = parent.courses.filter { !$0.isLectureOnly }
+            coursesToScan = allExerciseCourses
             currentCourseIndex = 0
             currentCourseTicks = 0
             detectedMatches.removeAll()
@@ -380,10 +381,21 @@ private struct LiveDeepSyncWebView: UIViewRepresentable {
                 return
             }
             
+            let effectiveUser = parent.username.trimmingCharacters(in: .whitespacesAndNewlines)
+            let effectivePass = parent.password
+            
+            // Sync EWInf #module-29808 exercise PDFs in background
+            Task { @MainActor in
+                await CourseMaterialsService.shared.syncEWInfExercisesFromMoodle(
+                    username: effectiveUser,
+                    password: effectivePass
+                )
+            }
+            
             loadCurrentCourse()
             
             pollTimer?.invalidate()
-            let timer = Timer(timeInterval: 0.40, repeats: true) { [weak self] _ in
+            let timer = Timer(timeInterval: 0.25, repeats: true) { [weak self] _ in
                 self?.runDeepSyncStep()
             }
             RunLoop.main.add(timer, forMode: .common)
@@ -399,9 +411,9 @@ private struct LiveDeepSyncWebView: UIViewRepresentable {
             currentCourseTicks = 0
             let course = coursesToScan[currentCourseIndex]
             let fraction = Double(currentCourseIndex) / Double(max(1, coursesToScan.count))
-            let prog = 0.20 + fraction * 0.70
+            let prog = 0.15 + fraction * 0.80
             
-            parent.onStatusUpdate("Öffne \(course.title)... (\(currentCourseIndex + 1)/\(coursesToScan.count))", prog)
+            parent.onStatusUpdate("Prüfe \(course.title)... (\(currentCourseIndex + 1)/\(coursesToScan.count))", prog)
             wv.load(URLRequest(url: course.targetEnrollmentURL))
         }
         
@@ -414,6 +426,14 @@ private struct LiveDeepSyncWebView: UIViewRepresentable {
             }
         }
         
+        func webView(_ webView: WKWebView, decidePolicyFor navigationAction: WKNavigationAction, decisionHandler: @escaping (WKNavigationActionPolicy) -> Void) {
+            if KeychainHelper.isTrustedCAUURL(navigationAction.request.url) {
+                decisionHandler(.allow)
+            } else {
+                decisionHandler(.cancel)
+            }
+        }
+        
         func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
             runDeepSyncStep()
         }
@@ -422,6 +442,11 @@ private struct LiveDeepSyncWebView: UIViewRepresentable {
             guard !hasSucceeded, let wv = webView else { return }
             guard currentCourseIndex < coursesToScan.count else {
                 finishSuccess()
+                return
+            }
+            
+            // NET-02: Only evaluate credentials/DOM scripts when the WebView is on a verified CAU/DFN domain
+            if let curURL = wv.url, !KeychainHelper.isTrustedCAUURL(curURL) {
                 return
             }
             
@@ -438,8 +463,8 @@ private struct LiveDeepSyncWebView: UIViewRepresentable {
             
             let course = coursesToScan[currentCourseIndex]
             
-            // Timeout per course: If after ~30 ticks (12.0s) nothing found, move to next course
-            if currentCourseTicks > 30 {
+            // Timeout per course: If after ~45 ticks (~11.2s) nothing found, move to next course
+            if currentCourseTicks > 45 {
                 advanceToNextCourse()
                 return
             }
@@ -453,7 +478,8 @@ private struct LiveDeepSyncWebView: UIViewRepresentable {
                     "dayName": g.dayName,
                     "startTime": g.startTime,
                     "endTime": g.endTime,
-                    "room": g.room
+                    "room": g.room,
+                    "weekType": g.weekType
                 ])
             }
             
@@ -475,6 +501,10 @@ private struct LiveDeepSyncWebView: UIViewRepresentable {
             
             let js = """
             (function() {
+                const host = (window.location.hostname || '').toLowerCase();
+                if (!host.endsWith('uni-kiel.de') && !host.endsWith('dfn.de')) {
+                    return { action: "UNTRUSTED_HOST" };
+                }
                 const PARAMS = \(jsonString);
                 const USERNAME = PARAMS.username;
                 const PASSWORD = PARAMS.password;
@@ -600,10 +630,6 @@ private struct LiveDeepSyncWebView: UIViewRepresentable {
                         });
                         if (ubOpener) {
                             const a = ubOpener.closest('a') || ubOpener;
-                            let code = (a.getAttribute('onclick') || '').replace(/return\\s+false\\s*;?/g, '');
-                            if (code) {
-                                try { (new Function(code)).call(a); } catch(e) {}
-                            }
                             try { a.click(); } catch(e) {}
                         }
                     }
@@ -665,7 +691,7 @@ private struct LiveDeepSyncWebView: UIViewRepresentable {
                     if (target) {
                         const a = target.closest('a') || target;
                         const now = Date.now();
-                        if (!window.__lastTreeClick || (now - window.__lastTreeClick > 1800)) {
+                        if (!window.__lastTreeClick || (now - window.__lastTreeClick > 1100)) {
                             window.__lastTreeClick = now;
                             let code = (a.getAttribute('onclick') || '').replace(/return\\s+false\\s*;?/g, '');
                             if (code) {
@@ -683,7 +709,7 @@ private struct LiveDeepSyncWebView: UIViewRepresentable {
                     return null;
                 }
                 
-                // 4. FIND EXERCISE TABLE (Must have real group rows like "Gruppe 1", "Gr. 05", etc.)
+                // 4. FIND EXERCISE TABLE (Must have real group rows like "Gruppe 1", "Gr. 04", etc.)
                 function findExerciseTable() {
                     const tables = Array.from(document.querySelectorAll('table.o_table, table.table'));
                     for (const t of tables) {
@@ -733,38 +759,75 @@ private struct LiveDeepSyncWebView: UIViewRepresentable {
                                 const rawName = tds[0] || (tr.querySelector('td') ? tr.querySelector('td').innerText : '');
                                 const rawDesc = tds[1] || '';
                                 const combined = `${rawName} ${rawDesc}`;
+                                const lowerComb = combined.toLowerCase();
                                 
                                 // Reject if it's just the course container
                                 if (combined.includes('26/27') && !/gruppe|gr\\./i.test(combined)) {
                                     continue;
                                 }
                                 
-                                const slot = parseGermanTimeslot(combined);
+                                const cleanTimeSource = combined.replace(/\\b\\d{4,}\\b/g, ' ');
+                                const slot = parseGermanTimeslot(cleanTimeSource);
                                 
-                                // Extract exact room if present
-                                let room = "CAU Campus";
+                                // Match directly against COURSE.groups by UnivIS ID, Group Number, or Timeslot
+                                let matchedCatGrp = null;
+                                if (Array.isArray(COURSE.groups)) {
+                                    // 1. Exact groupId / UnivIS token match (e.g. "060397", "060102", "030189")
+                                    for (const cg of COURSE.groups) {
+                                        const gid = String(cg.groupId || '').toLowerCase();
+                                        const baseGid = gid.split('-')[0];
+                                        if ((gid && lowerComb.includes(gid)) || (baseGid.length >= 5 && lowerComb.includes(baseGid))) {
+                                            matchedCatGrp = cg;
+                                            break;
+                                        }
+                                    }
+                                    // 2. Group number match (e.g. "2026W MatheA - Gr. 04" -> 4, "EBWL Übung Gruppe 2" -> 2)
+                                    if (!matchedCatGrp) {
+                                        const numM = rawName.match(/(?:übungsgruppe|gruppe|gr\\.?|übung|tutorium)\\s*0*(\\d+)/i);
+                                        if (numM) {
+                                            const gNum = parseInt(numM[1], 10);
+                                            for (const cg of COURSE.groups) {
+                                                const cgM = String(cg.name || '').match(/(?:übungsgruppe|gruppe|gr\\.?|übung|tutorium)\\s*0*(\\d+)/i);
+                                                if (cgM && parseInt(cgM[1], 10) === gNum) {
+                                                    matchedCatGrp = cg;
+                                                    break;
+                                                }
+                                            }
+                                            if (!matchedCatGrp && gNum >= 1 && gNum <= COURSE.groups.length) {
+                                                matchedCatGrp = COURSE.groups[gNum - 1];
+                                            }
+                                        }
+                                    }
+                                    // 3. Timeslot match
+                                    if (!matchedCatGrp && slot) {
+                                        matchedCatGrp = COURSE.groups.find(cg => cg.day === slot.day && cg.startTime === slot.startTime) || null;
+                                    }
+                                }
+                                
+                                let room = matchedCatGrp ? matchedCatGrp.room : "CAU Campus";
                                 const roomMatch = combined.match(/([a-z0-9]+\\s*-\\s*r\\.[a-z0-9./üäö]+|[a-z0-9]+\\s*-\\s*hörsaal\\s*\\d+|cap\\d+\\s*-\\s*[^\\n,]+)/i);
-                                if (roomMatch) {
+                                if (!matchedCatGrp && roomMatch) {
                                     room = roomMatch[1].trim();
                                 }
                                 
-                                // Extract weekType if present
-                                let weekType = "all";
-                                if (/(?:woche\\s*a|\\bw1\\b|29\\.10|30\\.10)/i.test(combined)) {
-                                    weekType = "A";
-                                } else if (/(?:woche\\s*b|\\bw2\\b|05\\.11|06\\.11)/i.test(combined)) {
-                                    weekType = "B";
+                                let weekType = matchedCatGrp ? (matchedCatGrp.weekType || "all") : "all";
+                                if (!matchedCatGrp) {
+                                    if (/(?:woche\\s*a|\\bw1\\b|29\\.10|30\\.10)/i.test(combined)) {
+                                        weekType = "A";
+                                    } else if (/(?:woche\\s*b|\\bw2\\b|05\\.11|06\\.11)/i.test(combined)) {
+                                        weekType = "B";
+                                    }
                                 }
                                 
-                                // Fallback timeslot for recognized EBWL Gruppe 2 if text parsing missed:
-                                let day = slot ? slot.day : (rawName.toLowerCase().includes('gruppe 2') ? 3 : 0);
-                                let dayName = slot ? slot.dayName : (rawName.toLowerCase().includes('gruppe 2') ? "Donnerstag" : "Montag");
-                                let startTime = slot ? slot.startTime : (rawName.toLowerCase().includes('gruppe 2') ? "12:15" : "10:15");
-                                let endTime = slot ? slot.endTime : (rawName.toLowerCase().includes('gruppe 2') ? "13:45" : "11:45");
-                                let time = slot ? slot.time : `${startTime}–${endTime}`;
+                                let day = matchedCatGrp ? matchedCatGrp.day : (slot ? slot.day : (rawName.toLowerCase().includes('gruppe 2') ? 3 : 0));
+                                let dayName = matchedCatGrp ? matchedCatGrp.dayName : (slot ? slot.dayName : (rawName.toLowerCase().includes('gruppe 2') ? "Donnerstag" : "Montag"));
+                                let startTime = matchedCatGrp ? matchedCatGrp.startTime : (slot ? slot.startTime : (rawName.toLowerCase().includes('gruppe 2') ? "12:15" : "10:15"));
+                                let endTime = matchedCatGrp ? matchedCatGrp.endTime : (slot ? slot.endTime : (rawName.toLowerCase().includes('gruppe 2') ? "13:45" : "11:45"));
+                                let time = `${startTime}–${endTime}`;
                                 
                                 enrolledRowFound = {
-                                    groupName: rawName.replace(/\\s+/g, ' ').trim(),
+                                    groupId: matchedCatGrp ? matchedCatGrp.groupId : "",
+                                    groupName: matchedCatGrp ? matchedCatGrp.name : rawName.replace(/\\s+/g, ' ').trim(),
                                     day: day,
                                     dayName: dayName,
                                     startTime: startTime,
@@ -772,7 +835,7 @@ private struct LiveDeepSyncWebView: UIViewRepresentable {
                                     time: time,
                                     room: room,
                                     weekType: weekType,
-                                    hasSlot: slot !== null || rawName.toLowerCase().includes('gruppe 2')
+                                    hasSlot: matchedCatGrp !== null || slot !== null || rawName.toLowerCase().includes('gruppe 2')
                                 };
                                 break;
                             }
@@ -806,11 +869,20 @@ private struct LiveDeepSyncWebView: UIViewRepresentable {
 
                     const choiceTable = document.querySelector('table.choicegroups, form.tableform table');
                     const checkedRadio = document.querySelector('form input[type="radio"]:checked, input[name="answer"]:checked');
-                    if (checkedRadio) {
-                        const tr = checkedRadio.closest('tr, label, div') || document.body;
-                        const lbl = tr.querySelector('label');
-                        const rawName = (lbl ? lbl.innerText : (tr.innerText || '').split('\\n')[0] || "Moodle Übung").replace(/\\s+/g, ' ').trim();
-                        const rowText = (tr.innerText || '').replace(/\\s+/g, ' ').trim();
+                    const yourSelBox = document.querySelector('#yourselection, .yourselection');
+                    if (checkedRadio || yourSelBox) {
+                        let rawName = "Moodle Übung";
+                        let rowText = "";
+                        if (checkedRadio) {
+                            const tr = checkedRadio.closest('tr, label, div') || document.body;
+                            const lbl = tr.querySelector('label');
+                            rawName = (lbl ? lbl.innerText : (tr.innerText || '').split('\\n')[0] || "Moodle Übung").replace(/\\s+/g, ' ').trim();
+                            rowText = (tr.innerText || '').replace(/\\s+/g, ' ').trim();
+                        } else if (yourSelBox) {
+                            rowText = (yourSelBox.innerText || '').replace(/\\s+/g, ' ').trim();
+                            const mSel = rowText.match(/((?:übungsgruppe|gruppe|übung|tutorium)\\s*0*\\d+)/i);
+                            rawName = mSel ? mSel[1] : rowText;
+                        }
 
                         // Also check #intro / .activity-description for matching group timeslot (e.g. "Übungsgruppe 3: Mittwoch 10:15-11:45 Uhr")
                         const introEl = document.querySelector('#intro, .activity-description');
@@ -889,8 +961,12 @@ private struct LiveDeepSyncWebView: UIViewRepresentable {
                 let msg = dict["msg"] as? String ?? ""
                 
                 switch action {
-                case "LOGIN_STEP1", "LOGIN_STEP2", "LOGIN_GENERIC", "CLICKED_NODE":
-                    self.parent.onStatusUpdate(msg, 0.40)
+                case "LOGIN_STEP1", "LOGIN_STEP2", "LOGIN_GENERIC":
+                    self.currentCourseTicks = 0
+                    self.parent.onStatusUpdate(msg, 0.35)
+                case "CLICKED_NODE":
+                    self.currentCourseTicks = min(self.currentCourseTicks, 12)
+                    self.parent.onStatusUpdate(msg, 0.45)
                 case "SCANNED_COURSE_TABLE":
                     let course = self.coursesToScan[self.currentCourseIndex]
                     if let rawEnrolled = dict["enrolled"] as? [String: Any] {

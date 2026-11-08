@@ -34,6 +34,14 @@ public class LMSMobileEngine: NSObject, ObservableObject, WKNavigationDelegate {
     }
     
     // MARK: - WKNavigationDelegate
+    public func webView(_ webView: WKWebView, decidePolicyFor navigationAction: WKNavigationAction, decisionHandler: @escaping (WKNavigationActionPolicy) -> Void) {
+        if KeychainHelper.isTrustedCAUURL(navigationAction.request.url) {
+            decisionHandler(.allow)
+        } else {
+            decisionHandler(.cancel)
+        }
+    }
+    
     public func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
         navigationTimeoutWorkItem?.cancel()
         if let cont = navigationContinuation {
@@ -205,20 +213,22 @@ public class LMSMobileEngine: NSObject, ObservableObject, WKNavigationDelegate {
         self.currentStatus = "Wähle '\(group.name)'..."
         self.progress = 0.75
         
-        let escapedName = group.name.replacingOccurrences(of: "'", with: "\\'")
-        let escapedId = group.groupId.replacingOccurrences(of: "'", with: "\\'")
+        let safeNameJS = KeychainHelper.jsStringLiteral(group.name.lowercased())
+        let safeIdJS = KeychainHelper.jsStringLiteral(group.groupId.lowercased())
+        let safeDayJS = KeychainHelper.jsStringLiteral(group.dayName.lowercased())
         
         let enrollJS = """
         (function() {
             const table = document.querySelector('table.o_table, table.table');
             if (!table) return 'NO_TABLE';
             const rows = Array.from(table.querySelectorAll('tbody tr'));
-            const targetName = '\(escapedName)'.toLowerCase();
-            const targetId = '\(escapedId)'.toLowerCase();
+            const targetName = \(safeNameJS);
+            const targetId = \(safeIdJS);
+            const targetDay = \(safeDayJS);
             
             for (let tr of rows) {
                 const text = (tr.innerText || '').toLowerCase();
-                if (text.includes(targetName) || (targetId && text.includes(targetId)) || text.includes('\(group.dayName.lowercased())')) {
+                if (text.includes(targetName) || (targetId && text.includes(targetId)) || text.includes(targetDay)) {
                     const enrollBtn = tr.querySelector('a[onclick*="cmd.enrolled.add"], a[onclick*="cmd.enroll"]') ||
                                       Array.from(tr.querySelectorAll('a')).find(a => /einschreiben/i.test(a.innerText || ''));
                     if (enrollBtn) {
@@ -357,18 +367,21 @@ public class LMSMobileEngine: NSObject, ObservableObject, WKNavigationDelegate {
     }
     
     private func attemptLoginIfPresent(username: String, password: String) async {
-        let escapedUser = username.replacingOccurrences(of: "'", with: "\\'")
-        let escapedPass = password.replacingOccurrences(of: "'", with: "\\'")
+        guard let curURL = webView?.url, KeychainHelper.isTrustedCAUURL(curURL) else { return }
+        let safeUserJS = KeychainHelper.jsStringLiteral(username)
+        let safePassJS = KeychainHelper.jsStringLiteral(password)
         
         let loginJS = """
         (function() {
+            const host = (window.location.hostname || '').toLowerCase();
+            if (!host.endsWith('uni-kiel.de') && !host.endsWith('dfn.de')) return 'UNTRUSTED_HOST';
             const userField = document.querySelector('input[name="username"], input[name="login"], input#username, input#login_input, input#j_username');
             const passField = document.querySelector('input[name="password"], input#password, input#pass, input#j_password');
             if (userField && passField) {
-                userField.value = '\(escapedUser)';
+                userField.value = \(safeUserJS);
                 userField.dispatchEvent(new Event('input', { bubbles: true }));
                 userField.dispatchEvent(new Event('change', { bubbles: true }));
-                passField.value = '\(escapedPass)';
+                passField.value = \(safePassJS);
                 passField.dispatchEvent(new Event('input', { bubbles: true }));
                 passField.dispatchEvent(new Event('change', { bubbles: true }));
                 const submitBtn = document.querySelector('button[type="submit"], input[type="submit"], button.btn-primary');

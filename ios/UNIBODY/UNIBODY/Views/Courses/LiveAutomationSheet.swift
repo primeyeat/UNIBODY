@@ -246,6 +246,14 @@ private struct LiveAutomationWebView: UIViewRepresentable {
             self.pollTimer = timer
         }
         
+        func webView(_ webView: WKWebView, decidePolicyFor navigationAction: WKNavigationAction, decisionHandler: @escaping (WKNavigationActionPolicy) -> Void) {
+            if KeychainHelper.isTrustedCAUURL(navigationAction.request.url) {
+                decisionHandler(.allow)
+            } else {
+                decisionHandler(.cancel)
+            }
+        }
+        
         func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
             runAutomationStep()
         }
@@ -253,6 +261,11 @@ private struct LiveAutomationWebView: UIViewRepresentable {
         private func runAutomationStep() {
             guard !hasSucceeded, let wv = webView else { return }
             stepCounter += 1
+            
+            // NET-02: Only evaluate credentials/DOM scripts when the WebView is on a verified CAU/DFN domain
+            if let curURL = wv.url, !KeychainHelper.isTrustedCAUURL(curURL) {
+                return
+            }
             
             let effectiveUser = parent.username.trimmingCharacters(in: .whitespacesAndNewlines)
             let effectivePass = parent.password
@@ -278,6 +291,10 @@ private struct LiveAutomationWebView: UIViewRepresentable {
             
             let js = """
             (function() {
+                const host = (window.location.hostname || '').toLowerCase();
+                if (!host.endsWith('uni-kiel.de') && !host.endsWith('dfn.de')) {
+                    return { action: "UNTRUSTED_HOST" };
+                }
                 const PARAMS = \(jsonString);
                 const USERNAME = PARAMS.username;
                 const PASSWORD = PARAMS.password;
