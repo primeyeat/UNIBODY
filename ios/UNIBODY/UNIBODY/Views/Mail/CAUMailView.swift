@@ -89,7 +89,7 @@ public struct CAUMailView: View {
                             .foregroundColor(.secondary)
                         TextField("E-Mails nach Modul, Dozent oder Betreff filtern...", text: $searchQuery)
                             .font(.caption)
-                            .foregroundColor(.white)
+                            .foregroundColor(.primary)
                             .autocorrectionDisabled()
                         if !searchQuery.isEmpty {
                             Button {
@@ -99,6 +99,7 @@ public struct CAUMailView: View {
                                     .font(.caption)
                                     .foregroundColor(.secondary)
                             }
+                            .accessibilityLabel("Suche leeren")
                             .buttonStyle(.plain)
                         }
                     }
@@ -117,7 +118,7 @@ public struct CAUMailView: View {
                                 .foregroundColor(AeroTheme.skyBlue.opacity(0.6))
                             Text("Keine E-Mails in diesem Ordner")
                                 .font(.headline)
-                                .foregroundColor(.white)
+                                .foregroundColor(.primary)
                             Text("Verbinde dein Studierenden-Postfach (imap.mail.uni-kiel.de:993 SSL · Inoffizieller Client) oder ziehe nach unten zum Aktualisieren.")
                                 .font(.caption)
                                 .foregroundColor(.secondary)
@@ -172,6 +173,7 @@ public struct CAUMailView: View {
                                 .foregroundColor(AeroTheme.skyBlue)
                         }
                     }
+                    .accessibilityLabel("Postfach aktualisieren")
                 }
             }
             .sheet(item: $selectedMessage) { msg in
@@ -234,7 +236,7 @@ private struct CAUMailRowCard: View {
                     HStack {
                         Text(message.senderName)
                             .font(.system(.subheadline, design: .rounded).weight(message.isUnread ? .bold : .semibold))
-                            .foregroundColor(.white)
+                            .foregroundColor(.primary)
                             .lineLimit(1)
                         Spacer()
                         Text(message.date)
@@ -248,7 +250,7 @@ private struct CAUMailRowCard: View {
 
                     Text(message.subject)
                         .font(.system(.caption, design: .rounded).weight(message.isUnread ? .bold : .medium))
-                        .foregroundColor(.white.opacity(0.95))
+                        .foregroundColor(.primary.opacity(0.95))
                         .lineLimit(2)
 
                     Text(message.snippet)
@@ -314,7 +316,7 @@ private struct CAUMailDetailSheet: View {
 
                             Text(message.subject)
                                 .font(.system(.headline, design: .rounded).weight(.bold))
-                                .foregroundColor(.white)
+                                .foregroundColor(.primary)
 
                             Divider().background(Color.white.opacity(0.15))
 
@@ -331,7 +333,7 @@ private struct CAUMailDetailSheet: View {
                                 VStack(alignment: .leading, spacing: 2) {
                                     Text(message.senderName)
                                         .font(.subheadline.weight(.bold))
-                                        .foregroundColor(.white)
+                                        .foregroundColor(.primary)
                                     Text(message.senderEmail)
                                         .font(.caption2)
                                         .foregroundColor(.secondary)
@@ -358,7 +360,7 @@ private struct CAUMailDetailSheet: View {
                                             VStack(alignment: .leading, spacing: 2) {
                                                 Text(att.filename)
                                                     .font(.caption.weight(.bold))
-                                                    .foregroundColor(.white)
+                                                    .foregroundColor(.primary)
                                                 Text("\(att.size) · Direkt in UNIBODY öffnen")
                                                     .font(.caption2)
                                                     .foregroundColor(.secondary)
@@ -378,7 +380,7 @@ private struct CAUMailDetailSheet: View {
                         // Sanitized Mail Body
                         Text(message.bodyText)
                             .font(.system(.subheadline, design: .default))
-                            .foregroundColor(.white.opacity(0.92))
+                            .foregroundColor(.primary.opacity(0.92))
                             .lineSpacing(4)
                             .padding(16)
                             .frame(maxWidth: .infinity, alignment: .leading)

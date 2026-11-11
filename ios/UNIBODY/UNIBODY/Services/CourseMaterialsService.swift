@@ -194,6 +194,7 @@ public class CourseMaterialsService: ObservableObject {
         config.httpCookieStorage = HTTPCookieStorage.shared
         self.session = URLSession(configuration: config)
         loadBuiltInMaterials()
+        restorePersistedCourses()
     }
 
     // MARK: - Unicode & Path Sanitization (SEC-03)
@@ -644,6 +645,7 @@ public class CourseMaterialsService: ObservableObject {
             completedIds.remove(homeworkId)
         }
         UserDefaults.standard.set(Array(completedIds), forKey: kCompletedHomeworkKey)
+        persistCourses()
 
         #if canImport(UIKit)
         UIImpactFeedbackGenerator(style: .light).impactOccurred()
@@ -758,6 +760,10 @@ public class CourseMaterialsService: ObservableObject {
         } catch {
             print("Moodle EWInf exercise sync error: \(error.localizedDescription)")
         }
+    }
+
+    fileprivate func authenticateMoodleSessionForSync(username: String, password: String) async -> Bool {
+        await authenticateMoodleSession(username: username, password: password)
     }
 
     private func authenticateMoodleSession(username: String, password: String) async -> Bool {
@@ -923,5 +929,290 @@ public class CourseMaterialsService: ObservableObject {
         #else
         return nil
         #endif
+    }
+}
+
+
+// MARK: - Persistence & live sync for ALL courses (Moodle via URLSession, OpenOlat via on-device crawler)
+
+extension CourseMaterialsService {
+
+    private static let moodleHost = "elearn.informatik.uni-kiel.de"
+    private static let openOlatHost = "lms.uni-kiel.de"
+
+    private static var coursesFileURL: URL? {
+        guard let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first else { return nil }
+        return base.appendingPathComponent("UNIBODY", isDirectory: true).appendingPathComponent("materials.json")
+    }
+
+    /// Restores the synced course materials from disk. Built-in courses missing in the saved file are kept.
+    func restorePersistedCourses() {
+        guard let url = Self.coursesFileURL,
+              let data = try? Data(contentsOf: url),
+              let saved = try? JSONDecoder().decode([MaterialCourse].self, from: data), !saved.isEmpty else { return }
+        let savedIds = Set(saved.map { $0.courseId.lowercased() })
+        courses = saved + courses.filter { !savedIds.contains($0.courseId.lowercased()) }
+    }
+
+    func persistCourses() {
+        guard let url = Self.coursesFileURL, let data = try? JSONEncoder().encode(courses) else { return }
+        try? FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try? data.write(to: url, options: [.atomic, .completeFileProtectionUnlessOpen])
+        ReminderService.shared.materialsChanged()
+    }
+
+    // MARK: Classification helpers
+
+    private static func firstMatch(_ pattern: String, in text: String, group: Int = 1) -> String? {
+        guard let regex = try? NSRegularExpression(pattern: pattern, options: [.caseInsensitive]) else { return nil }
+        let ns = text as NSString
+        guard let match = regex.firstMatch(in: text, range: NSRange(location: 0, length: ns.length)),
+              match.numberOfRanges > group, match.range(at: group).location != NSNotFound else { return nil }
+        return ns.substring(with: match.range(at: group))
+    }
+
+    static func sheetNumber(in text: String) -> Int? {
+        if let n = firstMatch(#"\b(?:bl|pr)[-_]?0*(\d+)"#, in: text) { return Int(n) }
+        if let n = firstMatch(#"(?:blatt|übung|uebung|aufgabe|hausaufgabe|assignment|serie)\s*#?\s*0*(\d+)"#, in: text) { return Int(n) }
+        return nil
+    }
+
+    static func isSolution(_ text: String) -> Bool {
+        firstMatch(#"(l(?:ö|oe)sung|solution|musterl)"#, in: text, group: 1) != nil
+    }
+
+    static func isExerciseSheet(_ text: String) -> Bool {
+        firstMatch(#"(\b(?:bl|pr)[-_]?\d+|blatt|übung|uebung|hausaufgabe|aufgabe|assignment|serie)"#, in: text, group: 1) != nil
+    }
+
+    private static func decodeEntities(_ text: String) -> String {
+        text.replacingOccurrences(of: "&amp;", with: "&")
+            .replacingOccurrences(of: "&nbsp;", with: " ")
+            .replacingOccurrences(of: "&quot;", with: "\"")
+            .replacingOccurrences(of: "&#039;", with: "'")
+    }
+
+    private func knownURLs(of course: MaterialCourse) -> Set<String> {
+        Set(course.homework.map { $0.downloadUrl } + course.lectureSlides.map { $0.url })
+    }
+
+    /// Files one discovered document into the course. Returns true if something new was added.
+    private func registerFile(courseIndex: Int, id: String, label: String, filename: String, url: String, size: String = "PDF") -> Bool {
+        let combined = "\(label) \(filename)"
+        let today = ISO8601DateFormatter().string(from: Date()).prefix(10)
+
+        if Self.isSolution(combined) {
+            courses[courseIndex].lectureSlides.append(
+                LectureSlideItem(id: id, title: label, filename: filename, date: String(today), pages: 0, size: size, url: url, chapterBadge: "LÖSUNG")
+            )
+            return true
+        }
+        if Self.isExerciseSheet(combined) {
+            courses[courseIndex].homework.append(
+                HomeworkItem(
+                    id: id,
+                    title: label,
+                    filename: filename,
+                    releaseDate: String(today),
+                    deadline: nil,
+                    status: "pending",
+                    pointsMax: 0,
+                    submissionFormat: "Beim Live-Abgleich im Kursraum gefunden",
+                    description: "Aufgabenblatt aus dem Kursraum (\(courses[courseIndex].platformHost)).",
+                    subtasks: [],
+                    fileSize: size,
+                    downloadUrl: url,
+                    completed: false
+                )
+            )
+            return true
+        }
+        courses[courseIndex].lectureSlides.append(
+            LectureSlideItem(id: id, title: label, filename: filename, date: String(today), pages: 0, size: size, url: url, chapterBadge: "LIVE")
+        )
+        return true
+    }
+
+    // MARK: Moodle (any course)
+
+    private func fetchMoodleHTML(_ urlString: String) async -> String? {
+        guard let url = URL(string: urlString), url.host?.lowercased() == Self.moodleHost else { return nil }
+        var request = URLRequest(url: url)
+        request.timeoutInterval = 10
+        guard let (data, _) = try? await session.data(for: request) else { return nil }
+        return String(data: data, encoding: .utf8) ?? String(data: data, encoding: .isoLatin1)
+    }
+
+    /// Reads file resources and assignment deadlines of one Moodle course. Returns the number of new entries.
+    private func syncMoodleCourse(at index: Int) async -> Int {
+        guard let number = Self.firstMatch(#"/course/view\.php\?(?:[^#]*&)?id=(\d+)"#, in: courses[index].courseUrl),
+              let html = await fetchMoodleHTML("https://\(Self.moodleHost)/course/view.php?id=\(number)") else { return 0 }
+
+        var added = 0
+        let pattern = #"<li\s+class="activity[^"]*modtype_resource[^"]*"\s+id="module-\d+"[^>]*>([\s\S]*?)</li>"#
+        if let regex = try? NSRegularExpression(pattern: pattern, options: [.caseInsensitive]) {
+            let ns = html as NSString
+            for match in regex.matches(in: html, range: NSRange(location: 0, length: ns.length)) {
+                let body = ns.substring(with: match.range(at: 1))
+                if body.contains("Not available unless") || body.contains("Nicht verfügbar, es sei denn") { continue }
+                guard let url = Self.firstMatch(#"href="(https://elearn\.informatik\.uni-kiel\.de/mod/resource/view\.php\?id=\d+)""#, in: body),
+                      let resId = Self.firstMatch(#"view\.php\?id=(\d+)"#, in: url),
+                      let rawLabel = Self.firstMatch(#"view\.php\?id=\d+"[^>]*>([\s\S]*?)</a>"#, in: body) else { continue }
+                if knownURLs(of: courses[index]).contains(url) { continue }
+                let label = Self.decodeEntities(
+                    rawLabel
+                        .replacingOccurrences(of: #"<span[^>]*accesshide[^>]*>[\s\S]*?</span>"#, with: " ", options: .regularExpression)
+                        .replacingOccurrences(of: "<[^>]+>", with: " ", options: .regularExpression)
+                        .replacingOccurrences(of: "\\s+", with: " ", options: .regularExpression)
+                        .trimmingCharacters(in: .whitespacesAndNewlines)
+                )
+                guard !label.isEmpty else { continue }
+                if registerFile(courseIndex: index, id: "mdl-\(resId)", label: label, filename: Self.sanitizeFilename(label), url: url) {
+                    added += 1
+                }
+            }
+        }
+
+        // Assignment deadlines from the course calendar ("upcoming events")
+        if let calendar = await fetchMoodleHTML("https://\(Self.moodleHost)/calendar/view.php?view=upcoming&course=\(number)") {
+            let formatter = ISO8601DateFormatter()
+            formatter.timeZone = TimeZone(identifier: "Europe/Berlin") ?? .current
+            for part in calendar.components(separatedBy: "data-type=\"event\"").dropFirst() {
+                let head = String(part.prefix(while: { $0 != ">" }))
+                guard head.contains("data-event-component=\"mod_assign\"") || head.contains("data-event-eventtype=\"due\""),
+                      let rawTitle = Self.firstMatch(#"data-event-title="([^"]*)""#, in: head),
+                      let stamp = Self.firstMatch(#"[?&;]time=(\d{9,11})"#, in: part),
+                      let seconds = TimeInterval(stamp) else { continue }
+                let title = Self.decodeEntities(rawTitle)
+                    .replacingOccurrences(of: #"\s*(ist fällig|is due|Fälligkeit)\s*$"#, with: "", options: [.regularExpression, .caseInsensitive])
+                let deadline = formatter.string(from: Date(timeIntervalSince1970: seconds))
+                let eventId = Self.firstMatch(#"data-event-id="(\d+)""#, in: head) ?? title
+                let hwId = "mdl-due-\(eventId)"
+                let sheet = Self.sheetNumber(in: title)
+
+                if let hIdx = courses[index].homework.firstIndex(where: { $0.id == hwId })
+                    ?? courses[index].homework.firstIndex(where: { sheet != nil && Self.sheetNumber(in: "\($0.title) \($0.filename)") == sheet }) {
+                    if courses[index].homework[hIdx].deadline != deadline {
+                        courses[index].homework[hIdx].deadline = deadline
+                        added += 1
+                    }
+                } else {
+                    courses[index].homework.append(
+                        HomeworkItem(
+                            id: hwId, title: title, filename: Self.sanitizeFilename(title), releaseDate: String(deadline.prefix(10)),
+                            deadline: deadline, status: "pending", pointsMax: 0,
+                            submissionFormat: "Abgabe im Moodle", description: "Abgabefrist aus dem Moodle-Kalender.",
+                            subtasks: [], fileSize: "–", downloadUrl: "https://\(Self.moodleHost)/course/view.php?id=\(number)", completed: false
+                        )
+                    )
+                    added += 1
+                }
+            }
+        }
+        return added
+    }
+
+    /// Live sync for every Moodle course (one shared login). Returns the number of new or updated entries.
+    @discardableResult
+    public func syncAllMoodleCourses(username: String, password: String) async -> Int {
+        let user = username.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !user.isEmpty, !password.isEmpty else { return 0 }
+
+        await syncEWInfExercisesFromMoodle(username: user, password: password)
+        isSyncingMoodle = true
+        defer { isSyncingMoodle = false }
+
+        guard await authenticateMoodleSessionForSync(username: user, password: password) else { return 0 }
+        var added = 0
+        for index in courses.indices where courses[index].platformHost == Self.moodleHost && courses[index].courseId != "infEWInf-01a" {
+            added += await syncMoodleCourse(at: index)
+        }
+        persistCourses()
+        return added
+    }
+
+    // MARK: OpenOlat (any course)
+
+    private func materialsDirectory(for courseId: String) -> URL {
+        let safeCourse = courseId.lowercased().replacingOccurrences(of: "[^a-z0-9_-]", with: "", options: .regularExpression)
+        let fm = FileManager.default
+        let docs = fm.urls(for: .documentDirectory, in: .userDomainMask).first ?? fm.temporaryDirectory
+        return docs.appendingPathComponent("Materials", isDirectory: true).appendingPathComponent(safeCourse, isDirectory: true)
+    }
+
+    /// Crawls every OpenOlat course and stores new PDFs on the device. Returns the number of new files.
+    private func syncAllOpenOlatCourses(username: String, password: String) async -> (newFiles: Int, unreachable: Int) {
+        var newFiles = 0
+        var unreachable = 0
+        let fm = FileManager.default
+
+        for index in courses.indices where courses[index].platformHost == Self.openOlatHost {
+            guard let courseURL = URL(string: courses[index].courseUrl) else { continue }
+            lastSyncStatus = "🔄 \(courses[index].shortTitle): Kursraum wird durchsucht …"
+            guard let files = await OpenOlatMaterialsCrawler.shared.crawl(courseURL: courseURL, username: username, password: password) else {
+                unreachable += 1
+                continue
+            }
+
+            let directory = materialsDirectory(for: courses[index].courseId)
+            try? fm.createDirectory(at: directory, withIntermediateDirectories: true)
+            var downloaded = 0
+            let syncedKey = "unibody_olat_synced_files"
+            var synced = Set(UserDefaults.standard.stringArray(forKey: syncedKey) ?? [])
+
+            for file in files where downloaded < 40 {
+                let filename = Self.sanitizeFilename(file.name)
+                let destination = directory.appendingPathComponent(filename)
+                // Only files this crawler stored itself count as present; a generated preview gets replaced
+                let marker = "\(courses[index].courseId.lowercased())/\(Self.normalizeKey(filename))"
+                if synced.contains(marker), fm.fileExists(atPath: destination.path) { continue }
+                guard let data = await OpenOlatMaterialsCrawler.shared.download(file) else { continue }
+                guard (try? data.write(to: destination, options: .atomic)) != nil else { continue }
+                downloaded += 1
+                synced.insert(marker)
+                UserDefaults.standard.set(Array(synced), forKey: syncedKey)
+
+                let size = "\(max(1, data.count / 1024)) KB"
+                let key = Self.normalizeKey(filename)
+                if let hIdx = courses[index].homework.firstIndex(where: { Self.normalizeKey($0.filename) == key }) {
+                    courses[index].homework[hIdx].fileSize = size
+                } else if let sIdx = courses[index].lectureSlides.firstIndex(where: { Self.normalizeKey($0.filename) == key }) {
+                    courses[index].lectureSlides[sIdx].size = size
+                } else {
+                    let label = file.path.isEmpty ? filename : "\(filename) · \(file.path)"
+                    _ = registerFile(
+                        courseIndex: index,
+                        id: "olat-\(courses[index].courseId.lowercased())-\(key)",
+                        label: label,
+                        filename: filename,
+                        url: courses[index].courseUrl,
+                        size: size
+                    )
+                }
+            }
+            newFiles += downloaded
+        }
+        return (newFiles, unreachable)
+    }
+
+    /// Full live sync: all Moodle courses plus all OpenOlat courses.
+    public func syncAllCourses(username: String, password: String) async {
+        let user = username.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !user.isEmpty, !password.isEmpty else {
+            lastSyncStatus = "⚠️ Bitte zuerst die Zugangsdaten im Tab 'Login & Tresor' hinterlegen."
+            return
+        }
+        let moodleChanges = await syncAllMoodleCourses(username: user, password: password)
+
+        isSyncingMoodle = true
+        defer { isSyncingMoodle = false }
+        let olat = await syncAllOpenOlatCourses(username: user, password: password)
+        persistCourses()
+
+        var summary = "✅ Abgleich fertig: \(moodleChanges) Moodle-Änderungen, \(olat.newFiles) neue OpenOlat-Dateien"
+        if olat.unreachable > 0 {
+            summary += " · \(olat.unreachable) Kursraum/-räume nicht erreichbar"
+        }
+        lastSyncStatus = summary
     }
 }

@@ -23,6 +23,15 @@ public struct CourseDetailView: View {
         appState.enrolledGroups[course.courseId] ?? appState.enrolledGroups[course.courseId.lowercased()]
     }
     
+    /// Groups scored against the rest of the timetable, best first
+    private var rankedGroups: [GroupEvaluation] {
+        // Only the already booked exercise of this course is left out; its lectures still count for gaps and free days
+        let otherEvents = appState.schedule.filter {
+            !($0.type == "enrolled_exercise" && $0.courseId?.lowercased() == course.courseId.lowercased())
+        }
+        return OptimizerEngine.rankGroups(groups: course.groups, currentSchedule: otherEvents, preferences: appState.optimizerPreferences)
+    }
+    
     private func triggerEnroll(grp: ExerciseGroup) {
         activeAutomationTask = AutomationTask(course: course, group: grp, isEnroll: true)
     }
@@ -88,7 +97,7 @@ public struct CourseDetailView: View {
                         // Group List Header
                         Text("Verfügbare Übungsgruppen (\(course.groups.count))")
                             .font(.system(.headline, design: .rounded).weight(.bold))
-                            .foregroundColor(.white)
+                            .foregroundColor(.primary)
                             .padding(.horizontal, 4)
                             .padding(.top, 6)
                     }
@@ -109,7 +118,7 @@ public struct CourseDetailView: View {
                                     }
                                     Text(grp.name)
                                         .font(.system(.subheadline, design: .rounded).weight(.bold))
-                                        .foregroundColor(.white)
+                                        .foregroundColor(.primary)
                                 }
                                 Spacer()
                                 Button(role: .destructive) {
@@ -167,7 +176,7 @@ public struct CourseDetailView: View {
                                 }
                             }
                             .font(.caption2)
-                            .foregroundColor(.white.opacity(0.8))
+                            .foregroundColor(.primary.opacity(0.8))
                         }
                         .padding(14)
                         .background(
@@ -182,9 +191,11 @@ public struct CourseDetailView: View {
                     
                     // Groups List
                     LazyVStack(spacing: 12) {
-                        ForEach(course.groups) { grp in
+                        ForEach(rankedGroups) { evaluation in
+                            let grp = evaluation.group
                             GroupDetailCard(
                                 group: grp,
+                                evaluation: evaluation,
                                 courseId: course.courseId,
                                 isEnrolled: enrolledGroupId?.lowercased() == grp.groupId.lowercased(),
                                 isUnenrolling: isUnenrolling && enrolledGroupId?.lowercased() == grp.groupId.lowercased(),
@@ -262,6 +273,7 @@ public struct CourseDetailView: View {
 private struct GroupDetailCard: View {
     @EnvironmentObject var appState: AppState
     let group: ExerciseGroup
+    let evaluation: GroupEvaluation
     let courseId: String
     let isEnrolled: Bool
     var isUnenrolling: Bool = false
@@ -289,12 +301,22 @@ private struct GroupDetailCard: View {
                         } else if group.weekType == "B" {
                             AeroBadge("Woche B", color: .indigo)
                         }
+                        
+                        if !evaluation.isConflict {
+                            AeroBadge("\(evaluation.displayScore) Pkt.", color: evaluation.displayScore >= 82 ? AeroTheme.emerald : AeroTheme.skyBlue)
+                        }
                     }
                     
                     Text(group.name)
                         .font(.system(.subheadline, design: .rounded).weight(.bold))
-                        .foregroundColor(.white)
+                        .foregroundColor(.primary)
                         .padding(.top, 2)
+                    
+                    if !evaluation.isConflict, !isEnrolled {
+                        Text(evaluation.reasons.prefix(2).joined(separator: " · "))
+                            .font(.caption2)
+                            .foregroundColor(.secondary)
+                    }
                 }
                 Spacer()
                 
@@ -434,7 +456,7 @@ private struct EnrollSuccessModalView: View {
                             VStack(spacing: 6) {
                                 Text("Live-Einschreibung erfolgreich!")
                                     .font(.system(.title3, design: .rounded).weight(.bold))
-                                    .foregroundColor(.white)
+                                    .foregroundColor(.primary)
                                 
                                 Text("Direkt im Hochschulsystem (\(platformHost)) gebucht & verifiziert")
                                     .font(.caption)
@@ -455,7 +477,7 @@ private struct EnrollSuccessModalView: View {
                                 
                                 Text(courseTitle)
                                     .font(.system(.headline, design: .rounded).weight(.bold))
-                                    .foregroundColor(.white)
+                                    .foregroundColor(.primary)
                                     .lineLimit(2)
                                 
                                 Text(groupName)
@@ -472,7 +494,7 @@ private struct EnrollSuccessModalView: View {
                                         Spacer()
                                         Text(timeSlot)
                                             .font(.caption.weight(.bold))
-                                            .foregroundColor(.white)
+                                            .foregroundColor(.primary)
                                     }
                                     
                                     if !room.isEmpty {
@@ -483,7 +505,7 @@ private struct EnrollSuccessModalView: View {
                                             Spacer()
                                             Text(room)
                                                 .font(.caption.weight(.bold))
-                                                .foregroundColor(.white)
+                                                .foregroundColor(.primary)
                                         }
                                     }
                                     
@@ -592,7 +614,7 @@ private struct UnenrollSuccessModalView: View {
                             VStack(spacing: 6) {
                                 Text("Erfolgreich ausgetragen")
                                     .font(.system(.title3, design: .rounded).weight(.bold))
-                                    .foregroundColor(.white)
+                                    .foregroundColor(.primary)
                                 
                                 Text("Die Abmeldung wurde im Hochschulsystem verifiziert.")
                                     .font(.caption)
@@ -613,7 +635,7 @@ private struct UnenrollSuccessModalView: View {
                                 
                                 Text(courseTitle)
                                     .font(.system(.headline, design: .rounded).weight(.bold))
-                                    .foregroundColor(.white)
+                                    .foregroundColor(.primary)
                                     .lineLimit(2)
                                 
                                 Text(groupName)
@@ -630,7 +652,7 @@ private struct UnenrollSuccessModalView: View {
                                         Spacer()
                                         Text(timeSlot)
                                             .font(.caption.weight(.bold))
-                                            .foregroundColor(.white)
+                                            .foregroundColor(.primary)
                                     }
                                     
                                     if !room.isEmpty {
@@ -641,7 +663,7 @@ private struct UnenrollSuccessModalView: View {
                                             Spacer()
                                             Text(room)
                                                 .font(.caption.weight(.bold))
-                                                .foregroundColor(.white)
+                                                .foregroundColor(.primary)
                                         }
                                     }
                                     

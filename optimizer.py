@@ -7,9 +7,9 @@ Calculates conflict-free tutorial groups and ranks them based on customizable we
 - Maximum daily workload penalty
 """
 
+import datetime
 import re
 import uuid
-from dataclasses import dataclass, asdict
 from typing import List, Dict, Optional, Tuple, Any
 
 
@@ -40,6 +40,40 @@ def minutes_to_time(mins: int) -> str:
     h = (mins // 60) % 24
     m = mins % 60
     return f"{h:02d}:{m:02d}"
+
+
+def resolve_week_type(item: Dict[str, Any]) -> Optional[str]:
+    """
+    Returns 'A' or 'B' for bi-weekly events/groups, or None for weekly ones.
+    Uses the explicit `week_type` field first and falls back to 'Woche A' / 'Woche B' in the name or title.
+    """
+    raw = str(item.get("week_type") or "").strip().upper()
+    if raw in ("A", "B"):
+        return raw
+    text = f"{item.get('name', '')} {item.get('title', '')} {item.get('tutor', '')}"
+    match = re.search(r"\bWoche\s*([AB])\b", text, re.IGNORECASE)
+    return match.group(1).upper() if match else None
+
+
+def weeks_can_collide(week_a: Optional[str], week_b: Optional[str]) -> bool:
+    """A 'Woche A' and a 'Woche B' event alternate and never meet; every other pairing can overlap."""
+    return not (week_a and week_b and week_a != week_b)
+
+
+def _last_sunday(year: int, month: int) -> datetime.date:
+    last_day = datetime.date(year, month + 1, 1) - datetime.timedelta(days=1)
+    return last_day - datetime.timedelta(days=(last_day.weekday() + 1) % 7)
+
+
+def utc_to_berlin(dt_utc: datetime.datetime) -> datetime.datetime:
+    """
+    Converts a naive UTC datetime to Europe/Berlin local time using the EU DST rule
+    (CEST from the last Sunday of March 01:00 UTC until the last Sunday of October 01:00 UTC).
+    """
+    dst_start = datetime.datetime.combine(_last_sunday(dt_utc.year, 3), datetime.time(1, 0))
+    dst_end = datetime.datetime.combine(_last_sunday(dt_utc.year, 10), datetime.time(1, 0))
+    offset_hours = 2 if dst_start <= dt_utc < dst_end else 1
+    return dt_utc + datetime.timedelta(hours=offset_hours)
 
 
 def parse_german_timeslot(text: str) -> Optional[Dict[str, Any]]:
@@ -138,29 +172,22 @@ def parse_ics_content(ics_text: str) -> List[Dict[str, Any]]:
 
         # Parse YYYYMMDDTHHMMSS
         try:
-            year = int(dt_start_str[0:4])
-            month = int(dt_start_str[4:6])
-            day_num = int(dt_start_str[6:8])
-            sh = int(dt_start_str[9:11])
-            sm = int(dt_start_str[11:13])
+            dt_start = datetime.datetime.strptime(dt_start_str[:15], "%Y%m%dT%H%M%S")
+            dt_end = datetime.datetime.strptime(dt_end_str[:15], "%Y%m%dT%H%M%S")
 
-            eh = int(dt_end_str[9:11])
-            em = int(dt_end_str[11:13])
-
-            # If UTC ('Z'), adjust +1 or +2 hours for Europe/Berlin roughly if needed,
-            # though UnivIS exports local Europe/Berlin timestamps without Z.
+            # UnivIS exports local Europe/Berlin timestamps without 'Z'; UTC timestamps are
+            # converted with the correct summer/winter offset (also shifts the weekday if needed).
             if dt_start_str.endswith("Z"):
-                sh = (sh + 2) % 24
-                eh = (eh + 2) % 24
+                dt_start = utc_to_berlin(dt_start)
+            if dt_end_str.endswith("Z"):
+                dt_end = utc_to_berlin(dt_end)
 
-            import datetime
-            dt_obj = datetime.date(year, month, day_num)
-            weekday = dt_obj.weekday()  # 0 = Monday .. 6 = Sunday
+            weekday = dt_start.weekday()  # 0 = Monday .. 6 = Sunday
             if weekday > 5:
                 continue  # Ignore Sundays
 
-            start_time = f"{sh:02d}:{sm:02d}"
-            end_time = f"{eh:02d}:{em:02d}"
+            start_time = f"{dt_start.hour:02d}:{dt_start.minute:02d}"
+            end_time = f"{dt_end.hour:02d}:{dt_end.minute:02d}"
 
             # Detect potential UnivIS clutter (e.g., exam dates, single appointments, or parallel exercise placeholders)
             is_recurring = bool(rrule_match and "WEEKLY" in rrule_match.group(1).upper())
@@ -247,7 +274,12 @@ def evaluate_group_candidate(
             )
         )
     ]
-    same_day_events = [e for e in active_events if int(e.get("day", -1)) == day]
+    # Bi-weekly awareness: a 'Woche A' group never meets a 'Woche B' event, so those are ignored entirely
+    c_week = resolve_week_type(candidate)
+    same_day_events = [
+        e for e in active_events
+        if int(e.get("day", -1)) == day and weeks_can_collide(c_week, resolve_week_type(e))
+    ]
 
     conflicts = []
     tight_transitions = []
@@ -464,3 +496,133 @@ def rank_course_groups(
 
     return evaluated
 
+
+
+def _group_as_event(course_id: str, group: Dict[str, Any]) -> Dict[str, Any]:
+    """Represents a chosen exercise group as a schedule event so other candidates are scored against it."""
+    return {
+        "id": f"plan-{course_id.lower()}",
+        "course_id": course_id,
+        "title": group.get("name", course_id),
+        "day": group.get("day", 0),
+        "start_time": group.get("start_time", "10:15"),
+        "end_time": group.get("end_time", "11:45"),
+        "room": group.get("room", ""),
+        "type": "planned_exercise",
+        "enabled": True,
+        "week_type": resolve_week_type(group),
+    }
+
+
+def optimize_group_combination(
+    courses: List[Dict[str, Any]],
+    fixed_schedule: List[Dict[str, Any]],
+    preferences: Dict[str, Any],
+    pinned_groups: Optional[Dict[str, str]] = None,
+    enrolled_groups: Optional[Dict[str, str]] = None,
+    top_n: int = 3,
+    beam_width: int = 300,
+) -> Dict[str, Any]:
+    """
+    Picks ONE exercise group per course so that the whole week is as good as possible,
+    instead of ranking every course in isolation.
+
+    - Courses the student is already enrolled in keep their booked group (locked).
+    - A pinned group (Wunsch #1) is locked as well, unless it is unknown.
+    - All other courses are searched jointly: every combination is scored by evaluating each chosen
+      group against the fixed schedule plus all other chosen groups (beam search, exhaustive for small inputs).
+
+    Returns {"plans": [...best first...], "course_count": n}. Each plan lists the chosen group per course,
+    the courses that could not be placed without a conflict, and a 0..100 total score.
+    """
+    pinned_groups = {k.lower(): v for k, v in (pinned_groups or {}).items() if v}
+    enrolled_groups = {k.lower(): v for k, v in (enrolled_groups or {}).items() if v}
+
+    relevant = [c for c in courses if c.get("groups")]
+    course_ids = {str(c.get("course_id", "")).lower() for c in relevant}
+
+    # Booked exercises of the optimized courses are re-added as locked choices, so drop them from the base
+    base_schedule = [
+        e for e in fixed_schedule
+        if not (
+            e.get("type") == "enrolled_exercise"
+            and str(e.get("course_id", "")).lower() in course_ids
+        )
+    ]
+
+    slots: List[Dict[str, Any]] = []
+    for course in relevant:
+        cid = str(course.get("course_id", ""))
+        ckey = cid.lower()
+        groups = course.get("groups", [])
+        locked_gid = enrolled_groups.get(ckey) or pinned_groups.get(ckey)
+        locked = [g for g in groups if g.get("group_id") == locked_gid] if locked_gid else []
+        slots.append({
+            "course_id": cid,
+            "title": course.get("title", cid),
+            "candidates": locked or groups,
+            "locked_reason": (
+                "enrolled" if locked and enrolled_groups.get(ckey) == locked_gid
+                else ("pinned" if locked else None)
+            ),
+        })
+
+    # Most constrained courses first keeps the beam focused on feasible combinations
+    slots.sort(key=lambda sl: len(sl["candidates"]))
+
+    # Beam state: (partial_score, chosen {course_id: group}, unplaced [course_id])
+    beam: List[Tuple[float, Dict[str, Dict[str, Any]], List[str]]] = [(0.0, {}, [])]
+    for slot in slots:
+        cid = slot["course_id"]
+        next_beam: List[Tuple[float, Dict[str, Dict[str, Any]], List[str]]] = []
+        for partial_score, chosen, unplaced in beam:
+            current = base_schedule + [_group_as_event(k, g) for k, g in chosen.items()]
+            placed_any = False
+            for group in slot["candidates"]:
+                result = evaluate_group_candidate(group, current, preferences, course_id=cid)
+                if result["is_conflict"]:
+                    continue
+                placed_any = True
+                next_beam.append((partial_score + result["score"], {**chosen, cid: group}, unplaced))
+            if not placed_any:
+                next_beam.append((partial_score - 200.0, chosen, unplaced + [cid]))
+        next_beam.sort(key=lambda st: -st[0])
+        beam = next_beam[:beam_width]
+
+    titles = {sl["course_id"]: sl["title"] for sl in slots}
+    locked_reasons = {sl["course_id"]: sl["locked_reason"] for sl in slots}
+
+    plans: List[Dict[str, Any]] = []
+    seen: set = set()
+    for _, chosen, unplaced in beam:
+        signature = tuple(sorted((k, g.get("group_id")) for k, g in chosen.items()))
+        if signature in seen:
+            continue
+        seen.add(signature)
+
+        # Final symmetric score: every chosen group against the base schedule plus ALL other chosen groups
+        assignments = []
+        total = 0.0
+        for cid, group in chosen.items():
+            others = base_schedule + [_group_as_event(k, g) for k, g in chosen.items() if k != cid]
+            result = evaluate_group_candidate(group, others, preferences, course_id=cid)
+            total += result["score"]
+            assignments.append({
+                "course_id": cid,
+                "course_title": titles.get(cid, cid),
+                "locked_reason": locked_reasons.get(cid),
+                "group": result,
+            })
+        assignments.sort(key=lambda a: (a["group"].get("day", 0), a["group"].get("start_time", "")))
+
+        placed = len(assignments)
+        average = (total / placed) if placed else 0.0
+        plans.append({
+            "total_score": max(0, min(100, round(average - 25.0 * len(unplaced)))),
+            "raw_score": round(total - 200.0 * len(unplaced), 2),
+            "assignments": assignments,
+            "unplaced": [{"course_id": cid, "course_title": titles.get(cid, cid)} for cid in unplaced],
+        })
+
+    plans.sort(key=lambda p: -p["raw_score"])
+    return {"plans": plans[:max(1, top_n)], "course_count": len(slots)}

@@ -1,6 +1,7 @@
 import SwiftUI
 
 public struct SettingsLoginView: View {
+    @ObservedObject private var reminderService = ReminderService.shared
     @EnvironmentObject var appState: AppState
     
     @State private var inputUsername: String = ""
@@ -61,7 +62,7 @@ public struct SettingsLoginView: View {
                         VStack(alignment: .leading, spacing: 14) {
                             Text("Zugangsdaten")
                                 .font(.system(.headline, design: .rounded).weight(.bold))
-                                .foregroundColor(.white)
+                                .foregroundColor(.primary)
                             
                             VStack(alignment: .leading, spacing: 6) {
                                 Text("CAU-Kennung (z. B. stu123456)")
@@ -76,7 +77,7 @@ public struct SettingsLoginView: View {
                                         .textContentType(.username)
                                         .textInputAutocapitalization(.never)
                                         .autocorrectionDisabled()
-                                        .foregroundColor(.white)
+                                        .foregroundColor(.primary)
                                 }
                                 .padding(12)
                                 .background(RoundedRectangle(cornerRadius: 12).fill(Color.white.opacity(0.08)))
@@ -94,11 +95,11 @@ public struct SettingsLoginView: View {
                                         .frame(width: 24)
                                     if isPasswordVisible {
                                         TextField("Passwort", text: $inputPassword)
-                                            .foregroundColor(.white)
+                                            .foregroundColor(.primary)
                                     } else {
                                         SecureField("Passwort", text: $inputPassword)
                                             .textContentType(.password)
-                                            .foregroundColor(.white)
+                                            .foregroundColor(.primary)
                                     }
                                     Button {
                                         isPasswordVisible.toggle()
@@ -106,6 +107,7 @@ public struct SettingsLoginView: View {
                                         Image(systemName: isPasswordVisible ? "eye.slash.fill" : "eye.fill")
                                             .foregroundColor(.secondary)
                                     }
+                                    .accessibilityLabel(isPasswordVisible ? "Passwort verbergen" : "Passwort anzeigen")
                                 }
                                 .padding(12)
                                 .background(RoundedRectangle(cornerRadius: 12).fill(Color.white.opacity(0.08)))
@@ -127,11 +129,25 @@ public struct SettingsLoginView: View {
                             }
                             
                             // Auto-Fill Toggles
+                            Toggle(isOn: Binding(
+                                get: { reminderService.isEnabled },
+                                set: { newValue in Task { await reminderService.setEnabled(newValue) } }
+                            )) {
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text("Erinnerungen")
+                                        .font(.subheadline.weight(.semibold))
+                                    Text(reminderService.statusText ?? "Mitteilung 24 und 2 Stunden vor Abgabefristen sowie zum Einschreibungsstart")
+                                        .font(.caption2)
+                                        .foregroundColor(.secondary)
+                                }
+                            }
+                            .tint(AeroTheme.emerald)
+                            
                             Toggle(isOn: $autoFill) {
                                 VStack(alignment: .leading, spacing: 2) {
                                     Text("Automatisches Ausfüllen (Auto-Fill)")
                                         .font(.subheadline.weight(.semibold))
-                                        .foregroundColor(.white)
+                                        .foregroundColor(.primary)
                                     Text("Trägt stu-Kennung & Passwort beim Aufruf automatisch ein")
                                         .font(.caption2)
                                         .foregroundColor(.secondary)
@@ -143,7 +159,7 @@ public struct SettingsLoginView: View {
                                 VStack(alignment: .leading, spacing: 2) {
                                     Text("1-Klick Auto-Submit")
                                         .font(.subheadline.weight(.semibold))
-                                        .foregroundColor(.white)
+                                        .foregroundColor(.primary)
                                     Text("Meldet dich ohne manuellen Klick direkt an")
                                         .font(.caption2)
                                         .foregroundColor(.secondary)
@@ -185,7 +201,7 @@ public struct SettingsLoginView: View {
                                     Image(systemName: "checkmark.circle.fill")
                                         .foregroundColor(AeroTheme.emerald)
                                     Text("Letzter Deep-Sync: \(d.formatted(date: .omitted, time: .shortened)) Uhr")
-                                        .foregroundColor(.white.opacity(0.85))
+                                        .foregroundColor(.primary.opacity(0.85))
                                 }
                                 .font(.caption2)
                                 .frame(maxWidth: .infinity, alignment: .center)
@@ -243,6 +259,8 @@ public struct SettingsLoginView: View {
                         }
                         .padding(18)
                         .frutigerGlass(cornerRadius: 18)
+                        
+                        OptimizerPreferencesCard()
                         
                         // Appearance & Theme Mode Section
                         VStack(alignment: .leading, spacing: 12) {

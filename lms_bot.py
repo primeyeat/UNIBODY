@@ -6,7 +6,7 @@ Supports:
    is verified and scraped with 100% authentic CAU UnivIS data!
 2. Interactive Google Chrome / Chromium Login via DevTools Protocol (CDP) so Shibboleth SSO & 2FA work seamlessly.
 3. Strict ID/Module Code verification (checks exact Modulcode / UnivIS-Kennnummer / OpenOlat Repository-ID).
-4. First-Come-First-Served Sniper (high-frequency polling / countdown trigger -> instant click on Rank 1, automatic fallback to Rank 2/3 if full).
+4. First-Come-First-Served Sniper (high-frequency polling -> instant click on Rank 1, automatic fallback to Rank 2/3 if full).
 """
 
 import os
@@ -537,7 +537,7 @@ def fetch_live_univis_course(query_str: str, semester: str = "2026w") -> Optiona
         "semester": "WiSe 2026/27 (UnivIS Live-XML)",
         "platform": "CAU UNIBODY Auto-Detect",
         "enrollment_mode": "sniper",
-        "enrollment_opens_at": "Sofort / Countdown",
+        "enrollment_opens_at": "Sofort",
         "url": detected_url,
         "verified_tokens": [q.lower(), primary["univis_id"].lower(), (primary["short"] or "").lower()],
         "groups": groups,
@@ -606,6 +606,111 @@ KEYCHAIN_SERVICE_NAME = "UNIBODY-Student-Vault"
 LEGACY_KEYCHAIN_SERVICE_NAME = "CAU-LMS-Sniper-Vault"
 
 
+# In-page crawler for an OpenOlat course (runs inside the logged-in Chrome tab).
+# Walks every node of the course menu plus up to three levels of sub-folders and
+# returns the PDF links it finds as a JSON string: [{"name", "href", "path"}].
+OPENOLAT_CRAWL_JS = r"""
+(async () => {
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+  const text = (el) => (el.textContent || '').replace(/\s+/g, ' ').trim();
+  const content = () =>
+    document.querySelector('#o_main_center_content_inner') ||
+    document.querySelector('#o_main_center_content') ||
+    document.body;
+  const settle = async () => {
+    await sleep(350);
+    for (let i = 0; i < 40; i++) {
+      if (!(window.o_info && window.o_info.linkbusy)) break;
+      await sleep(150);
+    }
+    await sleep(150);
+  };
+  const found = new Map();
+  const harvest = (trail) => {
+    for (const a of content().querySelectorAll('a[href]')) {
+      let name = '';
+      try {
+        name = decodeURIComponent(new URL(a.href).pathname.split('/').pop() || '');
+      } catch (e) {
+        continue;
+      }
+      if (!/\.pdf$/i.test(name) || found.has(name)) continue;
+      found.set(name, { name: name, href: a.href, path: trail.join(' / ') });
+    }
+  };
+  const treeLinks = () =>
+    Array.from(document.querySelectorAll('.o_tree a')).filter(
+      (a) => text(a) && a.target !== '_blank' && !/o_tree_oc/.test(a.className)
+    );
+  const folderLinks = () =>
+    Array.from(content().querySelectorAll('a')).filter(
+      (a) => text(a) && (a.querySelector('.o_filetype_folder') || /o_filetype_folder/.test(a.className))
+    );
+
+  let clicks = 0;
+  const MAX_CLICKS = 90;
+  const openTrail = async (trail) => {
+    const node = treeLinks().find((a) => text(a) === trail[0]);
+    if (!node) return false;
+    node.click(); clicks++;
+    await settle();
+    for (const folderName of trail.slice(1)) {
+      const folder = folderLinks().find((a) => text(a) === folderName);
+      if (!folder) return false;
+      folder.click(); clicks++;
+      await settle();
+    }
+    return true;
+  };
+  const crawlFolders = async (trail, depth) => {
+    if (depth >= 3) return;
+    const names = Array.from(new Set(folderLinks().map(text)));
+    for (const name of names) {
+      if (clicks >= MAX_CLICKS) return;
+      const next = trail.concat([name]);
+      if (!(await openTrail(next))) continue;
+      harvest(next);
+      await crawlFolders(next, depth + 1);
+    }
+  };
+
+  harvest([]);
+  const visited = new Set();
+  for (let guard = 0; guard < 60 && clicks < MAX_CLICKS; guard++) {
+    const node = treeLinks().find((a) => !visited.has(text(a)));
+    if (!node) break;
+    const title = text(node);
+    visited.add(title);
+    node.click(); clicks++;
+    await settle();
+    harvest([title]);
+    await crawlFolders([title], 0);
+  }
+  return JSON.stringify(Array.from(found.values()));
+})()
+"""
+
+# Downloads one file with the tab's own session and returns it base64-encoded ('' if not a PDF or too large).
+OPENOLAT_FETCH_JS_TEMPLATE = r"""
+(async () => {
+  try {
+    const res = await fetch(%s, { credentials: 'include' });
+    if (!res.ok) return '';
+    const buf = new Uint8Array(await res.arrayBuffer());
+    if (buf.length < 5 || buf.length > 25 * 1024 * 1024) return '';
+    if (String.fromCharCode(buf[0], buf[1], buf[2], buf[3], buf[4]) !== '%%PDF-') return '';
+    let bin = '';
+    for (let i = 0; i < buf.length; i += 0x8000) {
+      bin += String.fromCharCode.apply(null, buf.subarray(i, i + 0x8000));
+    }
+    return btoa(bin);
+  } catch (e) {
+    return '';
+  }
+})()
+"""
+
+
 class CAUBrowserSessionManager:
     """
     UNIBODY Dual-Platform Browser Manager:
@@ -647,6 +752,8 @@ class CAUBrowserSessionManager:
         )
 
         # Start background watcher that auto-fills open Chrome CAU login pages via CDP on BOTH platforms
+        self._materials_sync_lock = threading.Lock()
+        self.materials_sync_status: Dict[str, Any] = {"running": False, "message": "", "new_files": 0, "error": False}
         self._watcher_thread = threading.Thread(target=self._autofill_watcher_loop, daemon=True)
         self._watcher_thread.start()
 
@@ -1686,6 +1793,145 @@ setTimeout(runUnibodyAutoFill, 2200);
         })
         return self.session_state
 
+    def _cdp_eval_async(self, ws_url: str, expression: str, timeout: float = 60.0) -> Any:
+        """Evaluates an async JS expression in a tab and returns its resolved value (None on failure)."""
+        res = self._cdp_send_command(
+            ws_url,
+            "Runtime.evaluate",
+            {"expression": expression, "returnByValue": True, "awaitPromise": True},
+            timeout=timeout,
+        )
+        if isinstance(res, dict):
+            return res.get("result", {}).get("result", {}).get("value")
+        return None
+
+    def sync_openolat_materials_via_cdp(self, max_new_files_per_course: int = 40) -> Dict[str, Any]:
+        """
+        Live materials sync for ALL OpenOlat courses: opens each course in the logged-in Chrome session,
+        walks the course menu and its folders, and downloads every new PDF into data/materials/<course>/.
+        Only one sync runs at a time. Returns {"ok", "new_files", "courses"}.
+        """
+        from cau_materials import (
+            load_materials_data,
+            save_materials_data,
+            openolat_course_targets,
+            store_openolat_file,
+            local_material_exists,
+        )
+
+        if not self._materials_sync_lock.acquire(blocking=False):
+            return {"ok": False, "error": "Ein Materialien-Abgleich läuft bereits."}
+
+        def progress(message: str, running: bool = True, new_files: int = 0, error: bool = False) -> None:
+            self.materials_sync_status = {"running": running, "message": message, "new_files": new_files, "error": error}
+
+        progress("OpenOlat-Abgleich wird vorbereitet …")
+        try:
+            data = load_materials_data(sync_live=False)
+            targets = openolat_course_targets(data)
+            if not targets:
+                progress("Keine OpenOlat-Kurse vorhanden.", running=False)
+                return {"ok": True, "new_files": 0, "courses": 0}
+
+            creds = self.load_credentials(include_secret=True)
+            if self._get_cdp_tabs() is None:
+                self.add_log("INFO", "📚 Materialien-Abgleich: Starte Chrome-Sitzung für OpenOlat...")
+                self.launch_login_browser(target_url=targets[0]["course_url"], force_auto_login=True, fast_mode=True)
+            tabs = self._get_cdp_tabs() or []
+            tab = next((t for t in tabs if "lms.uni-kiel.de" in (t.get("url") or "").lower()), None)
+            if not tab:
+                try:
+                    req_new = urllib.request.Request(
+                        f"http://127.0.0.1:{self.debug_port}/json/new?{targets[0]['course_url']}", method="PUT"
+                    )
+                    tab = json.loads(urllib.request.urlopen(req_new, timeout=1.5).read().decode("utf-8", "ignore"))
+                except Exception:
+                    tab = None
+            ws = (tab or {}).get("webSocketDebuggerUrl")
+            if not ws:
+                self.add_log("WARN", "📚 Materialien-Abgleich: Keine Chrome-Sitzung für OpenOlat verfügbar.")
+                progress("OpenOlat: Keine Chrome-Sitzung verfügbar.", running=False, error=True)
+                return {"ok": False, "error": "Keine Chrome-Sitzung verfügbar."}
+
+            ready_js = """
+            (() => {
+                if (location.hostname !== 'lms.uni-kiel.de') return document.querySelector('input[type="password"]') ? 'LOGIN_NEEDED' : null;
+                if (document.querySelector('#o_fiooolat_login_name, input[name="o_fiooolat_login_name"], input[type="password"]')) return 'LOGIN_NEEDED';
+                if (document.querySelector('.o_tree a')) return 'COURSE_READY';
+                if (document.readyState === 'complete' && document.querySelector('#o_main_center_content_inner, #o_main')) return 'PAGE_READY';
+                return null;
+            })()
+            """
+
+            total_new = 0
+            unreachable = 0
+            for position, target in enumerate(targets, start=1):
+                key, course_url = target["key"], target["course_url"]
+                title = data.get(key, {}).get("title", key)
+                progress(f"OpenOlat {position}/{len(targets)}: {title} wird durchsucht …", new_files=total_new)
+                self._cdp_send_command(ws, "Page.navigate", {"url": course_url})
+                time.sleep(0.4)
+                state = self._cdp_wait_for_js(ws, ready_js, timeout=8.0, poll_interval=0.15)
+                if state == "LOGIN_NEEDED" and creds.get("username") and creds.get("password"):
+                    for _ in range(2):
+                        self.inject_autofill_into_tabs(force_submit=True)
+                        state = self._cdp_wait_for_js(ws, ready_js, timeout=6.0, poll_interval=0.15)
+                        if state and state != "LOGIN_NEEDED":
+                            break
+                    self._cdp_send_command(ws, "Page.navigate", {"url": course_url})
+                    time.sleep(0.4)
+                    state = self._cdp_wait_for_js(ws, ready_js, timeout=8.0, poll_interval=0.15)
+                if state not in ("COURSE_READY", "PAGE_READY"):
+                    self.add_log("WARN", f"📚 {title}: Kursraum nicht erreichbar (Login nötig oder kein Zugriff).")
+                    unreachable += 1
+                    continue
+
+                raw = self._cdp_eval_async(ws, OPENOLAT_CRAWL_JS, timeout=120.0)
+                try:
+                    files = json.loads(raw) if isinstance(raw, str) else []
+                except ValueError:
+                    files = []
+                if not files:
+                    self.add_log("INFO", f"📚 {title}: Keine PDF-Dateien im Kursraum gefunden.")
+                    continue
+
+                new_here = 0
+                for entry in files:
+                    name, href = str(entry.get("name", "")), str(entry.get("href", ""))
+                    host = urllib.parse.urlparse(href).hostname or ""
+                    # NET-02: only fetch from the university LMS itself, and only over HTTPS
+                    if not href.startswith("https://") or host != "lms.uni-kiel.de":
+                        continue
+                    if local_material_exists(key, name):
+                        continue
+                    if new_here >= max_new_files_per_course:
+                        break
+                    b64 = self._cdp_eval_async(ws, OPENOLAT_FETCH_JS_TEMPLATE % json.dumps(href), timeout=45.0)
+                    if not isinstance(b64, str) or not b64:
+                        continue
+                    try:
+                        pdf_bytes = base64.b64decode(b64)
+                    except ValueError:
+                        continue
+                    if store_openolat_file(data, key, name, str(entry.get("path", "")), pdf_bytes):
+                        new_here += 1
+                if new_here:
+                    save_materials_data(data)
+                total_new += new_here
+                self.add_log("SUCCESS", f"📚 {title}: {len(files)} PDF-Dateien gefunden, {new_here} neu gespeichert.")
+
+            summary = f"OpenOlat-Abgleich fertig: {total_new} neue Datei(en) aus {len(targets)} Kursräumen."
+            if unreachable:
+                summary += f" {unreachable} Kursraum/-räume nicht erreichbar."
+            progress(summary, running=False, new_files=total_new, error=bool(unreachable))
+            return {"ok": True, "new_files": total_new, "courses": len(targets)}
+        except Exception as exc:
+            progress(f"OpenOlat-Abgleich fehlgeschlagen: {exc}", running=False, error=True)
+            self.add_log("ERROR", f"📚 Materialien-Abgleich fehlgeschlagen: {exc}")
+            return {"ok": False, "error": str(exc)}
+        finally:
+            self._materials_sync_lock.release()
+
     def scan_enrolled_groups_via_cdp(self, all_courses: Dict[str, Dict[str, Any]]) -> Dict[str, Any]:
         """
         UNIBODY High-Speed & High-Precision Deep-Sync Crawler (v2):
@@ -1900,9 +2146,9 @@ setTimeout(runUnibodyAutoFill, 2200);
 
                 # Reuse authenticated opener to sync EWInf Übung X materials in the same session
                 try:
-                    from cau_materials import load_materials_data, sync_ewinf_exercises_from_moodle, save_materials_data
+                    from cau_materials import load_materials_data, sync_all_moodle_courses, save_materials_data
                     mdata = load_materials_data(sync_live=False)
-                    if sync_ewinf_exercises_from_moodle(mdata, opener=opener):
+                    if sync_all_moodle_courses(mdata, opener=opener):
                         save_materials_data(mdata)
                 except Exception:
                     pass

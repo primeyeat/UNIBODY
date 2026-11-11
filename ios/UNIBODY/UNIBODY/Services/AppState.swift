@@ -31,6 +31,14 @@ public class AppState: ObservableObject {
     
     @Published public var lastSyncDate: Date? = nil
     
+    // Optimizer weights and wishes (persisted)
+    @Published public var optimizerPreferences = OptimizerPreferences()
+    
+    // On-device persistence
+    private var autosaveCancellable: AnyCancellable?
+    private var backgroundSaveObserver: NSObjectProtocol?
+    private var lastPersistedData: Data?
+    
     // Theme & Easter Egg
     @Published public var isDarkMode: Bool = true
     @Published public var designTheme: String = UserDefaults.standard.string(forKey: "unibody_design_theme") ?? "aero" {
@@ -61,6 +69,92 @@ public class AppState: ObservableObject {
     
     public init() {
         loadCredentialsFromStorage()
+        loadInitialData()
+        restorePersistedState()
+        startAutosave()
+        ReminderService.shared.update(courses: courses, enrolledGroups: enrolledGroups)
+    }
+    
+    // MARK: - On-device persistence (timetable, courses, bookings, preferences)
+    
+    /// Everything that must survive an app restart. Credentials are NOT part of this (Keychain only, NET-03).
+    private struct PersistedState: Codable {
+        var version: Int = 1
+        var schedule: [ScheduleEvent]
+        var courses: [Course]
+        var enrolledGroups: [String: String]
+        var isDarkMode: Bool
+        var lastSyncDate: Date?
+        var optimizerPreferences: OptimizerPreferences
+    }
+    
+    private static var stateFileURL: URL? {
+        guard let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first else { return nil }
+        return base.appendingPathComponent("UNIBODY", isDirectory: true).appendingPathComponent("state.json")
+    }
+    
+    /// Replaces the built-in defaults with the saved state, if there is one.
+    /// Built-in courses that were added in a newer app version are kept alongside the saved ones.
+    private func restorePersistedState() {
+        guard let url = Self.stateFileURL,
+              let data = try? Data(contentsOf: url),
+              let saved = try? JSONDecoder().decode(PersistedState.self, from: data) else { return }
+        
+        let savedIds = Set(saved.courses.map { $0.courseId.lowercased() })
+        let newBuiltIns = courses.filter { !savedIds.contains($0.courseId.lowercased()) }
+        
+        schedule = saved.schedule
+        courses = saved.courses + newBuiltIns
+        enrolledGroups = saved.enrolledGroups
+        isDarkMode = saved.isDarkMode
+        lastSyncDate = saved.lastSyncDate
+        optimizerPreferences = saved.optimizerPreferences
+        lastPersistedData = data
+    }
+    
+    /// Writes the current state to Application Support (atomic, file-protected). Skips unchanged state.
+    public func persistState() {
+        guard let url = Self.stateFileURL else { return }
+        let snapshot = PersistedState(
+            schedule: schedule,
+            courses: courses,
+            enrolledGroups: enrolledGroups,
+            isDarkMode: isDarkMode,
+            lastSyncDate: lastSyncDate,
+            optimizerPreferences: optimizerPreferences
+        )
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.sortedKeys]
+        guard let data = try? encoder.encode(snapshot), data != lastPersistedData else { return }
+        do {
+            try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+            try data.write(to: url, options: [.atomic, .completeFileProtectionUnlessOpen])
+            lastPersistedData = data
+            ReminderService.shared.update(courses: courses, enrolledGroups: enrolledGroups)
+        } catch {
+            syncMessage = "⚠️ Stundenplan konnte nicht gespeichert werden: \(error.localizedDescription)"
+        }
+    }
+    
+    /// Saves shortly after any change and immediately when the app leaves the foreground.
+    private func startAutosave() {
+        autosaveCancellable = objectWillChange
+            .debounce(for: .milliseconds(600), scheduler: RunLoop.main)
+            .sink { [weak self] _ in
+                Task { @MainActor [weak self] in self?.persistState() }
+            }
+        #if canImport(UIKit)
+        backgroundSaveObserver = NotificationCenter.default.addObserver(
+            forName: UIApplication.willResignActiveNotification, object: nil, queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor [weak self] in self?.persistState() }
+        }
+        #endif
+    }
+    
+    /// Discards the saved timetable and courses and restores the built-in defaults.
+    public func resetTimetableToDefaults() {
+        enrolledGroups.removeAll()
         loadInitialData()
     }
     
@@ -501,19 +595,6 @@ public class AppState: ObservableObject {
             enrolledGroups.removeValue(forKey: cid)
         }
         schedule.removeAll { $0.id == id }
-    }
-    
-    public func armSniperJob(course: Course, priorities: [ExerciseGroup]) {
-        let job = SniperJob(
-            courseId: course.courseId,
-            title: course.title,
-            platformHost: course.platformHost,
-            mode: course.enrollmentMode,
-            status: "armed",
-            targetTime: course.enrollmentOpensAt,
-            priorities: priorities
-        )
-        jobs.insert(job, at: 0)
     }
     
     /// Triggers the interactive On-Device UNIBODY Deep-Sync Sheet.

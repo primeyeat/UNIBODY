@@ -909,6 +909,358 @@ def sync_ewinf_exercises_from_moodle(
     return changed
 
 
+# ---------------------------------------------------------------------------
+# Generic live sync for ALL courses (Moodle via HTTP session, OpenOlat via Chrome/CDP)
+# ---------------------------------------------------------------------------
+
+MOODLE_HOST = "elearn.informatik.uni-kiel.de"
+OPENOLAT_HOST = "lms.uni-kiel.de"
+LIVE_SECTION_TITLE = "Live-Abgleich › Dateien aus dem Kursraum"
+
+
+def _safe_material_filename(name: str, default_ext: str = ".pdf") -> str:
+    """Reduces a label or URL file name to a safe basename (no path parts, no control characters)."""
+    base = os.path.basename(unicodedata.normalize("NFC", name or "").replace("\\", "/")).strip()
+    base = re.sub(r'[\x00-\x1f<>:"|?*]', "", base)
+    base = re.sub(r"\s+", " ", base).strip(" .")
+    if not base:
+        base = "Dokument"
+    if "." not in base[-6:]:
+        base += default_ext
+    return base[:120]
+
+
+def _moodle_course_number(course_url: str) -> Optional[str]:
+    m = re.search(r"/course/view\.php\?(?:[^#]*&)?id=(\d+)", course_url or "")
+    return m.group(1) if m else None
+
+
+def _live_section(course: Dict[str, Any], key: str) -> Dict[str, Any]:
+    """Returns (and creates if needed) the section that collects files found by the live sync."""
+    sec_id = f"sec-{key}-live"
+    for sec in course.setdefault("sections", []):
+        if sec.get("id") == sec_id:
+            return sec
+    sec = {"id": sec_id, "title": LIVE_SECTION_TITLE, "week_number": 0, "items": []}
+    course["sections"].append(sec)
+    return sec
+
+
+def _known_file_urls(course: Dict[str, Any]) -> Dict[str, Dict[str, Any]]:
+    """Maps every resource URL already stored for a course to its file entry."""
+    known: Dict[str, Dict[str, Any]] = {}
+    for a in course.get("assignments", []):
+        for tf in a.get("task_files", []) + a.get("solution_files", []):
+            if tf.get("url"):
+                known[tf["url"]] = tf
+    for sec in course.get("sections", []):
+        for it in sec.get("items", []):
+            if it.get("url"):
+                known[it["url"]] = it
+    return known
+
+
+def _register_material_file(
+    course: Dict[str, Any],
+    key: str,
+    label: str,
+    file_name: str,
+    url: str,
+    entry_id: str,
+    folder_path: str,
+    submission_url: str,
+    size: str = "PDF",
+) -> bool:
+    """
+    Files one discovered document into the course: exercise sheets become assignments,
+    solutions are attached to their sheet, everything else lands in the live-sync section.
+    Returns True if the course data changed.
+    """
+    if url in _known_file_urls(course):
+        return False
+
+    kind = classify_material_type(f"{label} {file_name}", "pdf")
+    sheet_no = parse_sheet_number(label) or parse_sheet_number(file_name)
+    is_solution = bool(re.search(r"l(?:ö|oe)sung|solution|musterl", f"{label} {file_name}", re.IGNORECASE))
+    is_exercise = kind == "assignment" or bool(re.search(r"\b(?:Übung|Uebung)\s*\d", label, re.IGNORECASE))
+    file_entry = {"name": file_name, "size": size, "ext": "pdf", "url": url}
+    assignments = course.setdefault("assignments", [])
+
+    if is_solution:
+        target = next((a for a in assignments if sheet_no and a.get("sheet_number") == sheet_no), None)
+        if target is None:
+            return False
+        target.setdefault("solution_files", []).append(file_entry)
+        return True
+
+    if is_exercise:
+        # Reuse a built-in entry for the same sheet if it has no real file link yet
+        norm = _normalize_fname_key(file_name)
+        for a in assignments:
+            files = a.get("task_files", [])
+            same_file = any(_normalize_fname_key(tf.get("name", "")) == norm for tf in files)
+            placeholder = sheet_no and a.get("sheet_number") == sheet_no and not any(
+                "/mod/resource/" in (tf.get("url") or "") or tf.get("live") for tf in files
+            )
+            if same_file or placeholder:
+                a["task_files"] = [{**file_entry, "live": True}]
+                return True
+        assignments.append({
+            "id": entry_id,
+            "title": label,
+            "sheet_number": sheet_no or 0,
+            "folder_path": folder_path,
+            "due_date": "",
+            "max_points": 0,
+            "status": "not_submitted",
+            "description": "Beim Live-Abgleich im Kursraum gefunden.",
+            "task_files": [{**file_entry, "live": True}],
+            "solution_files": [],
+            "submission_url": submission_url,
+        })
+        return True
+
+    _live_section(course, key)["items"].append({
+        "id": entry_id,
+        "title": label,
+        "type": kind if kind in ("slides", "script", "code") else "slides",
+        "file_name": file_name,
+        "file_ext": "pdf",
+        "size": size,
+        "date": datetime.now().strftime("%d.%m.%Y"),
+        "url": url,
+    })
+    return True
+
+
+def parse_moodle_course_resources(course_html: str) -> List[Dict[str, str]]:
+    """Extracts all visible file resources ({'id', 'url', 'label'}) from a Moodle course page."""
+    found: List[Dict[str, str]] = []
+    seen: set = set()
+    for mod in re.finditer(
+        r'<li\s+class="activity[^"]*modtype_resource[^"]*"\s+id="module-(\d+)"[^>]*>(.*?)</li>',
+        course_html,
+        re.S,
+    ):
+        body = mod.group(2)
+        if "Not available unless" in body or "Nicht verfügbar, es sei denn" in body:
+            continue
+        link = re.search(
+            r'href="(https://elearn\.informatik\.uni-kiel\.de/mod/resource/view\.php\?id=(\d+))"[^>]*>(.*?)</a>',
+            body,
+            re.S,
+        )
+        if not link or link.group(2) in seen:
+            continue
+        seen.add(link.group(2))
+        raw = re.sub(r'<span[^>]*class="[^"]*accesshide[^"]*"[^>]*>.*?</span>', " ", link.group(3), flags=re.S)
+        label = re.sub(r"\s+", " ", re.sub(r"<[^>]+>", " ", raw)).strip()
+        label = (
+            label.replace("&amp;", "&").replace("&nbsp;", " ").replace("&quot;", '"').replace("&#039;", "'")
+        )
+        if label:
+            found.append({"id": link.group(2), "url": link.group(1), "label": label})
+    return found
+
+
+def parse_moodle_upcoming_deadlines(calendar_html: str) -> List[Dict[str, str]]:
+    """
+    Extracts assignment deadlines from Moodle's 'upcoming events' calendar view.
+    Returns [{'event_id', 'title', 'due_date' (ISO, local time)}].
+    """
+    deadlines: List[Dict[str, str]] = []
+    parts = re.split(r'(?=<div[^>]*data-type="event")', calendar_html)
+    for part in parts[1:]:
+        head = part[: part.find(">") + 1]
+        if 'data-event-component="mod_assign"' not in head and 'data-event-eventtype="due"' not in head:
+            continue
+        title_m = re.search(r'data-event-title="([^"]*)"', head)
+        id_m = re.search(r'data-event-id="(\d+)"', head)
+        time_m = re.search(r"[?&;]time=(\d{9,11})", part)
+        if not title_m or not time_m:
+            continue
+        title = title_m.group(1).replace("&amp;", "&").replace("&quot;", '"').replace("&#039;", "'")
+        title = re.sub(r"\s*(?:ist fällig|is due|Fälligkeit)\s*$", "", title, flags=re.IGNORECASE).strip()
+        due = datetime.fromtimestamp(int(time_m.group(1))).strftime("%Y-%m-%dT%H:%M:%S")
+        deadlines.append({"event_id": id_m.group(1) if id_m else title, "title": title, "due_date": due})
+    return deadlines
+
+
+def sync_moodle_course(
+    data: Dict[str, Any],
+    key: str,
+    opener: Optional[urllib.request.OpenerDirector] = None,
+) -> bool:
+    """
+    Live sync for ANY course hosted on the Informatik Moodle: reads the course page for file resources
+    and the course calendar for assignment deadlines. Files are downloaded on first open.
+    """
+    course = data.get(key) or {}
+    number = _moodle_course_number(course.get("course_url", ""))
+    if not number or MOODLE_HOST not in course.get("course_url", ""):
+        return False
+    opener = opener or _build_moodle_opener()
+    if not opener:
+        return False
+
+    base = f"https://{MOODLE_HOST}"
+    course_page = f"{base}/course/view.php?id={number}"
+    changed = False
+
+    try:
+        html = opener.open(course_page, timeout=12).read().decode("utf-8", "ignore")
+    except Exception:
+        return False
+    if "login/index.php" in html and 'id="module-' not in html:
+        return False  # session not authenticated
+
+    for res in parse_moodle_course_resources(html):
+        if _register_material_file(
+            course,
+            key,
+            label=res["label"],
+            file_name=_safe_material_filename(res["label"]),
+            url=res["url"],
+            entry_id=f"mdl-{res['id']}",
+            folder_path=f"Moodle / {res['label']}",
+            submission_url=course_page,
+        ):
+            changed = True
+
+    try:
+        cal_html = opener.open(
+            f"{base}/calendar/view.php?view=upcoming&course={number}", timeout=12
+        ).read().decode("utf-8", "ignore")
+    except Exception:
+        cal_html = ""
+
+    assignments = course.setdefault("assignments", [])
+    for dl in parse_moodle_upcoming_deadlines(cal_html):
+        sheet_no = parse_sheet_number(dl["title"])
+        target = next((a for a in assignments if a.get("id") == f"mdl-due-{dl['event_id']}"), None)
+        if target is None and sheet_no:
+            target = next((a for a in assignments if a.get("sheet_number") == sheet_no), None)
+        if target is None:
+            assignments.append({
+                "id": f"mdl-due-{dl['event_id']}",
+                "title": dl["title"],
+                "sheet_number": sheet_no or 0,
+                "folder_path": f"Moodle / {dl['title']}",
+                "due_date": dl["due_date"],
+                "max_points": 0,
+                "status": "not_submitted",
+                "description": "Abgabefrist aus dem Moodle-Kalender.",
+                "task_files": [],
+                "solution_files": [],
+                "submission_url": course_page,
+            })
+            changed = True
+        elif target.get("due_date") != dl["due_date"]:
+            target["due_date"] = dl["due_date"]
+            changed = True
+
+    if changed:
+        data[key] = course
+    return changed
+
+
+def sync_all_moodle_courses(
+    data: Dict[str, Any],
+    opener: Optional[urllib.request.OpenerDirector] = None,
+) -> bool:
+    """Runs the live sync for every Moodle course in the materials data (one shared login)."""
+    keys = [k for k, c in data.items() if isinstance(c, dict) and MOODLE_HOST in str(c.get("course_url", ""))]
+    if not keys:
+        return False
+    opener = opener or _build_moodle_opener()
+    if not opener:
+        return False
+    changed = False
+    for key in keys:
+        try:
+            if key == "infewinf-01a" and sync_ewinf_exercises_from_moodle(data, opener=opener):
+                changed = True
+            if sync_moodle_course(data, key, opener=opener):
+                changed = True
+        except Exception:
+            continue
+    return changed
+
+
+def openolat_course_targets(data: Dict[str, Any]) -> List[Dict[str, str]]:
+    """Lists the OpenOlat courses ({'key', 'course_url'}) whose materials can be crawled via Chrome."""
+    targets = []
+    for key, course in data.items():
+        if not isinstance(course, dict):
+            continue
+        url = str(course.get("course_url", ""))
+        if urllib.parse.urlparse(url).hostname == OPENOLAT_HOST and "RepositoryEntry/" in url:
+            targets.append({"key": key, "course_url": url})
+    return targets
+
+
+def store_openolat_file(
+    data: Dict[str, Any],
+    key: str,
+    name: str,
+    folder_path: str,
+    pdf_bytes: bytes,
+) -> bool:
+    """
+    Saves one PDF crawled from an OpenOlat course into data/materials/<key>/ and registers it.
+    Rejects anything that is not a real PDF or would leave the materials folder.
+    """
+    course = data.get(key)
+    cid_clean = re.sub(r"[^a-zA-Z0-9_\-]", "", key.lower())
+    if not course or not cid_clean or not pdf_bytes.startswith(b"%PDF-"):
+        return False
+
+    file_name = _safe_material_filename(name)
+    base_real = os.path.realpath(MATERIALS_DIR)
+    target = os.path.realpath(os.path.join(MATERIALS_DIR, cid_clean, file_name))
+    if os.path.commonpath([base_real, target]) != base_real:
+        return False
+    os.makedirs(os.path.dirname(target), exist_ok=True)
+    with open(target, "wb") as fp:
+        fp.write(pdf_bytes)
+
+    size = f"{max(1, round(len(pdf_bytes) / 1024))} KB"
+    norm = _normalize_fname_key(file_name)
+    # A built-in entry for this exact file only needs its real size
+    for a in course.get("assignments", []):
+        for tf in a.get("task_files", []) + a.get("solution_files", []):
+            if _normalize_fname_key(tf.get("name", "")) == norm:
+                changed = tf.get("size") != size or not tf.get("live")
+                tf["size"], tf["live"] = size, True
+                return changed
+    for sec in course.get("sections", []):
+        for it in sec.get("items", []):
+            if _normalize_fname_key(it.get("file_name", "")) == norm:
+                changed = it.get("size") != size
+                it["size"] = size
+                return changed
+
+    course_url = course.get("course_url", "")
+    return _register_material_file(
+        course,
+        key,
+        label=f"{file_name} · {folder_path}" if folder_path else file_name,
+        file_name=file_name,
+        url=f"{course_url}#{urllib.parse.quote(file_name)}",
+        entry_id=f"olat-{cid_clean}-{re.sub(r'[^a-z0-9]+', '-', norm)}",
+        folder_path=f"{folder_path} / {file_name}" if folder_path else file_name,
+        submission_url=course_url,
+        size=size,
+    )
+
+
+def local_material_exists(key: str, name: str) -> bool:
+    """True if a crawled file with this name is already stored for the course."""
+    cid_clean = re.sub(r"[^a-zA-Z0-9_\-]", "", key.lower())
+    path = os.path.join(MATERIALS_DIR, cid_clean, _safe_material_filename(name))
+    return os.path.isfile(path) and os.path.getsize(path) > 1024
+
+
 def load_materials_data(sync_live: bool = False) -> Dict[str, Any]:
     """Loads cached materials data from data/materials_cache.json or initializes defaults."""
     defaults = get_default_course_materials()
@@ -942,7 +1294,7 @@ def load_materials_data(sync_live: bool = False) -> Dict[str, Any]:
                                 a["status"] = status_map[a["sheet_number"]]
                         dirty = True
 
-                    if sync_live and sync_ewinf_exercises_from_moodle(data):
+                    if sync_live and sync_all_moodle_courses(data):
                         dirty = True
 
                     if dirty:
@@ -952,7 +1304,7 @@ def load_materials_data(sync_live: bool = False) -> Dict[str, Any]:
             pass
 
     if sync_live:
-        sync_ewinf_exercises_from_moodle(defaults)
+        sync_all_moodle_courses(defaults)
     save_materials_data(defaults)
     return defaults
 

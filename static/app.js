@@ -8,17 +8,25 @@ const START_HOUR = 8;
 const END_HOUR = 19; // 08:00 to 19:00 (11 hours)
 const PX_PER_HOUR = 44;
 
+const DEFAULT_PREFERENCES = Object.freeze({
+  weight_compact: 85,
+  weight_free_days: 80,
+  weight_time_window: 70,
+  weight_campus_buffer: 50,
+  earliest_time: "09:30",
+  latest_time: "16:30",
+  preferred_free_days: [4],
+});
+
+function allWeightsZero(prefs) {
+  return ["weight_compact", "weight_free_days", "weight_time_window", "weight_campus_buffer"].every(
+    (key) => Number(prefs[key] ?? 1) === 0
+  );
+}
+
 let appState = {
   schedule: [],
-  preferences: {
-    weight_compact: 85,
-    weight_free_days: 80,
-    weight_time_window: 70,
-    weight_campus_buffer: 50,
-    earliest_time: "09:30",
-    latest_time: "16:30",
-    preferred_free_days: [4],
-  },
+  preferences: { ...DEFAULT_PREFERENCES, preferred_free_days: [...DEFAULT_PREFERENCES.preferred_free_days] },
   enrolledGroups: {},
   catalog: [],
   currentCourse: null,
@@ -63,6 +71,27 @@ async function apiPost(path, payload) {
     body: JSON.stringify(payload),
   });
   return res.json();
+}
+
+/* TOASTS: short, non-blocking messages in the corner (replace alert()) */
+function showToast(message, kind = "info") {
+  const region = document.getElementById("toastRegion");
+  if (!region) return;
+  const toast = document.createElement("div");
+  toast.className = `toast toast-${kind}`;
+  toast.setAttribute("role", kind === "error" ? "alert" : "status");
+  const text = document.createElement("span");
+  text.textContent = message;
+  const close = document.createElement("button");
+  close.type = "button";
+  close.className = "toast-close";
+  close.setAttribute("aria-label", "Meldung schließen");
+  close.textContent = "×";
+  const remove = () => toast.remove();
+  close.addEventListener("click", remove);
+  toast.append(text, close);
+  region.appendChild(toast);
+  setTimeout(remove, kind === "error" ? 9000 : 5000);
 }
 
 /* INITIALIZATION */
@@ -331,6 +360,12 @@ function syncPreferencesUI() {
   document.getElementById("prefEarliest").value = p.earliest_time || "09:30";
   document.getElementById("prefLatest").value = p.latest_time || "16:30";
 
+  const chkReminders = document.getElementById("chkRemindersEnabled");
+  if (chkReminders) chkReminders.checked = p.reminders_enabled !== false;
+
+  const zeroHint = document.getElementById("zeroWeightsHint");
+  if (zeroHint) zeroHint.classList.toggle("hidden", !allWeightsZero(p));
+
   const freeSet = new Set(p.preferred_free_days || [4]);
   document.querySelectorAll("#freeDayToggles .day-btn").forEach((btn) => {
     const d = Number(btn.dataset.day);
@@ -411,7 +446,7 @@ async function verifyAndRankCourse(queryId) {
       </span>
     </div>
     <button type="button" id="btnRouteCourseBrowser" class="btn btn-xs btn-primary" title="Öffnet diesen Kurs automatisch auf der richtigen Plattform (${res.course.platform_host}) und loggt dich ein">
-      🚀 Auf ${res.course.platform_short || res.course.platform_host} öffnen
+      Auf ${res.course.platform_short || res.course.platform_host} öffnen
     </button>
   `;
 
@@ -475,8 +510,9 @@ async function markGroupAsAlreadyEnrolled(groupId) {
         showUnenrollmentSuccessModal(currentCourseRef, previousGroup);
       } else {
         const errorMsg = (res && res.message) || "Die Austragung im Browser konnte nicht bestätigt werden.";
-        alert(
-          `⚠️ UNIBODY Live-Austragung:\n\n${errorMsg}\n\nGoogle Chrome bleibt für dich geöffnet, damit du den Status auf ${currentCourseRef.platform_host || "dem LMS"} direkt prüfen kannst.`
+        showToast(
+          `Austragung nicht bestätigt: ${errorMsg} Chrome bleibt geöffnet, damit du den Status auf ${currentCourseRef.platform_host || "dem LMS"} prüfen kannst.`,
+          "error"
         );
         await pollTelemetry();
 
@@ -498,7 +534,7 @@ async function markGroupAsAlreadyEnrolled(groupId) {
         }
       }
     } catch (err) {
-      alert("⚠️ Netzwerkfehler beim Kommunizieren mit dem UNIBODY Backend.");
+      showToast("Der UNIBODY-Server antwortet nicht. Läuft er noch?", "error");
     } finally {
       if (clearBtn) {
         clearBtn.disabled = false;
@@ -664,6 +700,8 @@ function renderRankedGroups() {
   if (enrolledBanner) {
     if (enrolledGrp) {
       const isAlreadyOptimal = rank1Grp && rank1Grp.group_id === enrolledGrp.group_id;
+      const rank1IsBetter =
+        Boolean(rank1Grp) && !isAlreadyOptimal && Number(rank1Grp.score) > Number(enrolledGrp.score);
       enrolledBanner.classList.remove("hidden");
       enrolledBanner.innerHTML = `
         <div style="flex:1;">
@@ -675,7 +713,11 @@ function renderRankedGroups() {
             ${
               isAlreadyOptimal
                 ? "🎉 <strong>Perfekt!</strong> Deine bereits gebuchte Gruppe ist gleichzeitig Platz #1 im Optimizer. Der Termin ist fest im Wochenplan für alle anderen Kurse reserviert."
-                : `💡 <strong>Upgrade möglich:</strong> <strong>${rank1Grp ? rank1Grp.name : "Eine andere Gruppe"}</strong> hätte einen höheren Score (${rank1Grp ? rank1Grp.display_score : ""}% statt ${enrolledGrp.display_score}%). Du kannst dich per Klick direkt in die bessere Gruppe umtragen!`
+                : rank1IsBetter
+                ? `💡 <strong>Upgrade möglich:</strong> <strong>${escapeHtml(rank1Grp.name)}</strong> hätte einen höheren Score (${rank1Grp.display_score}% statt ${enrolledGrp.display_score}%). Du kannst dich per Klick direkt in die bessere Gruppe umtragen!`
+                : rank1Grp && rank1Grp.is_pinned
+                ? `Du hast <strong>${escapeHtml(rank1Grp.name)}</strong> als Wunsch #1 angepinnt. Sie ist nicht besser bewertet als deine gebuchte Gruppe (${rank1Grp.display_score}% gegenüber ${enrolledGrp.display_score}%).`
+                : `Deine gebuchte Gruppe ist gleichauf mit Platz #1 (${enrolledGrp.display_score}%). Ein Wechsel bringt nach deinen Gewichtungen keinen Vorteil.`
             }
           </div>
         </div>
@@ -750,12 +792,12 @@ function renderRankedGroups() {
                 ${
                   !g.is_conflict
                     ? `<button type="button" class="btn-live-enroll-group" style="background:linear-gradient(135deg, #0ea5e9 0%, #2563eb 100%); color:#fff; border:none; font-weight:800; padding:4px 10px; border-radius:999px; font-size:0.71rem; cursor:pointer; display:inline-flex; align-items:center; gap:4px; box-shadow:0 2px 6px rgba(14,165,233,0.35);" title="Jetzt direkt im Browser einschreiben">
-                        ⚡ Live einschreiben
+                        Live einschreiben
                        </button>`
                     : ""
                 }
                 <button type="button" class="btn-mark-enrolled" style="${enrollToggleBtnStyle}" title="Bereits extern manuell belegt? Hier für deinen Wochenplan vormerken">
-                  ☑️ Schon gebucht?
+                  Schon gebucht?
                 </button>
                </div>`
         }
@@ -799,6 +841,21 @@ function renderRankedGroups() {
 }
 
 /* RENDER WEEKLY TIMETABLE WITH CANDIDATE OVERLAYS */
+/* Splits a long event title into a short course label and the descriptive rest,
+   dropping UnivIS numbers and a trailing "(Mi 10:15 – 11:45 · Raum)" that the time line already shows. */
+function splitEventTitle(title) {
+  let text = String(title || "")
+    .replace(/\s*\[(?:UnivIS\s*)?#?[\w-]+\]/gi, "")
+    .replace(/\s*\((?=[^)]*\d{1,2}[:.]\d{2})[^)]*\)\s*$/, "")
+    .replace(/\s{2,}/g, " ")
+    .trim();
+  const colon = text.indexOf(":");
+  if (colon > 0 && colon <= 32 && colon < text.length - 1) {
+    return { short: text.slice(0, colon).trim(), long: text.slice(colon + 1).trim() };
+  }
+  return { short: text, long: "" };
+}
+
 function renderTimetable() {
   const grid = document.getElementById("timetableGrid");
   grid.innerHTML = "";
@@ -908,18 +965,24 @@ function renderTimetable() {
         ? `👆 Klick = Diesen Kurs ('${linkedCourseToken}') sofort in Schritt 1 auswählen · Shift+Klick = Pausieren · Rechtsklick = Löschen`
         : "Shift+Klick zum Pausieren/Aktivieren · Rechtsklick zum Löschen";
 
-      let turnusLabel = "🔄 Jede Woche";
+      let turnusLabel = "Jede Woche";
       let turnusCls = "turnus-all";
       if (ev.week_type === "A") {
-        turnusLabel = "🅰️ Woche A";
+        turnusLabel = "Woche A";
         turnusCls = "turnus-a";
       } else if (ev.week_type === "B") {
-        turnusLabel = "🅱️ Woche B";
+        turnusLabel = "Woche B";
         turnusCls = "turnus-b";
       }
 
+      const titleParts = splitEventTitle(ev.title);
+      if (ev.type === "enrolled_exercise" && ev.course_id && titleParts.long) {
+        titleParts.short = `✅ ${ev.course_id}`;
+      }
+      el.title = `${ev.title}\n${el.title}`;
       el.innerHTML = `
-        <div class="tt-ev-title">${isSelectedCourse ? "🎯 " : ""}${escapeHtml(ev.title)}</div>
+        <div class="tt-ev-title">${isSelectedCourse ? "🎯 " : ""}${escapeHtml(titleParts.short)}</div>
+        ${titleParts.long ? `<div class="tt-ev-sub">${escapeHtml(titleParts.long)}</div>` : ""}
         <div class="tt-ev-time">${escapeHtml(ev.start_time)}–${escapeHtml(ev.end_time)} ${ev.room ? `· ${escapeHtml(ev.room)}` : ""}</div>
         <div style="display:flex;align-items:center;gap:4px;margin-top:3px;">
           <button type="button" class="tt-turnus-pill ${turnusCls}" title="Klick = Turnus ändern (Jede Woche / Woche A / Woche B)">
@@ -1104,7 +1167,7 @@ function renderTimetable() {
         ? `Aktuell als Wunsch #1 (${g.name}) ausgewählt! (Klicke erneut zum Aufheben)`
         : `Klicke auf diesen Kasten, um '${g.name}' sofort als Wunsch #1 (Grün) für Schritt 3 auszuwählen!`;
 
-      const displayName = bucket.length > 1 ? formatShortGroupName(g.name) : g.name;
+      const displayName = bucket.length > 1 ? formatShortGroupName(g.name) : splitEventTitle(g.name).short;
 
       el.innerHTML = `
         <div class="tt-ev-title">${escapeHtml(badge)}: ${escapeHtml(displayName)}</div>
@@ -2187,13 +2250,13 @@ function renderTurnusManagerList() {
       </div>
       <div class="turnus-segmented-control">
         <button type="button" class="turnus-seg-btn ${currentWt === 'all' ? 'active' : ''}" data-wt="all">
-          🔄 Jede Woche
+          Jede Woche
         </button>
         <button type="button" class="turnus-seg-btn turnus-btn-a ${currentWt === 'A' ? 'active' : ''}" data-wt="A">
-          🅰️ Woche A
+          Woche A
         </button>
         <button type="button" class="turnus-seg-btn turnus-btn-b ${currentWt === 'B' ? 'active' : ''}" data-wt="B">
-          🅱️ Woche B
+          Woche B
         </button>
       </div>
     `;
@@ -2553,9 +2616,21 @@ function bindUIEvents() {
       const v = Number(el.value);
       document.getElementById(valId).textContent = `${v}%`;
       appState.preferences[prefKey] = v;
+      document.getElementById("zeroWeightsHint")?.classList.toggle("hidden", !allWeightsZero(appState.preferences));
       await savePreferencesAndRecalc();
     });
   });
+
+  const btnResetPreferences = document.getElementById("btnResetPreferences");
+  if (btnResetPreferences) {
+    btnResetPreferences.addEventListener("click", async () => {
+      Object.assign(appState.preferences, DEFAULT_PREFERENCES, {
+        preferred_free_days: [...DEFAULT_PREFERENCES.preferred_free_days],
+      });
+      syncPreferencesUI();
+      await savePreferencesAndRecalc();
+    });
+  }
 
   document.getElementById("prefEarliest").addEventListener("change", async (e) => {
     appState.preferences.earliest_time = e.target.value;
@@ -2641,7 +2716,7 @@ function bindUIEvents() {
     const use_keychain = document.getElementById("credUseKeychain").checked;
 
     if (!username) {
-      alert("Bitte gib deine CAU-Kennung (z. B. stu123456) ein!");
+      showToast("Bitte gib deine CAU-Kennung ein, z. B. stu123456.", "warn");
       return;
     }
 
@@ -2656,7 +2731,7 @@ function bindUIEvents() {
     });
 
     if (!res.ok) {
-      alert(res.error || "Fehler beim Speichern der Login-Daten.");
+      showToast(res.error || "Die Login-Daten konnten nicht gespeichert werden.", "error");
       return;
     }
 
@@ -2717,7 +2792,7 @@ function bindUIEvents() {
   if (btnEditCurrentGroups) {
     btnEditCurrentGroups.addEventListener("click", () => {
       if (!appState.currentCourse) {
-        alert("Bitte wähle zuerst oben in Schritt 1 einen Kurs aus!");
+        showToast("Bitte wähle zuerst in Schritt 1 einen Kurs aus.", "warn");
         return;
       }
       const titleEl = document.getElementById("editGroupsTitle");
@@ -2742,7 +2817,7 @@ function bindUIEvents() {
         raw_text: rawText,
       });
       if (!res.ok) {
-        alert(res.error || "Fehler beim Parsen der Gruppen.");
+        showToast(res.error || "Die Gruppen konnten nicht gelesen werden.", "error");
         return;
       }
       const m = document.getElementById("modalEditGroups");
@@ -2798,10 +2873,37 @@ function bindUIEvents() {
     });
   }
 
+  // Reminders on/off
+  const chkRemindersEnabled = document.getElementById("chkRemindersEnabled");
+  if (chkRemindersEnabled) {
+    chkRemindersEnabled.addEventListener("change", async () => {
+      appState.preferences.reminders_enabled = chkRemindersEnabled.checked;
+      await apiPost("/api/preferences/update", { preferences: appState.preferences });
+    });
+  }
+
+  // Escape closes the topmost open dialog
+  document.addEventListener("keydown", (e) => {
+    if (e.key !== "Escape") return;
+    const open = Array.from(document.querySelectorAll(".modal-backdrop:not(.hidden)"));
+    const top = open[open.length - 1];
+    if (!top) return;
+    e.preventDefault();
+    const closer = top.querySelector("[data-close]");
+    if (closer) closer.click();
+    else top.classList.add("hidden");
+  });
+
+  // Combined plan across all courses
+  const btnCombinedPlan = document.getElementById("btnComputeCombinedPlan");
+  if (btnCombinedPlan) {
+    btnCombinedPlan.addEventListener("click", computeCombinedPlan);
+  }
+
   // Enrollment locked modal: button handler
-  const btnLockedArmCountdown = document.getElementById("btnLockedArmCountdown");
-  if (btnLockedArmCountdown) {
-    btnLockedArmCountdown.addEventListener("click", () => {
+  const btnLockedToCourses = document.getElementById("btnLockedToCourses");
+  if (btnLockedToCourses) {
+    btnLockedToCourses.addEventListener("click", () => {
       document.getElementById("modalEnrollmentLocked").classList.add("hidden");
       const step3Card = document.querySelector(".left-panel");
       if (step3Card) {
@@ -2946,7 +3048,7 @@ async function savePreferencesAndRecalc() {
 
 async function triggerEnrollment() {
   if (!appState.currentCourse) {
-    alert("Bitte zuerst eine Kurs-ID in Schritt 1 verifizieren!");
+    showToast("Bitte wähle zuerst in Schritt 1 einen Kurs aus.", "warn");
     return;
   }
   const modeSel = document.getElementById("enrollModeSelect");
@@ -2964,8 +3066,6 @@ async function triggerEnrollment() {
     course_id: appState.currentCourse.course_id,
     mode,
     simulate_first_choice_full: simulateFallback,
-    trigger_type: "immediate",
-    countdown_seconds: 0,
   });
 
   setTimeout(pollTelemetry, 300);
@@ -4253,7 +4353,7 @@ async function renderFinder() {
         <div class="fsh-right">
           ${isSlides && items.length > 0 ? `
             <button type="button" class="btn btn-outline btn-xs" id="btnDownloadAllSlides">
-              📥 Alle herunterladen (${items.length})
+              Alle herunterladen (${items.length})
             </button>
           ` : ""}
         </div>
@@ -4617,7 +4717,7 @@ function renderAssignmentCardHtml(a, courseId) {
 
         <div class="mdb-footer-row">
           <button type="button" class="btn btn-outline btn-xs btn-finder-toggle-status" data-aid="${aid}" data-cid="${cid}">
-            <span>${isSubmitted ? "↩️ Als offen markieren" : "✅ Als erledigt markieren"}</span>
+            <span>${isSubmitted ? "Als offen markieren" : "✅ Als erledigt markieren"}</span>
           </button>
           ${a.submission_url ? `
             <a href="${escapeHtml(a.submission_url)}" target="_blank" rel="noopener noreferrer" class="btn btn-primary btn-xs">
@@ -4664,12 +4764,24 @@ function bindMaterialsUIEvents() {
   // Refresh button
   document.getElementById("btnMaterialsRefresh")?.addEventListener("click", async () => {
     const btn = document.getElementById("btnMaterialsRefresh");
-    if (btn) btn.textContent = "🔄 Synchronisiere...";
+    if (btn) {
+      btn.disabled = true;
+      btn.textContent = "Synchronisiere …";
+    }
+    setMaterialsSyncStatus("Moodle-Kurse werden abgeglichen …", true);
     finderState.courseDetailsCache = {};
-    await updateMaterialsBadgeAndStatus(true);
-    await renderFinder();
-    if (btn) btn.textContent = "🔄 Aktualisieren";
+    try {
+      await updateMaterialsBadgeAndStatus(true);
+      await renderFinder();
+      await watchOpenOlatSync();
+    } finally {
+      if (btn) {
+        btn.disabled = false;
+        btn.textContent = "Aktualisieren";
+      }
+    }
   });
+
 
   // View toggle buttons (Grid vs List)
   document.getElementById("btnViewGrid")?.addEventListener("click", () => {
@@ -4720,3 +4832,108 @@ function bindMaterialsUIEvents() {
   }
 }
 
+
+/* MATERIALS SYNC PROGRESS: the OpenOlat crawl runs in the background on the server */
+function setMaterialsSyncStatus(text, busy = false) {
+  const el = document.getElementById("materialsSyncStatus");
+  if (!el) return;
+  el.textContent = text || "";
+  el.classList.toggle("hidden", !text);
+  el.classList.toggle("busy", Boolean(busy));
+}
+
+async function watchOpenOlatSync() {
+  // Poll until the background crawl has finished (at most ~6 minutes)
+  for (let i = 0; i < 240; i++) {
+    let status;
+    try {
+      status = await apiGet("/api/materials/sync-status");
+    } catch (err) {
+      setMaterialsSyncStatus("Status nicht abrufbar. Läuft der UNIBODY-Server noch?");
+      return;
+    }
+    if (!status || !status.ok) {
+      setMaterialsSyncStatus("");
+      return;
+    }
+    if (!status.running) {
+      setMaterialsSyncStatus(status.message || "Abgleich abgeschlossen.");
+      if (status.new_files > 0) {
+        finderState.courseDetailsCache = {};
+        await updateMaterialsBadgeAndStatus();
+        await renderFinder();
+        showToast(`${status.new_files} neue Datei(en) aus OpenOlat gespeichert.`);
+      } else if (status.error) {
+        showToast(status.message, "warn");
+      }
+      return;
+    }
+    setMaterialsSyncStatus(status.message || "OpenOlat-Kursräume werden durchsucht …", true);
+    await new Promise((resolve) => setTimeout(resolve, 1500));
+  }
+  setMaterialsSyncStatus("Der Abgleich läuft noch im Hintergrund.");
+}
+
+/* COMBINED PLAN: best group combination across all courses */
+async function computeCombinedPlan() {
+  const container = document.getElementById("combinedPlanContainer");
+  const btn = document.getElementById("btnComputeCombinedPlan");
+  if (!container) return;
+  container.classList.remove("hidden");
+  container.innerHTML = `<div class="empty-hint">Kombinationen werden berechnet …</div>`;
+  if (btn) btn.disabled = true;
+  try {
+    const res = await apiPost("/api/optimizer/plan", {});
+    renderCombinedPlans(res && res.ok ? res.plans || [] : []);
+  } catch (err) {
+    container.innerHTML = `<div class="empty-hint">Die Berechnung ist fehlgeschlagen. Läuft der UNIBODY-Server noch?</div>`;
+  } finally {
+    if (btn) btn.disabled = false;
+  }
+}
+
+function renderCombinedPlans(plans) {
+  const container = document.getElementById("combinedPlanContainer");
+  if (!container) return;
+  if (!plans.length || !plans.some((p) => p.assignments.length || p.unplaced.length)) {
+    container.innerHTML = `<div class="empty-hint">Keine Kurse mit Übungsgruppen gefunden.</div>`;
+    return;
+  }
+  const dayShort = ["Mo", "Di", "Mi", "Do", "Fr", "Sa", "So"];
+  container.innerHTML = plans
+    .map((plan, idx) => {
+      const rows = plan.assignments
+        .map((a) => {
+          const g = a.group || {};
+          const lock =
+            a.locked_reason === "enrolled"
+              ? `<span class="combined-plan-tag">gebucht</span>`
+              : a.locked_reason === "pinned"
+              ? `<span class="combined-plan-tag">Wunsch #1</span>`
+              : "";
+          const full = g.is_full ? `<span class="combined-plan-tag warn">voll</span>` : "";
+          return `
+            <li>
+              <span class="combined-plan-time">${dayShort[g.day] || "?"} ${escapeHtml(g.start_time || "")}–${escapeHtml(g.end_time || "")}</span>
+              <span class="combined-plan-course"><strong>${escapeHtml(a.course_id)}</strong> · ${escapeHtml(g.name || "")} ${lock}${full}</span>
+              <span class="combined-plan-score">${g.display_score ?? "–"}</span>
+            </li>`;
+        })
+        .join("");
+      const unplaced = plan.unplaced.length
+        ? `<div class="combined-plan-unplaced">Ohne konfliktfreie Gruppe: ${plan.unplaced
+            .map((u) => escapeHtml(u.course_id))
+            .join(", ")}</div>`
+        : "";
+      return `
+        <div class="combined-plan-card${idx === 0 ? " best" : ""}">
+          <div class="combined-plan-head">
+            <strong>${idx === 0 ? "Beste Kombination" : `Alternative ${idx}`}</strong>
+            <span class="combined-plan-total">${plan.total_score} / 100</span>
+          </div>
+          <ul>${rows}</ul>
+          ${unplaced}
+        </div>`;
+    })
+    .join("");
+}

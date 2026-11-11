@@ -15,18 +15,18 @@
 		000020000000000000000006 /* ScheduleEvent.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000010000000000000000006 /* ScheduleEvent.swift */; };
 		000020000000000000000007 /* SniperJob.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000010000000000000000007 /* SniperJob.swift */; };
 		000020000000000000000008 /* AeroTheme.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000010000000000000000008 /* AeroTheme.swift */; };
-		000020000000000000000009 /* SettingsLoginView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000010000000000000000009 /* SettingsLoginView.swift */; };
-		00002000000000000000000A /* AddEventSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00001000000000000000000A /* AddEventSheet.swift */; };
-		00002000000000000000000B /* ScheduleEventCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00001000000000000000000B /* ScheduleEventCard.swift */; };
-		00002000000000000000000C /* ScheduleView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00001000000000000000000C /* ScheduleView.swift */; };
-		00002000000000000000000D /* MaterialsFinderView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00001000000000000000000D /* MaterialsFinderView.swift */; };
-		00002000000000000000000E /* CAUMailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00001000000000000000000E /* CAUMailView.swift */; };
-		00002000000000000000000F /* AeroBadge.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00001000000000000000000F /* AeroBadge.swift */; };
-		000020000000000000000010 /* CapacityPill.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000010000000000000000010 /* CapacityPill.swift */; };
-		000020000000000000000011 /* CourseDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000010000000000000000011 /* CourseDetailView.swift */; };
-		000020000000000000000012 /* CoursesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000010000000000000000012 /* CoursesView.swift */; };
-		000020000000000000000013 /* LiveAutomationSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000010000000000000000013 /* LiveAutomationSheet.swift */; };
-		000020000000000000000014 /* SniperDashboardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000010000000000000000014 /* SniperDashboardView.swift */; };
+		000020000000000000000009 /* OptimizerPreferencesCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000010000000000000000009 /* OptimizerPreferencesCard.swift */; };
+		00002000000000000000000A /* SettingsLoginView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00001000000000000000000A /* SettingsLoginView.swift */; };
+		00002000000000000000000B /* AddEventSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00001000000000000000000B /* AddEventSheet.swift */; };
+		00002000000000000000000C /* ScheduleEventCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00001000000000000000000C /* ScheduleEventCard.swift */; };
+		00002000000000000000000D /* ScheduleView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00001000000000000000000D /* ScheduleView.swift */; };
+		00002000000000000000000E /* MaterialsFinderView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00001000000000000000000E /* MaterialsFinderView.swift */; };
+		00002000000000000000000F /* CAUMailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00001000000000000000000F /* CAUMailView.swift */; };
+		000020000000000000000010 /* AeroBadge.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000010000000000000000010 /* AeroBadge.swift */; };
+		000020000000000000000011 /* CapacityPill.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000010000000000000000011 /* CapacityPill.swift */; };
+		000020000000000000000012 /* CourseDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000010000000000000000012 /* CourseDetailView.swift */; };
+		000020000000000000000013 /* CoursesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000010000000000000000013 /* CoursesView.swift */; };
+		000020000000000000000014 /* LiveAutomationSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000010000000000000000014 /* LiveAutomationSheet.swift */; };
 		000020000000000000000015 /* LiveDeepSyncSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000010000000000000000015 /* LiveDeepSyncSheet.swift */; };
 		000020000000000000000016 /* UnivISImportView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000010000000000000000016 /* UnivISImportView.swift */; };
 		000020000000000000000017 /* AppState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000010000000000000000017 /* AppState.swift */; };
@@ -35,18 +35,20 @@
 		00002000000000000000001A /* CourseMaterialsService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00001000000000000000001A /* CourseMaterialsService.swift */; };
 		00002000000000000000001B /* KeychainHelper.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00001000000000000000001B /* KeychainHelper.swift */; };
 		00002000000000000000001C /* LMSMobileEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00001000000000000000001C /* LMSMobileEngine.swift */; };
-		00002000000000000000001D /* OptimizerEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00001000000000000000001D /* OptimizerEngine.swift */; };
-		00002000000000000000001E /* SyncService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00001000000000000000001E /* SyncService.swift */; };
-		00002000000000000000001F /* UnivISParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00001000000000000000001F /* UnivISParser.swift */; };
-		000021000000000000000020 /* EBWL_Uebungsblatt_01_Rechtsformen.pdf in Resources */ = {isa = PBXBuildFile; fileRef = 000011000000000000000020 /* EBWL_Uebungsblatt_01_Rechtsformen.pdf */; };
-		000021000000000000000021 /* EWInf_Uebung_1.pdf in Resources */ = {isa = PBXBuildFile; fileRef = 000011000000000000000021 /* EWInf_Uebung_1.pdf */; };
-		000021000000000000000022 /* EWInf_Uebung_2.pdf in Resources */ = {isa = PBXBuildFile; fileRef = 000011000000000000000022 /* EWInf_Uebung_2.pdf */; };
-		000021000000000000000023 /* bl01.pdf in Resources */ = {isa = PBXBuildFile; fileRef = 000011000000000000000023 /* bl01.pdf */; };
-		000021000000000000000024 /* bl02.pdf in Resources */ = {isa = PBXBuildFile; fileRef = 000011000000000000000024 /* bl02.pdf */; };
-		000021000000000000000025 /* kap_01-1_rub.pdf in Resources */ = {isa = PBXBuildFile; fileRef = 000011000000000000000025 /* kap_01-1_rub.pdf */; };
-		000021000000000000000026 /* kap_01-2_rub.pdf in Resources */ = {isa = PBXBuildFile; fileRef = 000011000000000000000026 /* kap_01-2_rub.pdf */; };
-		000021000000000000000027 /* kap_01-3_rub.pdf in Resources */ = {isa = PBXBuildFile; fileRef = 000011000000000000000027 /* kap_01-3_rub.pdf */; };
-		000021000000000000000028 /* pr01.pdf in Resources */ = {isa = PBXBuildFile; fileRef = 000011000000000000000028 /* pr01.pdf */; };
+		00002000000000000000001D /* OpenOlatMaterialsCrawler.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00001000000000000000001D /* OpenOlatMaterialsCrawler.swift */; };
+		00002000000000000000001E /* OptimizerEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00001000000000000000001E /* OptimizerEngine.swift */; };
+		00002000000000000000001F /* ReminderService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00001000000000000000001F /* ReminderService.swift */; };
+		000020000000000000000020 /* SyncService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000010000000000000000020 /* SyncService.swift */; };
+		000020000000000000000021 /* UnivISParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000010000000000000000021 /* UnivISParser.swift */; };
+		000021000000000000000022 /* EBWL_Uebungsblatt_01_Rechtsformen.pdf in Resources */ = {isa = PBXBuildFile; fileRef = 000011000000000000000022 /* EBWL_Uebungsblatt_01_Rechtsformen.pdf */; };
+		000021000000000000000023 /* EWInf_Uebung_1.pdf in Resources */ = {isa = PBXBuildFile; fileRef = 000011000000000000000023 /* EWInf_Uebung_1.pdf */; };
+		000021000000000000000024 /* EWInf_Uebung_2.pdf in Resources */ = {isa = PBXBuildFile; fileRef = 000011000000000000000024 /* EWInf_Uebung_2.pdf */; };
+		000021000000000000000025 /* bl01.pdf in Resources */ = {isa = PBXBuildFile; fileRef = 000011000000000000000025 /* bl01.pdf */; };
+		000021000000000000000026 /* bl02.pdf in Resources */ = {isa = PBXBuildFile; fileRef = 000011000000000000000026 /* bl02.pdf */; };
+		000021000000000000000027 /* kap_01-1_rub.pdf in Resources */ = {isa = PBXBuildFile; fileRef = 000011000000000000000027 /* kap_01-1_rub.pdf */; };
+		000021000000000000000028 /* kap_01-2_rub.pdf in Resources */ = {isa = PBXBuildFile; fileRef = 000011000000000000000028 /* kap_01-2_rub.pdf */; };
+		000021000000000000000029 /* kap_01-3_rub.pdf in Resources */ = {isa = PBXBuildFile; fileRef = 000011000000000000000029 /* kap_01-3_rub.pdf */; };
+		00002100000000000000002A /* pr01.pdf in Resources */ = {isa = PBXBuildFile; fileRef = 00001100000000000000002A /* pr01.pdf */; };
 		0000200000000000000003E7 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 0000100000000000000003E7 /* Assets.xcassets */; };
 /* End PBXBuildFile section */
 
@@ -60,18 +62,18 @@
 		000010000000000000000006 /* ScheduleEvent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Models/ScheduleEvent.swift"; sourceTree = "<group>"; };
 		000010000000000000000007 /* SniperJob.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Models/SniperJob.swift"; sourceTree = "<group>"; };
 		000010000000000000000008 /* AeroTheme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Theme/AeroTheme.swift"; sourceTree = "<group>"; };
-		000010000000000000000009 /* SettingsLoginView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Views/Settings/SettingsLoginView.swift"; sourceTree = "<group>"; };
-		00001000000000000000000A /* AddEventSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Views/Schedule/AddEventSheet.swift"; sourceTree = "<group>"; };
-		00001000000000000000000B /* ScheduleEventCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Views/Schedule/ScheduleEventCard.swift"; sourceTree = "<group>"; };
-		00001000000000000000000C /* ScheduleView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Views/Schedule/ScheduleView.swift"; sourceTree = "<group>"; };
-		00001000000000000000000D /* MaterialsFinderView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Views/Materials/MaterialsFinderView.swift"; sourceTree = "<group>"; };
-		00001000000000000000000E /* CAUMailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Views/Mail/CAUMailView.swift"; sourceTree = "<group>"; };
-		00001000000000000000000F /* AeroBadge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Views/Components/AeroBadge.swift"; sourceTree = "<group>"; };
-		000010000000000000000010 /* CapacityPill.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Views/Components/CapacityPill.swift"; sourceTree = "<group>"; };
-		000010000000000000000011 /* CourseDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Views/Courses/CourseDetailView.swift"; sourceTree = "<group>"; };
-		000010000000000000000012 /* CoursesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Views/Courses/CoursesView.swift"; sourceTree = "<group>"; };
-		000010000000000000000013 /* LiveAutomationSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Views/Courses/LiveAutomationSheet.swift"; sourceTree = "<group>"; };
-		000010000000000000000014 /* SniperDashboardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Views/Sniper/SniperDashboardView.swift"; sourceTree = "<group>"; };
+		000010000000000000000009 /* OptimizerPreferencesCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Views/Settings/OptimizerPreferencesCard.swift"; sourceTree = "<group>"; };
+		00001000000000000000000A /* SettingsLoginView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Views/Settings/SettingsLoginView.swift"; sourceTree = "<group>"; };
+		00001000000000000000000B /* AddEventSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Views/Schedule/AddEventSheet.swift"; sourceTree = "<group>"; };
+		00001000000000000000000C /* ScheduleEventCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Views/Schedule/ScheduleEventCard.swift"; sourceTree = "<group>"; };
+		00001000000000000000000D /* ScheduleView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Views/Schedule/ScheduleView.swift"; sourceTree = "<group>"; };
+		00001000000000000000000E /* MaterialsFinderView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Views/Materials/MaterialsFinderView.swift"; sourceTree = "<group>"; };
+		00001000000000000000000F /* CAUMailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Views/Mail/CAUMailView.swift"; sourceTree = "<group>"; };
+		000010000000000000000010 /* AeroBadge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Views/Components/AeroBadge.swift"; sourceTree = "<group>"; };
+		000010000000000000000011 /* CapacityPill.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Views/Components/CapacityPill.swift"; sourceTree = "<group>"; };
+		000010000000000000000012 /* CourseDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Views/Courses/CourseDetailView.swift"; sourceTree = "<group>"; };
+		000010000000000000000013 /* CoursesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Views/Courses/CoursesView.swift"; sourceTree = "<group>"; };
+		000010000000000000000014 /* LiveAutomationSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Views/Courses/LiveAutomationSheet.swift"; sourceTree = "<group>"; };
 		000010000000000000000015 /* LiveDeepSyncSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Views/Sync/LiveDeepSyncSheet.swift"; sourceTree = "<group>"; };
 		000010000000000000000016 /* UnivISImportView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Views/Sync/UnivISImportView.swift"; sourceTree = "<group>"; };
 		000010000000000000000017 /* AppState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Services/AppState.swift"; sourceTree = "<group>"; };
@@ -80,18 +82,20 @@
 		00001000000000000000001A /* CourseMaterialsService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Services/CourseMaterialsService.swift"; sourceTree = "<group>"; };
 		00001000000000000000001B /* KeychainHelper.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Services/KeychainHelper.swift"; sourceTree = "<group>"; };
 		00001000000000000000001C /* LMSMobileEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Services/LMSMobileEngine.swift"; sourceTree = "<group>"; };
-		00001000000000000000001D /* OptimizerEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Services/OptimizerEngine.swift"; sourceTree = "<group>"; };
-		00001000000000000000001E /* SyncService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Services/SyncService.swift"; sourceTree = "<group>"; };
-		00001000000000000000001F /* UnivISParser.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Services/UnivISParser.swift"; sourceTree = "<group>"; };
-		000011000000000000000020 /* EBWL_Uebungsblatt_01_Rechtsformen.pdf */ = {isa = PBXFileReference; lastKnownFileType = image.pdf; path = "BundledMaterials/EBWL_Uebungsblatt_01_Rechtsformen.pdf"; sourceTree = "<group>"; };
-		000011000000000000000021 /* EWInf_Uebung_1.pdf */ = {isa = PBXFileReference; lastKnownFileType = image.pdf; path = "BundledMaterials/EWInf_Uebung_1.pdf"; sourceTree = "<group>"; };
-		000011000000000000000022 /* EWInf_Uebung_2.pdf */ = {isa = PBXFileReference; lastKnownFileType = image.pdf; path = "BundledMaterials/EWInf_Uebung_2.pdf"; sourceTree = "<group>"; };
-		000011000000000000000023 /* bl01.pdf */ = {isa = PBXFileReference; lastKnownFileType = image.pdf; path = "BundledMaterials/bl01.pdf"; sourceTree = "<group>"; };
-		000011000000000000000024 /* bl02.pdf */ = {isa = PBXFileReference; lastKnownFileType = image.pdf; path = "BundledMaterials/bl02.pdf"; sourceTree = "<group>"; };
-		000011000000000000000025 /* kap_01-1_rub.pdf */ = {isa = PBXFileReference; lastKnownFileType = image.pdf; path = "BundledMaterials/kap_01-1_rub.pdf"; sourceTree = "<group>"; };
-		000011000000000000000026 /* kap_01-2_rub.pdf */ = {isa = PBXFileReference; lastKnownFileType = image.pdf; path = "BundledMaterials/kap_01-2_rub.pdf"; sourceTree = "<group>"; };
-		000011000000000000000027 /* kap_01-3_rub.pdf */ = {isa = PBXFileReference; lastKnownFileType = image.pdf; path = "BundledMaterials/kap_01-3_rub.pdf"; sourceTree = "<group>"; };
-		000011000000000000000028 /* pr01.pdf */ = {isa = PBXFileReference; lastKnownFileType = image.pdf; path = "BundledMaterials/pr01.pdf"; sourceTree = "<group>"; };
+		00001000000000000000001D /* OpenOlatMaterialsCrawler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Services/OpenOlatMaterialsCrawler.swift"; sourceTree = "<group>"; };
+		00001000000000000000001E /* OptimizerEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Services/OptimizerEngine.swift"; sourceTree = "<group>"; };
+		00001000000000000000001F /* ReminderService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Services/ReminderService.swift"; sourceTree = "<group>"; };
+		000010000000000000000020 /* SyncService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Services/SyncService.swift"; sourceTree = "<group>"; };
+		000010000000000000000021 /* UnivISParser.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Services/UnivISParser.swift"; sourceTree = "<group>"; };
+		000011000000000000000022 /* EBWL_Uebungsblatt_01_Rechtsformen.pdf */ = {isa = PBXFileReference; lastKnownFileType = image.pdf; path = "BundledMaterials/EBWL_Uebungsblatt_01_Rechtsformen.pdf"; sourceTree = "<group>"; };
+		000011000000000000000023 /* EWInf_Uebung_1.pdf */ = {isa = PBXFileReference; lastKnownFileType = image.pdf; path = "BundledMaterials/EWInf_Uebung_1.pdf"; sourceTree = "<group>"; };
+		000011000000000000000024 /* EWInf_Uebung_2.pdf */ = {isa = PBXFileReference; lastKnownFileType = image.pdf; path = "BundledMaterials/EWInf_Uebung_2.pdf"; sourceTree = "<group>"; };
+		000011000000000000000025 /* bl01.pdf */ = {isa = PBXFileReference; lastKnownFileType = image.pdf; path = "BundledMaterials/bl01.pdf"; sourceTree = "<group>"; };
+		000011000000000000000026 /* bl02.pdf */ = {isa = PBXFileReference; lastKnownFileType = image.pdf; path = "BundledMaterials/bl02.pdf"; sourceTree = "<group>"; };
+		000011000000000000000027 /* kap_01-1_rub.pdf */ = {isa = PBXFileReference; lastKnownFileType = image.pdf; path = "BundledMaterials/kap_01-1_rub.pdf"; sourceTree = "<group>"; };
+		000011000000000000000028 /* kap_01-2_rub.pdf */ = {isa = PBXFileReference; lastKnownFileType = image.pdf; path = "BundledMaterials/kap_01-2_rub.pdf"; sourceTree = "<group>"; };
+		000011000000000000000029 /* kap_01-3_rub.pdf */ = {isa = PBXFileReference; lastKnownFileType = image.pdf; path = "BundledMaterials/kap_01-3_rub.pdf"; sourceTree = "<group>"; };
+		00001100000000000000002A /* pr01.pdf */ = {isa = PBXFileReference; lastKnownFileType = image.pdf; path = "BundledMaterials/pr01.pdf"; sourceTree = "<group>"; };
 		0000100000000000000003E7 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		0000100000000000000003E6 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -126,18 +130,18 @@
 				000010000000000000000006 /* ScheduleEvent.swift */,
 				000010000000000000000007 /* SniperJob.swift */,
 				000010000000000000000008 /* AeroTheme.swift */,
-				000010000000000000000009 /* SettingsLoginView.swift */,
-				00001000000000000000000A /* AddEventSheet.swift */,
-				00001000000000000000000B /* ScheduleEventCard.swift */,
-				00001000000000000000000C /* ScheduleView.swift */,
-				00001000000000000000000D /* MaterialsFinderView.swift */,
-				00001000000000000000000E /* CAUMailView.swift */,
-				00001000000000000000000F /* AeroBadge.swift */,
-				000010000000000000000010 /* CapacityPill.swift */,
-				000010000000000000000011 /* CourseDetailView.swift */,
-				000010000000000000000012 /* CoursesView.swift */,
-				000010000000000000000013 /* LiveAutomationSheet.swift */,
-				000010000000000000000014 /* SniperDashboardView.swift */,
+				000010000000000000000009 /* OptimizerPreferencesCard.swift */,
+				00001000000000000000000A /* SettingsLoginView.swift */,
+				00001000000000000000000B /* AddEventSheet.swift */,
+				00001000000000000000000C /* ScheduleEventCard.swift */,
+				00001000000000000000000D /* ScheduleView.swift */,
+				00001000000000000000000E /* MaterialsFinderView.swift */,
+				00001000000000000000000F /* CAUMailView.swift */,
+				000010000000000000000010 /* AeroBadge.swift */,
+				000010000000000000000011 /* CapacityPill.swift */,
+				000010000000000000000012 /* CourseDetailView.swift */,
+				000010000000000000000013 /* CoursesView.swift */,
+				000010000000000000000014 /* LiveAutomationSheet.swift */,
 				000010000000000000000015 /* LiveDeepSyncSheet.swift */,
 				000010000000000000000016 /* UnivISImportView.swift */,
 				000010000000000000000017 /* AppState.swift */,
@@ -146,18 +150,20 @@
 				00001000000000000000001A /* CourseMaterialsService.swift */,
 				00001000000000000000001B /* KeychainHelper.swift */,
 				00001000000000000000001C /* LMSMobileEngine.swift */,
-				00001000000000000000001D /* OptimizerEngine.swift */,
-				00001000000000000000001E /* SyncService.swift */,
-				00001000000000000000001F /* UnivISParser.swift */,
-				000011000000000000000020 /* EBWL_Uebungsblatt_01_Rechtsformen.pdf */,
-				000011000000000000000021 /* EWInf_Uebung_1.pdf */,
-				000011000000000000000022 /* EWInf_Uebung_2.pdf */,
-				000011000000000000000023 /* bl01.pdf */,
-				000011000000000000000024 /* bl02.pdf */,
-				000011000000000000000025 /* kap_01-1_rub.pdf */,
-				000011000000000000000026 /* kap_01-2_rub.pdf */,
-				000011000000000000000027 /* kap_01-3_rub.pdf */,
-				000011000000000000000028 /* pr01.pdf */,
+				00001000000000000000001D /* OpenOlatMaterialsCrawler.swift */,
+				00001000000000000000001E /* OptimizerEngine.swift */,
+				00001000000000000000001F /* ReminderService.swift */,
+				000010000000000000000020 /* SyncService.swift */,
+				000010000000000000000021 /* UnivISParser.swift */,
+				000011000000000000000022 /* EBWL_Uebungsblatt_01_Rechtsformen.pdf */,
+				000011000000000000000023 /* EWInf_Uebung_1.pdf */,
+				000011000000000000000024 /* EWInf_Uebung_2.pdf */,
+				000011000000000000000025 /* bl01.pdf */,
+				000011000000000000000026 /* bl02.pdf */,
+				000011000000000000000027 /* kap_01-1_rub.pdf */,
+				000011000000000000000028 /* kap_01-2_rub.pdf */,
+				000011000000000000000029 /* kap_01-3_rub.pdf */,
+				00001100000000000000002A /* pr01.pdf */,
 				0000100000000000000003E7 /* Assets.xcassets */,
 				0000100000000000000003E6 /* Info.plist */,
 			);
@@ -230,15 +236,15 @@
 			buildActionMask = 2147483647;
 			files = (
 				0000200000000000000003E7 /* Assets.xcassets in Resources */,
-				000021000000000000000020 /* EBWL_Uebungsblatt_01_Rechtsformen.pdf in Resources */,
-				000021000000000000000021 /* EWInf_Uebung_1.pdf in Resources */,
-				000021000000000000000022 /* EWInf_Uebung_2.pdf in Resources */,
-				000021000000000000000023 /* bl01.pdf in Resources */,
-				000021000000000000000024 /* bl02.pdf in Resources */,
-				000021000000000000000025 /* kap_01-1_rub.pdf in Resources */,
-				000021000000000000000026 /* kap_01-2_rub.pdf in Resources */,
-				000021000000000000000027 /* kap_01-3_rub.pdf in Resources */,
-				000021000000000000000028 /* pr01.pdf in Resources */,
+				000021000000000000000022 /* EBWL_Uebungsblatt_01_Rechtsformen.pdf in Resources */,
+				000021000000000000000023 /* EWInf_Uebung_1.pdf in Resources */,
+				000021000000000000000024 /* EWInf_Uebung_2.pdf in Resources */,
+				000021000000000000000025 /* bl01.pdf in Resources */,
+				000021000000000000000026 /* bl02.pdf in Resources */,
+				000021000000000000000027 /* kap_01-1_rub.pdf in Resources */,
+				000021000000000000000028 /* kap_01-2_rub.pdf in Resources */,
+				000021000000000000000029 /* kap_01-3_rub.pdf in Resources */,
+				00002100000000000000002A /* pr01.pdf in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -257,18 +263,18 @@
 				000020000000000000000006 /* ScheduleEvent.swift in Sources */,
 				000020000000000000000007 /* SniperJob.swift in Sources */,
 				000020000000000000000008 /* AeroTheme.swift in Sources */,
-				000020000000000000000009 /* SettingsLoginView.swift in Sources */,
-				00002000000000000000000A /* AddEventSheet.swift in Sources */,
-				00002000000000000000000B /* ScheduleEventCard.swift in Sources */,
-				00002000000000000000000C /* ScheduleView.swift in Sources */,
-				00002000000000000000000D /* MaterialsFinderView.swift in Sources */,
-				00002000000000000000000E /* CAUMailView.swift in Sources */,
-				00002000000000000000000F /* AeroBadge.swift in Sources */,
-				000020000000000000000010 /* CapacityPill.swift in Sources */,
-				000020000000000000000011 /* CourseDetailView.swift in Sources */,
-				000020000000000000000012 /* CoursesView.swift in Sources */,
-				000020000000000000000013 /* LiveAutomationSheet.swift in Sources */,
-				000020000000000000000014 /* SniperDashboardView.swift in Sources */,
+				000020000000000000000009 /* OptimizerPreferencesCard.swift in Sources */,
+				00002000000000000000000A /* SettingsLoginView.swift in Sources */,
+				00002000000000000000000B /* AddEventSheet.swift in Sources */,
+				00002000000000000000000C /* ScheduleEventCard.swift in Sources */,
+				00002000000000000000000D /* ScheduleView.swift in Sources */,
+				00002000000000000000000E /* MaterialsFinderView.swift in Sources */,
+				00002000000000000000000F /* CAUMailView.swift in Sources */,
+				000020000000000000000010 /* AeroBadge.swift in Sources */,
+				000020000000000000000011 /* CapacityPill.swift in Sources */,
+				000020000000000000000012 /* CourseDetailView.swift in Sources */,
+				000020000000000000000013 /* CoursesView.swift in Sources */,
+				000020000000000000000014 /* LiveAutomationSheet.swift in Sources */,
 				000020000000000000000015 /* LiveDeepSyncSheet.swift in Sources */,
 				000020000000000000000016 /* UnivISImportView.swift in Sources */,
 				000020000000000000000017 /* AppState.swift in Sources */,
@@ -277,9 +283,11 @@
 				00002000000000000000001A /* CourseMaterialsService.swift in Sources */,
 				00002000000000000000001B /* KeychainHelper.swift in Sources */,
 				00002000000000000000001C /* LMSMobileEngine.swift in Sources */,
-				00002000000000000000001D /* OptimizerEngine.swift in Sources */,
-				00002000000000000000001E /* SyncService.swift in Sources */,
-				00002000000000000000001F /* UnivISParser.swift in Sources */,
+				00002000000000000000001D /* OpenOlatMaterialsCrawler.swift in Sources */,
+				00002000000000000000001E /* OptimizerEngine.swift in Sources */,
+				00002000000000000000001F /* ReminderService.swift in Sources */,
+				000020000000000000000020 /* SyncService.swift in Sources */,
+				000020000000000000000021 /* UnivISParser.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

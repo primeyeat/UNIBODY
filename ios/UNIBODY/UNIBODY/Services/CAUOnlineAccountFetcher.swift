@@ -55,7 +55,7 @@ public class CAUOnlineAccountFetcher: ObservableObject {
         
         // 2. Also kick off background sync of EWInf Übung 1..20 PDFs (#module-29808)
         Task {
-            await CourseMaterialsService.shared.syncEWInfExercisesFromMoodle(username: trimmedUser, password: password)
+            await CourseMaterialsService.shared.syncAllMoodleCourses(username: trimmedUser, password: password)
         }
         
         // 3. Fetch all Moodle ChoiceGroup pages in parallel

@@ -82,6 +82,7 @@ public struct ScheduleEventCard: View {
                             .font(.subheadline)
                             .foregroundColor(.secondary.opacity(0.75))
                     }
+                    .accessibilityLabel("Termin löschen")
                     .buttonStyle(.plain)
                 }
             }
@@ -289,7 +290,7 @@ private struct EventPreviewCard: View {
             
             Text(event.title)
                 .font(.system(.headline, design: .rounded).weight(.bold))
-                .foregroundColor(.white)
+                .foregroundColor(.primary)
                 .fixedSize(horizontal: false, vertical: true)
             
             Divider()
@@ -298,7 +299,7 @@ private struct EventPreviewCard: View {
             HStack(spacing: 16) {
                 Label("\(event.startTime) – \(event.endTime)", systemImage: "clock.fill")
                     .font(.subheadline.weight(.medium))
-                    .foregroundColor(.white.opacity(0.9))
+                    .foregroundColor(.primary.opacity(0.9))
                 
                 if !event.room.isEmpty {
                     Label(event.room, systemImage: "mappin.circle.fill")

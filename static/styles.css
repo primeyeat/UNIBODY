@@ -7781,3 +7781,158 @@ body.dark-mode .finder-subfolder-header {
   }
 }
 
+
+/* Combined plan across all courses */
+.combined-plan-block { margin-top: 14px; }
+.combined-plan-list { display: flex; flex-direction: column; gap: 10px; margin-top: 10px; }
+.combined-plan-card {
+  border: 1px solid var(--aero-outer-ring);
+  border-radius: var(--radius-md);
+  background: var(--aero-glass-bg);
+  padding: 10px 12px;
+  color: var(--aero-ink);
+}
+.combined-plan-card.best { border-color: var(--aero-green); }
+.combined-plan-head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 6px; }
+.combined-plan-total { font-variant-numeric: tabular-nums; font-weight: 700; color: var(--aero-green-dark); }
+.combined-plan-card ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+.combined-plan-card li { display: grid; grid-template-columns: 110px 1fr auto; gap: 8px; font-size: 0.85rem; align-items: baseline; }
+.combined-plan-time { font-variant-numeric: tabular-nums; color: var(--aero-ink-muted); }
+.combined-plan-course { min-width: 0; overflow-wrap: anywhere; }
+.combined-plan-score { font-variant-numeric: tabular-nums; font-weight: 600; }
+.combined-plan-tag {
+  display: inline-block; margin-left: 4px; padding: 0 6px; border-radius: 999px;
+  font-size: 0.72rem; border: 1px solid var(--aero-outer-ring); color: var(--aero-ink-muted);
+}
+.combined-plan-tag.warn { border-color: var(--aero-amber); color: var(--aero-amber); }
+.combined-plan-unplaced { margin-top: 6px; font-size: 0.8rem; color: var(--aero-red); }
+
+/* Reminders card */
+.reminder-toggle-row { display: flex; gap: 10px; align-items: flex-start; color: var(--aero-ink); cursor: pointer; }
+.reminder-toggle-row input { margin-top: 4px; }
+.reminder-toggle-row small { color: var(--aero-ink-muted); }
+
+/* Preferences: defaults button and zero-weights hint */
+.prefs-header-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+.zero-weights-hint {
+  margin: 0 0 12px;
+  padding: 8px 12px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--aero-amber);
+  background: rgba(245, 158, 11, 0.12);
+  color: var(--aero-ink);
+  font-size: 0.85rem;
+}
+
+/* Ranking cards: page scrolls instead of a nested box; score, spots and actions sit in their own row */
+.ranked-groups-list { max-height: none; overflow-y: visible; padding-right: 0; }
+.group-card { flex-direction: column; align-items: stretch; gap: 8px; }
+.group-left, .group-info { min-width: 0; }
+.group-info { flex: 1; }
+.group-info h4 { overflow-wrap: anywhere; }
+.group-right {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+  min-width: 0;
+  text-align: left;
+  padding-left: 56px;
+}
+.group-right .score-circle { white-space: nowrap; }
+.group-right .spots-tag { margin-top: 0; }
+.group-right > div[style], .group-right > button[style] { margin-top: 0 !important; }
+.group-right .spots-pill { white-space: nowrap; }
+
+/* Timetable blocks: short course label first, descriptive name below, both clipped cleanly */
+.tt-ev-title { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tt-ev-sub {
+  position: relative;
+  z-index: 2;
+  font-size: 0.66rem;
+  font-weight: 600;
+  line-height: 1.2;
+  opacity: 0.95;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.tt-ev-time { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* Timetable stays in view while the left column scrolls (wide, tall windows only) */
+@media (min-width: 1201px) and (min-height: 720px) {
+  .workspace > .right-panel {
+    position: sticky;
+    top: 84px;
+    align-self: start;
+    max-height: calc(100vh - 100px);
+    overflow-y: auto;
+    scrollbar-width: thin;
+  }
+}
+
+/* Toast messages */
+.toast-region {
+  position: fixed;
+  right: 18px;
+  bottom: 18px;
+  z-index: 5000;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-width: min(420px, calc(100vw - 32px));
+  pointer-events: none;
+}
+.toast {
+  pointer-events: auto;
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--aero-outer-ring);
+  border-left: 4px solid var(--aero-blue);
+  background: var(--aero-glass-elevated);
+  color: var(--aero-ink);
+  font-size: 0.88rem;
+  line-height: 1.4;
+  box-shadow: 0 8px 24px rgba(0, 40, 80, 0.22);
+}
+.toast-warn { border-left-color: var(--aero-amber); }
+.toast-error { border-left-color: var(--aero-red); }
+.toast span { flex: 1; overflow-wrap: anywhere; }
+.toast-close {
+  border: none;
+  background: transparent;
+  color: var(--aero-ink-muted);
+  font-size: 1.1rem;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0 2px;
+}
+
+/* Materials sync progress */
+.materials-sync-status { font-size: 0.82rem; color: var(--aero-ink-muted); align-self: center; }
+.materials-sync-status.busy::before {
+  content: "";
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  margin-right: 6px;
+  border-radius: 50%;
+  border: 2px solid var(--aero-blue);
+  border-top-color: transparent;
+  vertical-align: -1px;
+  animation: materials-sync-spin 0.9s linear infinite;
+}
+@keyframes materials-sync-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) {
+  .materials-sync-status.busy::before { animation: none; }
+}
+
+/* Visible keyboard focus everywhere */
+:where(button, a, input, select, textarea, summary, [tabindex]):focus-visible {
+  outline: 2px solid var(--aero-blue) !important;
+  outline-offset: 2px;
+}

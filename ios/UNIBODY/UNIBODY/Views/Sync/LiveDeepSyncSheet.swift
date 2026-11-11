@@ -84,11 +84,11 @@ public struct LiveDeepSyncSheet: View {
                             VStack(alignment: .leading, spacing: 2) {
                                 Text("UNIBODY Deep-Sync")
                                     .font(.system(.headline, design: .rounded).weight(.bold))
-                                    .foregroundColor(.white)
+                                    .foregroundColor(.primary)
                                 
                                 Text("Liest gebuchte Übungen live aus den echten Kursen aus")
                                     .font(.caption2)
-                                    .foregroundColor(.white.opacity(0.75))
+                                    .foregroundColor(.primary.opacity(0.75))
                             }
                             
                             Spacer()
@@ -109,7 +109,7 @@ public struct LiveDeepSyncSheet: View {
                                 .font(.caption)
                             Text(currentStatus)
                                 .font(.system(.subheadline, design: .rounded).weight(.medium))
-                                .foregroundColor(.white)
+                                .foregroundColor(.primary)
                                 .lineLimit(2)
                             Spacer()
                         }
@@ -151,7 +151,7 @@ public struct LiveDeepSyncSheet: View {
                                 Spacer()
                                 Text("\(detectedGroups.count) verifiziert")
                                     .font(.caption2)
-                                    .foregroundColor(.white.opacity(0.7))
+                                    .foregroundColor(.primary.opacity(0.7))
                             }
                             .padding(.horizontal, 16)
                             .padding(.top, 10)
@@ -163,7 +163,7 @@ public struct LiveDeepSyncSheet: View {
                                             HStack {
                                                 Text(dg.courseId)
                                                     .font(.caption.weight(.bold))
-                                                    .foregroundColor(.white)
+                                                    .foregroundColor(.primary)
                                                 Spacer()
                                                 if dg.weekType != "all" {
                                                     AeroBadge("Woche \(dg.weekType)", color: AeroTheme.solarOrange)
@@ -172,7 +172,7 @@ public struct LiveDeepSyncSheet: View {
                                             }
                                             Text(dg.groupName)
                                                 .font(.caption2)
-                                                .foregroundColor(.white.opacity(0.85))
+                                                .foregroundColor(.primary.opacity(0.85))
                                                 .lineLimit(1)
                                             Text("🗓️ \(dg.dayName), \(dg.time) · \(dg.room)")
                                                 .font(.system(size: 10, weight: .medium))
@@ -386,7 +386,7 @@ private struct LiveDeepSyncWebView: UIViewRepresentable {
             
             // Sync EWInf #module-29808 exercise PDFs in background
             Task { @MainActor in
-                await CourseMaterialsService.shared.syncEWInfExercisesFromMoodle(
+                await CourseMaterialsService.shared.syncAllMoodleCourses(
                     username: effectiveUser,
                     password: effectivePass
                 )

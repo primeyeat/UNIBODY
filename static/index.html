@@ -32,7 +32,7 @@
 
     <div class="session-controls">
       <button id="btnToggleDarkMode" class="btn btn-outline" title="Zwischen Frutiger Aero Daylight und Deep Ocean Aurora Dark Mode wechseln">
-        🌙 Dark Mode
+        Dark Mode
       </button>
     </div>
   </header>
@@ -56,11 +56,11 @@
 
         <div class="future-cal-actions">
           <div class="view-segmented-control">
-            <button type="button" id="btnViewWeek" class="seg-btn active">🗓️ Wochenansicht</button>
-            <button type="button" id="btnViewAgenda" class="seg-btn">📋 8-Wochen Agenda</button>
+            <button type="button" id="btnViewWeek" class="seg-btn active">Wochenansicht</button>
+            <button type="button" id="btnViewAgenda" class="seg-btn">8-Wochen Agenda</button>
           </div>
           <button type="button" id="btnJumpToTimetable" class="btn btn-outline btn-xs">
-            🗓️ Zum Stundenplan &amp; Kursen
+            Zum Stundenplan &amp; Kursen
           </button>
         </div>
       </div>
@@ -91,7 +91,7 @@
   <main class="workspace" id="pageTimetable">
     <div class="workspace-subnav-bar">
       <button type="button" id="btnSwitchToFutureCal" class="btn btn-outline btn-xs">
-        📅 Zum 8-Wochen Zukunftskalender wechseln →
+        Zum 8-Wochen Zukunftskalender wechseln →
       </button>
     </div>
     <!-- LEFT COLUMN: COURSE ID SNIPER + RANKED GROUPS -->
@@ -101,25 +101,25 @@
         <div class="card-header">
           <div>
             <span class="step-pill">SCHRITT 1</span>
-            <h2>Kurs-ID / UnivIS-Kennung / LMS-Code eingeben</h2>
+            <h2>Kurs auswählen</h2>
           </div>
           <button id="btnOpenCustomCourseModal" class="btn btn-xs btn-ghost">+ Eigenen LMS-Kurs anlegen</button>
         </div>
 
         <p class="helper-text">
-          Gib den <strong>Wirtschaftsinformatik-Modulcode</strong> (z.&nbsp;B. <code>infEWInf-01a</code>, <code>infEInf-02a</code>, <code>Inf-Math-A</code>, <code>BWL-EinfBWL</code>), die exakte <strong>UnivIS-Kennung (2026w)</strong> (z.&nbsp;B. <code>080038</code>, <code>080042</code>, <code>080058</code>, <code>080056</code>, <code>060107</code>, <code>030225</code>, <code>080103</code>) oder eine beliebige andere 6-stellige UnivIS-Nummer für den <strong>Live-XML-Abruf</strong> ein.
+          Modulcode (z.&nbsp;B. <code>Inf-Math-A</code>) oder sechsstellige UnivIS-Nummer eingeben, oder unten einen Kurs aus dem Katalog wählen.
         </p>
 
         <div class="search-bar">
           <input
             type="text"
             id="courseQueryInput"
-            placeholder="z. B. 080038, 080058, 060107, 030225, infEWInf-01a, infEInf-02a..."
+            placeholder="Modulcode oder UnivIS-Nummer"
             value="infEWInf-01a"
             autocomplete="off"
           />
           <button id="btnVerifyCourse" class="btn btn-primary">
-            🔍 Kurs verifizieren &amp; berechnen
+            Kurs verifizieren &amp; berechnen
           </button>
         </div>
 
@@ -135,11 +135,11 @@
         <div class="card-header">
           <div>
             <span class="step-pill">SCHRITT 2</span>
-            <h2>Berechnetes Übungsgruppen-Ranking &amp; Direkteinschreibung</h2>
+            <h2>Übungsgruppen-Ranking &amp; Einschreibung</h2>
           </div>
           <div class="mode-switch">
             <button type="button" id="btnSyncEnrolledGroups" class="btn btn-primary btn-sync-prominent" title="Öffnet in Chrome automatisch deine Gruppen-Übersicht auf lms.uni-kiel.de (OpenOlat) und elearn.informatik.uni-kiel.de (Moodle), liest alle bereits gebuchten Übungsgruppen samt Uhrzeit &amp; Raum aus und trägt sie in deinen Stundenplan ein!">
-              🔄 UNIBODY Deep-Sync (Gebuchte Übungen holen)
+              UNIBODY Deep-Sync (Gebuchte Übungen holen)
             </button>
           </div>
         </div>
@@ -151,13 +151,21 @@
         <div class="sniper-action-bar">
           <div class="sniper-buttons" style="width:100%;">
             <button id="btnExecuteNow" class="btn btn-accent" style="width:100%;font-size:1.05rem;padding:12px 20px;">
-              ⚡ Jetzt sofort einschreiben (Bestplatz sichern)
+              Jetzt sofort einschreiben (Bestplatz sichern)
             </button>
           </div>
         </div>
 
         <!-- Ranked Groups List -->
         <div id="rankedGroupsContainer" class="ranked-groups-list"></div>
+
+        <!-- Combined plan across all courses -->
+        <div class="combined-plan-block">
+          <button type="button" id="btnComputeCombinedPlan" class="btn btn-outline" style="width:100%;" title="Sucht für alle Kurse gleichzeitig die Kombination von Übungsgruppen, die zusammen den besten Wochenplan ergibt. Bereits gebuchte und angepinnte Gruppen bleiben fest.">
+            Beste Kombination für alle Kurse berechnen
+          </button>
+          <div id="combinedPlanContainer" class="combined-plan-list hidden"></div>
+        </div>
       </div>
     </section>
 
@@ -167,17 +175,17 @@
       <div class="card calendar-card" id="calendarCard">
         <div class="card-header">
           <div>
-            <h2>📅 UNIBODY Wochen-Stundenplan (Frutiger Aero Glass)</h2>
+            <h2>Wochenplan</h2>
             <p class="helper-text">
-              <strong>🟦 Klick auf blauen Vorlesungs-Block</strong> = Kurs in Schritt 1 auswählen · <strong>🟧 Klick auf gestrichelten Übungs-Block</strong> = Übung als Wunsch #1 in Schritt 3 priorisieren!
+              Klick auf eine Vorlesung wählt den Kurs in Schritt 1. Klick auf eine gestrichelte Übung setzt sie als Wunsch #1.
             </p>
           </div>
           <div class="calendar-actions">
             <button type="button" id="btnOpenTurnusManagerModal" class="btn btn-xs btn-outline" title="Turnus aller Vorlesungen (Woche A / B / Jede Woche) anpassen">
-              🔄 Turnus (A / B / Jede)
+              Turnus (A / B / Jede)
             </button>
             <button id="btnOpenIcsModal" class="btn btn-xs btn-outline">
-              🧹 UnivIS .ics Import &amp; Bereiniger
+              UnivIS .ics Import &amp; Bereiniger
             </button>
             <button id="btnOpenAddEventModal" class="btn btn-xs btn-primary">
               + Eigener Termin
@@ -210,7 +218,7 @@
           ← Zurück zum Stundenplan
         </button>
         <div class="settings-title-wrap">
-          <h2>⚙️ Einstellungen</h2>
+          <h2>Einstellungen</h2>
           <span class="settings-subtitle">Inoffizielles Studierenden-Tool · Design-Themen, Uni-Login, Optimierungs-Präferenzen &amp; Telemetrie</span>
         </div>
       </div>
@@ -220,9 +228,9 @@
         <div class="card-header">
           <div>
             <span class="step-pill">DESIGN</span>
-            <h2>🎨 Erscheinungsbild &amp; Theme-Stile</h2>
+            <h2>Erscheinungsbild</h2>
           </div>
-          <span class="live-recalc-tag" id="currentThemeBadge">🫧 Frutiger Aero</span>
+          <span class="live-recalc-tag" id="currentThemeBadge">Frutiger Aero</span>
         </div>
         <div class="vault-form-body">
           <p class="helper-text">
@@ -232,17 +240,17 @@
             <div class="form-group" style="flex:2;">
               <label for="selectThemeStyle">Design auswählen:</label>
               <select id="selectThemeStyle" class="form-select" style="font-size:0.92rem;font-weight:700;padding:10px 14px;">
-                <option value="aero">🫧 Frutiger Aero (Klassik Aqua Glass)</option>
-                <option value="matte">🪨 Matte Minimal (Flat &amp; Puristisch)</option>
-                <option value="cupertino">🍏 Cupertino Minimal (Modern Apple macOS/iOS)</option>
-                <option value="botanical">🌿 Botanischer Garten (Emerald &amp; Nature)</option>
-                <option value="vaporwave">🌴 Vaporwave Sunset (Synthwave &amp; Neon Dreams)</option>
+                <option value="aero">Frutiger Aero (Klassik Aqua Glass)</option>
+                <option value="matte">Matte Minimal (Flat &amp; Puristisch)</option>
+                <option value="cupertino">Cupertino Minimal (Modern Apple macOS/iOS)</option>
+                <option value="botanical">Botanischer Garten (Emerald &amp; Nature)</option>
+                <option value="vaporwave">Vaporwave Sunset (Synthwave &amp; Neon Dreams)</option>
               </select>
             </div>
             <div class="form-group" style="flex:1;">
               <label>Modus:</label>
               <button type="button" id="btnToggleDarkModeInSettings" class="btn btn-outline" style="width:100%;padding:10px 14px;justify-content:center;">
-                🌙 Dark Mode
+                Dark Mode
               </button>
             </div>
           </div>
@@ -253,13 +261,13 @@
       <div class="card account-vault-card" id="accountVaultCard">
         <div class="card-header">
           <div>
-            <span class="step-pill" id="vaultStatusPill">🫧 UNIBODY TRESOR</span>
-            <h2>🔐 Uni-Login &amp; UNIBODY Auto-Login (Inoffizielles Tool für OpenOlat &amp; Moodle)</h2>
+            <span class="step-pill" id="vaultStatusPill">UNIBODY TRESOR</span>
+            <h2>Uni-Login</h2>
           </div>
           <div style="display:flex;gap:6px;align-items:center;">
             <span id="vaultSavedBadge" class="vault-badge unsaved">Noch kein Account gespeichert</span>
             <button type="button" id="btnCollapseVault" class="btn btn-xs btn-ghost" title="Formular ein-/ausklappen">
-              🔽 Einklappen
+              Einklappen
             </button>
           </div>
         </div>
@@ -291,7 +299,7 @@
                   autocomplete="current-password"
                 />
                 <button type="button" id="btnTogglePwVisibility" class="btn btn-xs btn-ghost" title="Passwort anzeigen/verbergen">
-                  👁️
+                  
                 </button>
               </div>
             </div>
@@ -299,7 +307,7 @@
             <div class="form-group">
               <label for="credPlatform">UNIBODY Plattform-Modus</label>
               <select id="credPlatform">
-                <option value="unibody">🫧 UNIBODY Auto-Router (Beide Seiten automatisch!)</option>
+                <option value="unibody">UNIBODY Auto-Router (Beide Seiten automatisch!)</option>
                 <option value="https://lms.uni-kiel.de">Nur 1. Seite: OpenOlat (lms.uni-kiel.de)</option>
                 <option value="https://elearn.informatik.uni-kiel.de">Nur 2. Seite: Info-Moodle (elearn.informatik.uni-kiel.de)</option>
               </select>
@@ -309,27 +317,27 @@
           <div class="vault-toggles-row">
             <label class="checkbox-inline">
               <input type="checkbox" id="credAutoFill" checked />
-              <span>✨ Auf beiden Plattformen automatisch ausfüllen (Auto-Fill)</span>
+              <span>Auf beiden Plattformen automatisch ausfüllen (Auto-Fill)</span>
             </label>
             <label class="checkbox-inline">
               <input type="checkbox" id="credAutoSubmit" checked />
-              <span>⚡ Automatisch auf „Anmelden“ klicken (1-Klick Auto-Login)</span>
+              <span>Automatisch auf „Anmelden“ klicken (1-Klick Auto-Login)</span>
             </label>
             <label class="checkbox-inline">
               <input type="checkbox" id="credUseKeychain" checked />
-              <span>🍏 Im macOS Schlüsselbund sichern</span>
+              <span>Im macOS Schlüsselbund sichern</span>
             </label>
           </div>
 
           <div class="vault-actions-row">
             <button type="submit" id="btnSaveCreds" class="btn btn-primary">
-              💾 UNIBODY Login-Daten speichern
+              UNIBODY Login-Daten speichern
             </button>
             <button type="button" id="btnSaveAndAutoLogin" class="btn btn-accent">
-              🚀 Speichern &amp; beide Plattformen im Browser einloggen
+              Speichern &amp; beide Plattformen im Browser einloggen
             </button>
             <button type="button" id="btnClearCreds" class="btn btn-xs btn-ghost" style="margin-left:auto;">
-              🗑️ Gespeicherte Daten löschen
+              Gespeicherte Daten löschen
             </button>
           </div>
         </form>
@@ -340,15 +348,21 @@
         <div class="card-header">
           <div>
             <span class="step-pill">OPTIMIERUNG</span>
-            <h2>🎛️ Optimierungs-Gewichtung &amp; Stundenplan-Präferenzen</h2>
+            <h2>Optimizer-Gewichtung</h2>
           </div>
-          <span class="live-recalc-tag">⚡ Live-Berechnung aktiv</span>
+          <div class="prefs-header-actions">
+            <span class="live-recalc-tag">Live-Berechnung aktiv</span>
+            <button type="button" id="btnResetPreferences" class="btn btn-xs btn-outline" title="Gewichtungen, Wunschzeiten und Wunsch-Frei auf die Standardwerte zurücksetzen">Standardwerte</button>
+          </div>
+        </div>
+        <div id="zeroWeightsHint" class="zero-weights-hint hidden" role="status">
+          Alle Gewichtungen stehen auf 0 %. Damit bewertet der Optimizer jede konfliktfreie Gruppe gleich, das Ranking sagt dann nichts aus.
         </div>
 
         <div class="sliders-grid">
           <div class="slider-item">
             <div class="slider-label">
-              <span>🧲 Kompakte Tage (Minimale Freistunden)</span>
+              <span>Kompakte Tage (Minimale Freistunden)</span>
               <strong id="valCompact">85%</strong>
             </div>
             <input type="range" id="sliderCompact" min="0" max="100" value="85" />
@@ -356,7 +370,7 @@
 
           <div class="slider-item">
             <div class="slider-label">
-              <span>🏖️ Freie Tage komplett freihalten</span>
+              <span>Freie Tage komplett freihalten</span>
               <strong id="valFreeDays">80%</strong>
             </div>
             <input type="range" id="sliderFreeDays" min="0" max="100" value="80" />
@@ -364,7 +378,7 @@
 
           <div class="slider-item">
             <div class="slider-label">
-              <span>⏰ Wunsch-Zeitfenster einhalten</span>
+              <span>Wunsch-Zeitfenster einhalten</span>
               <strong id="valTimeWindow">70%</strong>
             </div>
             <input type="range" id="sliderTimeWindow" min="0" max="100" value="70" />
@@ -372,7 +386,7 @@
 
           <div class="slider-item">
             <div class="slider-label">
-              <span>🏃 Campus-Raumwechsel-Puffer (&ge; 15m c.t.)</span>
+              <span>Campus-Raumwechsel-Puffer (&ge; 15m c.t.)</span>
               <strong id="valCampus">50%</strong>
             </div>
             <input type="range" id="sliderCampus" min="0" max="100" value="50" />
@@ -401,11 +415,27 @@
         </div>
       </div>
 
+      <!-- 2b. REMINDERS CARD -->
+      <div class="card" id="settingsRemindersCard">
+        <div class="card-header">
+          <div>
+            <h2>Erinnerungen</h2>
+          </div>
+        </div>
+        <label class="reminder-toggle-row" for="chkRemindersEnabled">
+          <input type="checkbox" id="chkRemindersEnabled" checked />
+          <span>
+            <strong>Mitteilungen auf diesem Mac anzeigen</strong><br />
+            <small>24 und 2 Stunden vor jeder offenen Abgabefrist sowie 15 Minuten vor und beim Start einer Einschreibung. Funktioniert, solange der UNIBODY-Server läuft.</small>
+          </span>
+        </label>
+      </div>
+
       <!-- 3. TELEMETRIE & ROUTING-PROTOKOLL CARD -->
       <div class="card terminal-card" id="settingsTelemetryCard">
         <div class="card-header">
           <div>
-            <h2>🛡️ UNIBODY Telemetrie &amp; Routing-Protokoll</h2>
+            <h2>Protokoll</h2>
           </div>
           <span id="jobStatusBadge" class="status-pill idle">Bereit</span>
         </div>
@@ -432,7 +462,7 @@
           <div class="mail-header-title-wrap">
             <div class="mail-title-row">
               <span class="step-pill">WEBMAIL</span>
-              <h2>✉️ E-Mail</h2>
+              <h2>E-Mail</h2>
               <span class="live-recalc-tag" id="mailConnectionStatusBadge">🟢 Verbunden</span>
             </div>
             <span class="mail-subtitle" id="mailAccountSubtitle">
@@ -443,10 +473,10 @@
 
         <div class="mail-nav-actions">
           <button type="button" id="btnMailRefresh" class="btn btn-outline" title="Postfach jetzt synchronisieren">
-            🔄 Aktualisieren
+            Aktualisieren
           </button>
           <a href="https://webmail.mail.uni-kiel.de/roundcube/" target="_blank" rel="noopener noreferrer" class="btn btn-primary" id="btnOpenRoundcubeExternal" title="Im Original CAU Roundcube Webmail öffnen">
-            🌐 In Roundcube öffnen ↗
+            In Roundcube öffnen ↗
           </a>
         </div>
       </div>
@@ -459,20 +489,20 @@
             <!-- Folders / Mailbox Selector Bar -->
             <div class="mail-folders-bar" id="mailFolderBar">
               <button type="button" class="mail-folder-pill active" data-folder="INBOX">
-                <span class="folder-icon">📬</span>
+                <span class="folder-icon"></span>
                 <span class="folder-name">Posteingang</span>
                 <span class="folder-badge" id="badgeInboxCount">--</span>
               </button>
               <button type="button" class="mail-folder-pill" data-folder="Sent">
-                <span class="folder-icon">📤</span>
+                <span class="folder-icon"></span>
                 <span class="folder-name">Gesendet</span>
               </button>
               <button type="button" class="mail-folder-pill" data-folder="Drafts">
-                <span class="folder-icon">📝</span>
+                <span class="folder-icon"></span>
                 <span class="folder-name">Entwürfe</span>
               </button>
               <button type="button" class="mail-folder-pill" data-folder="Trash">
-                <span class="folder-icon">🗑️</span>
+                <span class="folder-icon"></span>
                 <span class="folder-name">Papierkorb</span>
               </button>
               <button type="button" class="mail-folder-pill" data-folder="Spam">
@@ -508,7 +538,7 @@
                 <span class="status-icon">🔐</span>
                 <h4>CAU-Zugangsdaten erforderlich</h4>
                 <p>Hinterlege deine stu-Kennung und dein Passwort in den Einstellungen, um deine Uni-Mails direkt abzurufen.</p>
-                <button type="button" id="btnGoToSettingsFromMail" class="btn btn-primary btn-xs">Zu den Einstellungen ⚙️</button>
+                <button type="button" id="btnGoToSettingsFromMail" class="btn btn-primary btn-xs">Zu den Einstellungen </button>
               </div>
 
               <!-- Empty state -->
@@ -546,10 +576,10 @@
                   <h3 id="mailDetailSubject">(Kein Betreff)</h3>
                   <div class="mail-detail-actions">
                     <button type="button" id="btnToggleReadStatus" class="btn btn-xs btn-outline" title="Gelesen/Ungelesen markieren">
-                      ✉️ Als ungelesen markieren
+                      Als ungelesen markieren
                     </button>
                     <a href="https://webmail.mail.uni-kiel.de/roundcube/" target="_blank" rel="noopener noreferrer" class="btn btn-xs btn-outline" title="Im CAU Roundcube Webmail öffnen">
-                      🌐 Roundcube ↗
+                      Roundcube ↗
                     </a>
                   </div>
                 </div>
@@ -611,8 +641,8 @@
           <div class="materials-header-title-wrap">
             <div class="materials-title-row">
               <span class="step-pill beta-pill">BETA</span>
-              <h2>📁 Aufgaben &amp; Materialien</h2>
-              <span class="live-recalc-tag" id="materialsPlatformSyncBadge">🏛️ OpenOLAT + 💻 Moodle synchronisiert</span>
+              <h2>Aufgaben &amp; Materialien</h2>
+              <span class="live-recalc-tag" id="materialsPlatformSyncBadge">OpenOLAT + Moodle synchronisiert</span>
             </div>
             <span class="materials-subtitle">
               Native Mac-Ordnerstruktur für alle Fächer, Hausaufgaben, Abgabefristen und Vorlesungsfolien · (Beta: In kontinuierlicher Entwicklung)
@@ -622,13 +652,14 @@
 
         <div class="materials-nav-actions">
           <button type="button" id="btnMaterialsRefresh" class="btn btn-outline" title="Materialien jetzt synchronisieren">
-            🔄 Aktualisieren
+            Aktualisieren
           </button>
+          <span id="materialsSyncStatus" class="materials-sync-status hidden" role="status" aria-live="polite"></span>
           <a href="https://elearn.informatik.uni-kiel.de/my/" target="_blank" rel="noopener noreferrer" class="btn btn-outline" id="btnOpenMoodleExternal">
-            💻 Moodle ↗
+            Moodle ↗
           </a>
           <a href="https://lms.uni-kiel.de/" target="_blank" rel="noopener noreferrer" class="btn btn-primary" id="btnOpenOlatExternal">
-            🏛️ OpenOLAT ↗
+            OpenOLAT ↗
           </a>
         </div>
       </div>
@@ -667,7 +698,7 @@
                 ⊞
               </button>
               <button type="button" class="finder-view-btn" id="btnViewList" title="Listenansicht">
-                ☰
+                
               </button>
             </div>
           </div>
@@ -677,9 +708,9 @@
         <div class="finder-quick-tags-bar" id="finderQuickTagsBar">
           <div class="quick-tags-list">
             <button type="button" class="finder-tag-pill active" data-tag="all">Alle Fächer</button>
-            <button type="button" class="finder-tag-pill" data-tag="deadlines">🔥 Ausstehende Hausaufgaben</button>
-            <button type="button" class="finder-tag-pill" data-tag="moodle">💻 Moodle Kurse</button>
-            <button type="button" class="finder-tag-pill" data-tag="openolat">🏛️ OpenOLAT Kurse</button>
+            <button type="button" class="finder-tag-pill" data-tag="deadlines">Ausstehende Hausaufgaben</button>
+            <button type="button" class="finder-tag-pill" data-tag="moodle">Moodle Kurse</button>
+            <button type="button" class="finder-tag-pill" data-tag="openolat">OpenOLAT Kurse</button>
           </div>
           <span class="finder-status-summary" id="finderStatusSummary">5 Ordner</span>
         </div>
@@ -703,7 +734,7 @@
   <div id="modalAddEvent" class="modal-backdrop hidden">
     <div class="modal">
       <div class="modal-header">
-        <h3>+ Festen Termin zum Stundenplan hinzufügen</h3>
+        <h3>Termin hinzufügen</h3>
         <button class="btn-close" data-close="modalAddEvent">&times;</button>
       </div>
       <form id="formAddEvent" class="modal-body">
@@ -739,9 +770,9 @@
           <div class="form-group">
             <label>Turnus / Rhythmus</label>
             <select id="evWeekType">
-              <option value="all">🔄 Jede Woche (Wöchentlich)</option>
-              <option value="A">🅰️ Woche A (14-tägig · ungerade KW)</option>
-              <option value="B">🅱️ Woche B (14-tägig · gerade KW)</option>
+              <option value="all">Jede Woche (Wöchentlich)</option>
+              <option value="A">Woche A (14-tägig · ungerade KW)</option>
+              <option value="B">Woche B (14-tägig · gerade KW)</option>
             </select>
           </div>
         </div>
@@ -757,7 +788,7 @@
   <div id="modalIcsImport" class="modal-backdrop hidden">
     <div class="modal modal-large">
       <div class="modal-header">
-        <h3>🧹 UnivIS .ics Smart-Import &amp; Geistertermin-Filter</h3>
+        <h3>UnivIS-Kalender importieren</h3>
         <button class="btn-close" data-close="modalIcsImport">&times;</button>
       </div>
       <div class="modal-body">
@@ -769,7 +800,7 @@
         <div class="ics-upload-bar">
           <input type="file" id="icsFileInput" accept=".ics,text/calendar" />
           <button type="button" id="btnLoadDemoIcs" class="btn btn-xs btn-outline">
-            📄 Typischen CAU UnivIS-Export (mit Geister-Übungen) als Demo laden
+            Typischen CAU UnivIS-Export (mit Geister-Übungen) als Demo laden
           </button>
         </div>
 
@@ -791,7 +822,7 @@
   <div id="modalCustomCourse" class="modal-backdrop hidden">
     <div class="modal modal-large">
       <div class="modal-header">
-        <h3>+ Eigenen CAU LMS-Kurs mit exakter ID hinterlegen</h3>
+        <h3>Eigenen Kurs anlegen</h3>
         <button class="btn-close" data-close="modalCustomCourse">&times;</button>
       </div>
       <form id="formCustomCourse" class="modal-body">
@@ -884,7 +915,7 @@
       <div class="modal-footer">
         <button type="button" class="btn btn-ghost" data-close="modalEnrollmentSuccess">Schließen</button>
         <button type="button" class="btn btn-primary" id="btnNotifShowSchedule" data-close="modalEnrollmentSuccess">
-          📅 Im Wochenplan ansehen
+          Im Wochenplan ansehen
         </button>
       </div>
     </div>
@@ -940,7 +971,7 @@
       <div class="modal-footer">
         <button type="button" class="btn btn-ghost" data-close="modalUnenrollmentSuccess">Schließen</button>
         <button type="button" class="btn btn-primary" id="btnNotifUnenrollSchedule" data-close="modalUnenrollmentSuccess">
-          📅 Wochenplan ansehen
+          Wochenplan ansehen
         </button>
       </div>
     </div>
@@ -991,8 +1022,8 @@
       </div>
       <div class="modal-footer">
         <button type="button" class="btn btn-ghost" data-close="modalEnrollmentLocked">Schließen</button>
-        <button type="button" class="btn btn-secondary" id="btnLockedArmCountdown" data-close="modalEnrollmentLocked">
-          ⏱️ Zur Kurs-Auswahl
+        <button type="button" class="btn btn-secondary" id="btnLockedToCourses" data-close="modalEnrollmentLocked">
+          Zur Kurs-Auswahl
         </button>
       </div>
     </div>
@@ -1064,7 +1095,7 @@
             <span id="evDetailBuilding" class="detail-sub">Christian-Albrechts-Universität zu Kiel</span>
           </div>
           <a id="btnEvDetailAppleMaps" class="btn btn-xs btn-outline" style="margin-left:auto; text-decoration:none;" target="_blank" rel="noopener noreferrer">
-            🗺️ In Apple Maps öffnen
+            In Apple Maps öffnen
           </a>
         </div>
         <div class="event-detail-row">
@@ -1074,7 +1105,7 @@
             <span id="evDetailWeekType" class="detail-sub">Jede Woche</span>
           </div>
           <button type="button" id="btnEvDetailChangeTurnus" class="btn btn-xs btn-outline" style="margin-left:auto;">
-            ✏️ Turnus ändern
+            Turnus ändern
           </button>
         </div>
         <div class="event-detail-row" id="evDetailCourseWrap">
@@ -1087,7 +1118,7 @@
       </div>
       <div class="modal-footer" style="display:flex; justify-content:space-between; align-items:center;">
         <button type="button" id="btnEvDetailDelete" class="btn btn-outline" style="color: #ef4444; border-color: rgba(239, 68, 68, 0.35);">
-          🗑️ Termin löschen...
+          Termin löschen...
         </button>
         <button type="button" class="btn btn-primary" data-close="modalEventDetail">Fertig</button>
       </div>
@@ -1100,7 +1131,7 @@
       <div class="modal-header">
         <div class="modal-title-wrap">
           <span class="aero-badge week-badge-a">Vorlesungs-Rhythmus</span>
-          <h3>🔄 Turnus der Vorlesungen &amp; Termine festlegen</h3>
+          <h3>Turnus festlegen</h3>
         </div>
         <button class="btn-close" data-close="modalTurnusManager">&times;</button>
       </div>
@@ -1130,7 +1161,7 @@
         <p class="turnus-select-sub" id="turnusSelectSub">Wähle den Rhythmus dieser Vorlesung:</p>
         <div class="turnus-options">
           <button type="button" class="turnus-opt-btn" data-turnus="all" id="turnusOptAll">
-            <div class="opt-icon">🔄</div>
+            <div class="opt-icon"></div>
             <div class="opt-info">
               <strong>Jede Woche</strong>
               <span>Findet wöchentlich in jeder Woche statt (Standard)</span>
@@ -1138,7 +1169,7 @@
             <span class="opt-check">✓</span>
           </button>
           <button type="button" class="turnus-opt-btn" data-turnus="A" id="turnusOptA">
-            <div class="opt-icon">🅰️</div>
+            <div class="opt-icon"></div>
             <div class="opt-info">
               <strong>Woche A (14-tägig)</strong>
               <span>Nur ungerade Kalenderwochen (KW 43, 45, 47, 49...)</span>
@@ -1146,7 +1177,7 @@
             <span class="opt-check">✓</span>
           </button>
           <button type="button" class="turnus-opt-btn" data-turnus="B" id="turnusOptB">
-            <div class="opt-icon">🅱️</div>
+            <div class="opt-icon"></div>
             <div class="opt-info">
               <strong>Woche B (14-tägig)</strong>
               <span>Nur gerade Kalenderwochen (KW 44, 46, 48, 50...)</span>
@@ -1194,7 +1225,7 @@
       <div class="confirm-delete-footer">
         <button type="button" class="btn btn-outline" data-close="modalConfirmDelete">Abbrechen</button>
         <button type="button" class="btn btn-primary btn-confirm-delete-danger" id="btnExecuteDeleteEvent">
-          🗑️ Ja, Termin löschen
+          Ja, Termin löschen
         </button>
       </div>
     </div>
@@ -1221,26 +1252,26 @@
         <div class="drawer-section-title">Navigation</div>
         <nav class="drawer-nav">
           <button type="button" class="drawer-item" id="drawerBtnTimetable">
-            <span class="drawer-icon">🗓️</span>
+            <span class="drawer-icon"></span>
             <span>Stundenplan &amp; Kurse</span>
           </button>
           <button type="button" class="drawer-item" id="drawerBtnCalendar">
-            <span class="drawer-icon">📅</span>
+            <span class="drawer-icon"></span>
             <span>Kalender (8-Wochen-Vorschau)</span>
           </button>
           <button type="button" class="drawer-item" id="drawerBtnMaterials">
-            <span class="drawer-icon">📁</span>
+            <span class="drawer-icon"></span>
             <span>Aufgaben &amp; Materialien</span>
             <span class="feature-beta-tag">BETA</span>
             <span class="drawer-badge" id="drawerMaterialsBadge" style="display: none;">0</span>
           </button>
           <button type="button" class="drawer-item" id="drawerBtnMail">
-            <span class="drawer-icon">✉️</span>
+            <span class="drawer-icon"></span>
             <span>E-Mail</span>
             <span class="drawer-badge" id="drawerMailBadge" style="display: none;">0</span>
           </button>
           <button type="button" class="drawer-item" id="drawerBtnSettings">
-            <span class="drawer-icon">⚙️</span>
+            <span class="drawer-icon"></span>
             <span>Einstellungen</span>
           </button>
         </nav>
@@ -1253,5 +1284,7 @@
   </aside>
 
   <script src="/app.js?v=33"></script>
+  <!-- Toast messages -->
+  <div id="toastRegion" class="toast-region" aria-live="polite"></div>
 </body>
 </html>

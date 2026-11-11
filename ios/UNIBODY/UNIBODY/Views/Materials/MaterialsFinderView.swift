@@ -76,7 +76,7 @@ public struct MaterialsFinderView: View {
                         .padding()
                     }
                     .refreshable {
-                        await materialsService.syncEWInfExercisesFromMoodle(
+                        await materialsService.syncAllCourses(
                             username: appState.username,
                             password: appState.password
                         )
@@ -124,7 +124,7 @@ public struct MaterialsFinderView: View {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button {
                         Task {
-                            await materialsService.syncEWInfExercisesFromMoodle(
+                            await materialsService.syncAllCourses(
                                 username: appState.username,
                                 password: appState.password
                             )
@@ -138,6 +138,7 @@ public struct MaterialsFinderView: View {
                                 .foregroundColor(AeroTheme.skyBlue)
                         }
                     }
+                    .accessibilityLabel("Materialien abgleichen")
                 }
             }
             .sheet(item: $activePDFItem) { item in
@@ -145,7 +146,7 @@ public struct MaterialsFinderView: View {
             }
             .task {
                 if !appState.username.isEmpty && !appState.password.isEmpty {
-                    await materialsService.syncEWInfExercisesFromMoodle(
+                    await materialsService.syncAllMoodleCourses(
                         username: appState.username,
                         password: appState.password
                     )
@@ -205,7 +206,7 @@ public struct MaterialsFinderView: View {
                                         .lineLimit(1)
                                 }
                                 .font(.caption)
-                                .foregroundColor(selectedSubfolder == nil ? .white : .secondary)
+                                .foregroundColor(selectedSubfolder == nil ? .primary : .secondary)
                             }
                             .buttonStyle(.plain)
 
@@ -216,7 +217,7 @@ public struct MaterialsFinderView: View {
 
                                 Text(sub == .homework ? course.homeworkFolderTitle : course.slidesFolderTitle)
                                     .font(.caption.weight(.bold))
-                                    .foregroundColor(.white)
+                                    .foregroundColor(.primary)
                                     .lineLimit(1)
                             }
                         }
@@ -233,7 +234,7 @@ public struct MaterialsFinderView: View {
                     .foregroundColor(.secondary)
                 TextField("Aufgaben, bl01.pdf, Übung 1 oder Folien suchen...", text: $searchQuery)
                     .font(.caption)
-                    .foregroundColor(.white)
+                    .foregroundColor(.primary)
                     .autocorrectionDisabled()
                 if !searchQuery.isEmpty {
                     Button {
@@ -243,6 +244,7 @@ public struct MaterialsFinderView: View {
                             .font(.caption)
                             .foregroundColor(.secondary)
                     }
+                    .accessibilityLabel("Suche leeren")
                     .buttonStyle(.plain)
                 }
             }
@@ -289,7 +291,7 @@ public struct MaterialsFinderView: View {
                         .foregroundColor(AeroTheme.emerald)
                     Text(syncMsg)
                         .font(.caption2.weight(.semibold))
-                        .foregroundColor(.white.opacity(0.9))
+                        .foregroundColor(.primary.opacity(0.9))
                     Spacer()
                 }
                 .padding(.horizontal, 12)
@@ -342,7 +344,7 @@ public struct MaterialsFinderView: View {
 
                 Text(course.title)
                     .font(.system(.headline, design: .rounded).weight(.bold))
-                    .foregroundColor(.white)
+                    .foregroundColor(.primary)
 
                 Text(course.lecturer)
                     .font(.caption)
@@ -384,7 +386,7 @@ public struct MaterialsFinderView: View {
                     VStack(alignment: .leading, spacing: 4) {
                         Text(course.homeworkFolderTitle)
                             .font(.system(.subheadline, design: .rounded).weight(.bold))
-                            .foregroundColor(.white)
+                            .foregroundColor(.primary)
 
                         HStack(spacing: 8) {
                             Text("\(course.homework.count) \(course.homework.count == 1 ? "Aufgabenblatt" : "Aufgabenblätter")")
@@ -436,7 +438,7 @@ public struct MaterialsFinderView: View {
                     VStack(alignment: .leading, spacing: 4) {
                         Text(course.slidesFolderTitle)
                             .font(.system(.subheadline, design: .rounded).weight(.bold))
-                            .foregroundColor(.white)
+                            .foregroundColor(.primary)
 
                         Text("\(course.lectureSlides.count) Foliensätze · Keynote-Ansicht & Direkt-PDF")
                             .font(.caption)
@@ -679,7 +681,7 @@ private struct FinderStatCard: View {
                 Spacer()
                 Text(value)
                     .font(.system(.title3, design: .rounded).weight(.heavy))
-                    .foregroundColor(.white)
+                    .foregroundColor(.primary)
             }
             Text(label)
                 .font(.system(size: 10, weight: .semibold, design: .rounded))
@@ -719,7 +721,7 @@ private struct FinderCourseFolderRow: View {
                 HStack(spacing: 6) {
                     Text(course.shortTitle)
                         .font(.system(.subheadline, design: .rounded).weight(.bold))
-                        .foregroundColor(.white)
+                        .foregroundColor(.primary)
                         .lineLimit(1)
                     Spacer()
                     if course.pendingCount > 0 {
@@ -801,7 +803,7 @@ private struct HomeworkFinderCard: View {
             if !homework.description.isEmpty {
                 Text(homework.description)
                     .font(.caption)
-                    .foregroundColor(.white.opacity(0.85))
+                    .foregroundColor(.primary.opacity(0.85))
             }
 
             if !homework.subtasks.isEmpty {
@@ -829,7 +831,7 @@ private struct HomeworkFinderCard: View {
                                     .foregroundColor(homework.completed ? AeroTheme.emerald : AeroTheme.skyBlue)
                                 Text(task)
                                     .font(.caption2)
-                                    .foregroundColor(.white.opacity(0.9))
+                                    .foregroundColor(.primary.opacity(0.9))
                             }
                         }
                     }
@@ -875,7 +877,7 @@ private struct HomeworkFinderCard: View {
                         .padding(.horizontal, 12)
                         .padding(.vertical, 8)
                         .background(Capsule().fill(Color.white.opacity(0.1)))
-                        .foregroundColor(.white)
+                        .foregroundColor(.primary)
                     }
                 }
             }
@@ -925,7 +927,7 @@ private struct KeynoteSlideCard: View {
                 VStack(alignment: .leading, spacing: 5) {
                     Text(slide.title)
                         .font(.system(.subheadline, design: .rounded).weight(.bold))
-                        .foregroundColor(.white)
+                        .foregroundColor(.primary)
                         .fixedSize(horizontal: false, vertical: true)
 
                     HStack(spacing: 8) {
@@ -984,7 +986,7 @@ private struct KeynoteSlideCard: View {
                             .font(.caption.weight(.bold))
                             .padding(8)
                             .background(Circle().fill(Color.white.opacity(0.1)))
-                            .foregroundColor(.white)
+                            .foregroundColor(.primary)
                     }
                 }
             }

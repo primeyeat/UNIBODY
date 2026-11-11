@@ -18,8 +18,10 @@ from optimizer import (
     parse_ics_content,
     parse_german_timeslot,
     rank_course_groups,
+    optimize_group_combination,
     DAY_NAMES_DE,
 )
+from reminders import ReminderWorker
 from lms_bot import (
     BUILTIN_CAU_COURSES,
     CAUBrowserSessionManager,
@@ -158,6 +160,7 @@ DEFAULT_PREFERENCES = {
     "latest_time": "16:30",        # Nicht nach 16:30 wenn vermeidbar
     "preferred_free_days": [0],    # Montag Vormittag / freie Randtage bevorzugen
     "min_break_minutes": 15,       # 15 Min c.t. Pause
+    "reminders_enabled": True,     # macOS-Mitteilungen für Abgabefristen & Einschreibungsstart
 }
 
 SAMPLE_UNIVIS_ICS = """BEGIN:VCALENDAR
@@ -605,7 +608,16 @@ class CAUBotRequestHandler(SimpleHTTPRequestHandler):
             qs = parse_qs(parsed.query)
             sync_live = qs.get("sync", ["0"])[0] in ("1", "true", "yes")
             res = get_materials_overview(sync_live=sync_live)
+            if sync_live:
+                # OpenOlat courses are crawled through the Chrome session in the background;
+                # progress shows up in the log and new files appear on the next refresh.
+                threading.Thread(target=session_mgr.sync_openolat_materials_via_cdp, daemon=True).start()
+                res["openolat_sync_started"] = True
             self._send_json(res)
+            return
+
+        if path == "/api/materials/sync-status":
+            self._send_json({"ok": True, **session_mgr.materials_sync_status})
             return
 
         if path == "/api/materials/course":
@@ -797,6 +809,21 @@ class CAUBotRequestHandler(SimpleHTTPRequestHandler):
                 APP_STATE["preferences"].update(body.get("preferences", {}))
                 save_state(APP_STATE)
             self._send_json({"ok": True, "preferences": APP_STATE["preferences"]})
+            return
+
+        if path == "/api/optimizer/plan":
+            # Joint optimization: one exercise group per course, scored as a whole week
+            with STATE_LOCK:
+                all_courses = {**BUILTIN_CAU_COURSES, **APP_STATE["custom_courses"]}
+                courses = [enrich_course_with_unibody(c) for c in all_courses.values()]
+                result = optimize_group_combination(
+                    courses,
+                    APP_STATE["schedule"],
+                    APP_STATE["preferences"],
+                    pinned_groups=APP_STATE.get("pinned_groups", {}),
+                    enrolled_groups=APP_STATE.get("enrolled_groups", {}),
+                )
+            self._send_json({"ok": True, **result})
             return
 
         if path == "/api/course/lookup":
@@ -1259,7 +1286,7 @@ class CAUBotRequestHandler(SimpleHTTPRequestHandler):
                 "semester": "WiSe 2026/27",
                 "platform": c.get("platform") or "OpenOlat (lms.uni-kiel.de)",
                 "enrollment_mode": c.get("enrollment_mode") or "sniper",
-                "enrollment_opens_at": c.get("enrollment_opens_at") or "Sofort / Countdown",
+                "enrollment_opens_at": c.get("enrollment_opens_at") or "Sofort",
                 "url": c.get("url") or f"https://lms.uni-kiel.de/auth/RepositoryEntry/{olat_repo_id or '0'}",
                 "verified_tokens": tokens,
                 "groups": parsed_groups,
@@ -1362,8 +1389,6 @@ class CAUBotRequestHandler(SimpleHTTPRequestHandler):
             course_id = body.get("course_id", "")
             mode = body.get("mode", "sniper")
             simulate_full = bool(body.get("simulate_first_choice_full", False))
-            trigger_type = body.get("trigger_type", "immediate")  # 'immediate' or 'countdown'
-            countdown_seconds = int(body.get("countdown_seconds", 0))
 
             with STATE_LOCK:
                 res = lookup_course_by_identifier(course_id, APP_STATE["custom_courses"], session_mgr)
@@ -1402,7 +1427,6 @@ class CAUBotRequestHandler(SimpleHTTPRequestHandler):
                     "course_url": course.get("url", "https://lms.uni-kiel.de"),
                     "course_title": course["title"],
                     "mode": mode,
-                    "trigger_type": trigger_type,
                     "status": "starting",
                     "created_at": datetime.now().strftime("%H:%M:%S"),
                     "priorities": valid_priorities[:3],
@@ -1411,10 +1435,10 @@ class CAUBotRequestHandler(SimpleHTTPRequestHandler):
                 APP_STATE["jobs"].insert(0, job_entry)
                 save_state(APP_STATE)
 
-            def _delayed_runner():
+            def _job_runner():
                 execute_enrollment_job(job_id, simulate_first_choice_full=simulate_full)
 
-            t = threading.Thread(target=_delayed_runner, daemon=True)
+            t = threading.Thread(target=_job_runner, daemon=True)
             t.start()
 
             self._send_json({"ok": True, "job": job_entry})
@@ -1423,7 +1447,29 @@ class CAUBotRequestHandler(SimpleHTTPRequestHandler):
         self._send_json({"ok": False, "error": f"Unknown endpoint {path}"}, status=404)
 
 
+def _reminder_snapshot() -> Dict[str, Any]:
+    """Current data for the reminder thread (deadlines, enrollment openings, on/off switch)."""
+    from cau_materials import load_materials_data
+    with STATE_LOCK:
+        all_courses = {**BUILTIN_CAU_COURSES, **APP_STATE["custom_courses"]}
+        courses = list(all_courses.values())
+        enrolled = dict(APP_STATE.get("enrolled_groups", {}))
+        enabled = bool(APP_STATE["preferences"].get("reminders_enabled", True))
+    return {
+        "enabled": enabled,
+        "materials": load_materials_data(sync_live=False) if enabled else {},
+        "courses": courses,
+        "enrolled_groups": enrolled,
+    }
+
+
 def run_server(port: int = 8765):
+    ReminderWorker(
+        sent_file=os.path.join(DATA_DIR, "reminders_sent.json"),
+        snapshot=_reminder_snapshot,
+        log=session_mgr.add_log,
+    ).start()
+
     # Bind exclusively to 127.0.0.1 (localhost) for maximum privacy and security.
     # Prevents any other device on the same local network / WiFi from accessing UNIBODY.
     server = ThreadingHTTPServer(("127.0.0.1", port), CAUBotRequestHandler)

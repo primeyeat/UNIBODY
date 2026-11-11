@@ -35,14 +35,14 @@ public struct CoursesView: View {
                                     HStack {
                                         Text("UNIBODY Deep-Sync")
                                             .font(.system(.subheadline, design: .rounded).weight(.bold))
-                                            .foregroundColor(.white)
+                                            .foregroundColor(.primary)
                                         Spacer()
                                         AeroBadge("OpenOlat & Moodle", color: AeroTheme.emerald)
                                     }
                                     
                                     Text(appState.isDeepSyncing ? "Synchronisiere mit CAU-Portalen..." : "Gebuchte Gruppen live abfragen & im Stundenplan blockieren")
                                         .font(.caption2)
-                                        .foregroundColor(.white.opacity(0.8))
+                                        .foregroundColor(.primary.opacity(0.8))
                                         .lineLimit(1)
                                 }
                             }
@@ -59,7 +59,7 @@ public struct CoursesView: View {
                                     .foregroundColor(AeroTheme.emerald)
                                 Text(msg)
                                     .font(.caption2)
-                                    .foregroundColor(.white.opacity(0.9))
+                                    .foregroundColor(.primary.opacity(0.9))
                                     .lineLimit(1)
                                 Spacer()
                             }
@@ -97,6 +97,7 @@ public struct CoursesView: View {
                                 .foregroundColor(AeroTheme.skyBlue)
                         }
                     }
+                    .accessibilityLabel("Gebuchte Gruppen synchronisieren")
                 }
             }
         }

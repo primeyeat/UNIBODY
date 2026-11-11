@@ -85,6 +85,7 @@ public struct ScheduleView: View {
                                 .foregroundColor(AeroTheme.skyBlue)
                         }
                     }
+                    .accessibilityLabel("Gebuchte Gruppen synchronisieren")
                 }
                 ToolbarItem(placement: .navigationBarTrailing) {
                     HStack(spacing: 12) {
@@ -97,6 +98,7 @@ public struct ScheduleView: View {
                                 .font(.title3)
                                 .foregroundColor(AeroTheme.skyBlue)
                         }
+                        .accessibilityLabel(appState.isDarkMode ? "Zum hellen Modus wechseln" : "Zum dunklen Modus wechseln")
                         
                         Button {
                             showAddEventSheet = true
@@ -105,6 +107,7 @@ public struct ScheduleView: View {
                                 .font(.title3)
                                 .foregroundColor(AeroTheme.skyBlue)
                         }
+                        .accessibilityLabel("Termin hinzufügen")
                     }
                 }
             }
@@ -139,7 +142,7 @@ private struct DaySchedulePageView: View {
                 VStack(alignment: .leading, spacing: 2) {
                     Text(dayNames[day])
                         .font(.system(.title2, design: .rounded).weight(.bold))
-                        .foregroundColor(.white)
+                        .foregroundColor(.primary)
                     Text("\(eventsForDay.count) Termine eingetragen")
                         .font(.caption)
                         .foregroundColor(.secondary)
@@ -170,7 +173,7 @@ private struct DaySchedulePageView: View {
                         .foregroundColor(AeroTheme.skyBlue.opacity(0.6))
                     Text("Keine Termine am \(dayNames[day])")
                         .font(.headline)
-                        .foregroundColor(.white)
+                        .foregroundColor(.primary)
                     Text("Importiere deinen UnivIS-Plan oder wähle Übungsgruppen aus dem Katalog.")
                         .font(.caption)
                         .foregroundColor(.secondary)

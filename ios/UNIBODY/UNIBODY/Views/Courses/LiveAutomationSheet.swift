@@ -40,7 +40,7 @@ public struct LiveAutomationSheet: View {
                             VStack(alignment: .leading, spacing: 2) {
                                 Text(task.isEnroll ? "Auto-Pilot: Einschreibung" : "Auto-Pilot: Austragung")
                                     .font(.system(.headline, design: .rounded).weight(.bold))
-                                    .foregroundColor(.white)
+                                    .foregroundColor(.primary)
                                 
                                 Text(task.course.courseId + (task.group != nil ? " · \(task.group!.name)" : ""))
                                     .font(.caption)
@@ -63,7 +63,7 @@ public struct LiveAutomationSheet: View {
                         HStack(spacing: 8) {
                             Text(currentStatus)
                                 .font(.system(.subheadline, design: .rounded).weight(.medium))
-                                .foregroundColor(.white)
+                                .foregroundColor(.primary)
                                 .lineLimit(2)
                             Spacer()
                         }

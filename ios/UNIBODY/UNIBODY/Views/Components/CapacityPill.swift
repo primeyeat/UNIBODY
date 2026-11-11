@@ -48,5 +48,7 @@ public struct CapacityPill: View {
             Capsule()
                 .strokeBorder(color.opacity(0.3), lineWidth: 0.8)
         )
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(isFull ? "Ausgebucht" : "\(spotsFree) von \(spotsTotal) Plätzen frei")
     }
 }

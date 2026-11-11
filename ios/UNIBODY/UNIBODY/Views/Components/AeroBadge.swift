@@ -121,6 +121,7 @@ public struct ClaireEasterEggModalView: View {
                             .font(.title2)
                             .foregroundColor(colorScheme == .dark ? Color.white.opacity(0.7) : Color(red: 0.65, green: 0.25, blue: 0.38))
                     }
+                    .accessibilityLabel("Schließen")
                     .padding(.top, 16)
                     .padding(.trailing, 20)
                 }
