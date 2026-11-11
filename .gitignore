@@ -19,3 +19,11 @@ xcuserdata/
 CLAUDE.md
 *.local.md
 
+# Large media assets / recordings
+*.mp4
+*.mov
+Bildschirmaufnahme*
+Bildschirmfoto*
+UNIBODY.png
+
+
