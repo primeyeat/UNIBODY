@@ -10,6 +10,7 @@ Supports:
 """
 
 import os
+import sys
 import re
 import html
 import time
@@ -728,6 +729,7 @@ class CAUBrowserSessionManager:
         self.debug_port = 9222
         self.server_port = 8765
         self.chrome_process: Optional[subprocess.Popen] = None
+        self.browser_headless = False  # True while the running Chrome session has no window
         self.session_state = {
             "browser_running": False,
             "logged_in": False,
@@ -1536,6 +1538,7 @@ setTimeout(runUnibodyAutoFill, 2200);
         target_url: Optional[str] = None,
         force_auto_login: bool = False,
         fast_mode: bool = False,
+        headless: bool = False,
     ) -> Dict[str, Any]:
         """
         UNIBODY Browser Launcher:
@@ -1544,6 +1547,8 @@ setTimeout(runUnibodyAutoFill, 2200);
         so both CAU platforms are logged in with a single click!
         If a specific course URL is passed, routes directly to that course's platform.
         When `fast_mode=True`, returns as soon as the CDP socket is ready (~0.4s) without fixed sleeps.
+        When `headless=True`, Chrome runs without a window (background syncs). A visible session is
+        never replaced by a headless one; a leftover headless session is closed before a visible launch.
         """
         chrome_bin = self.find_chrome_binary()
         if not chrome_bin:
@@ -1565,6 +1570,10 @@ setTimeout(runUnibodyAutoFill, 2200);
             urls_to_open = [pref_plat]
 
         tabs = self._get_cdp_tabs()
+        if tabs is not None and self.browser_headless and not headless:
+            # The user needs a window now, but only an invisible background session is running.
+            self.close_browser()
+            tabs = None
         if tabs is not None:
             if fast_mode:
                 return {"ok": True, "status": self.session_state}
@@ -1607,8 +1616,20 @@ setTimeout(runUnibodyAutoFill, 2200);
             f"--load-extension={self.ext_dir}",
             "--no-first-run",
             "--no-default-browser-check",
+            *(["--headless=new", "--window-size=1440,900"] if headless else []),
             *urls_to_open,
         ]
+        # On macOS, start the browser through LaunchServices instead of as a child process.
+        # A child would count as "UNIBODY" for macOS privacy checks, so the browser's own
+        # self-update would show up as "UNIBODY wants to modify apps".
+        app_bundle = chrome_bin.split(".app/", 1)[0] + ".app" if ".app/" in chrome_bin else ""
+        if sys.platform == "darwin" and app_bundle and os.path.exists("/usr/bin/open"):
+            cmd = [
+                "/usr/bin/open", "-n",
+                *(["-g", "-j"] if headless else []),  # background sync: no focus change, no window
+                "-a", app_bundle,
+                "--args", *cmd[1:],
+            ]
         try:
             self.chrome_process = subprocess.Popen(
                 cmd,
@@ -1616,9 +1637,10 @@ setTimeout(runUnibodyAutoFill, 2200);
                 stderr=subprocess.DEVNULL,
                 start_new_session=True,
             )
+            self.browser_headless = headless
             self.add_log(
                 "SUCCESS",
-                f"🫧 UNIBODY Chrome-Session gestartet -> {' + '.join(urls_to_open)}"
+                f"🫧 UNIBODY Chrome-Session gestartet{' (im Hintergrund)' if headless else ''} -> {' + '.join(urls_to_open)}"
             )
             if fast_mode:
                 deadline = time.time() + 2.5
@@ -1678,6 +1700,7 @@ setTimeout(runUnibodyAutoFill, 2200);
                 except Exception:
                     pass
             self.chrome_process = None
+        self.browser_headless = False
 
         # 3. Terminate any residual Chrome process on debug_port
         try:
@@ -1826,6 +1849,7 @@ setTimeout(runUnibodyAutoFill, 2200);
             self.materials_sync_status = {"running": running, "message": message, "new_files": new_files, "error": error}
 
         progress("OpenOlat-Abgleich wird vorbereitet …")
+        launched_headless = False
         try:
             data = load_materials_data(sync_live=False)
             targets = openolat_course_targets(data)
@@ -1836,7 +1860,8 @@ setTimeout(runUnibodyAutoFill, 2200);
             creds = self.load_credentials(include_secret=True)
             if self._get_cdp_tabs() is None:
                 self.add_log("INFO", "📚 Materialien-Abgleich: Starte Chrome-Sitzung für OpenOlat...")
-                self.launch_login_browser(target_url=targets[0]["course_url"], force_auto_login=True, fast_mode=True)
+                self.launch_login_browser(target_url=targets[0]["course_url"], force_auto_login=True, fast_mode=True, headless=True)
+                launched_headless = True
             tabs = self._get_cdp_tabs() or []
             tab = next((t for t in tabs if "lms.uni-kiel.de" in (t.get("url") or "").lower()), None)
             if not tab:
@@ -1930,6 +1955,12 @@ setTimeout(runUnibodyAutoFill, 2200);
             self.add_log("ERROR", f"📚 Materialien-Abgleich fehlgeschlagen: {exc}")
             return {"ok": False, "error": str(exc)}
         finally:
+            if launched_headless:
+                # Never leave an invisible Chrome behind.
+                try:
+                    self.close_browser()
+                except Exception:
+                    pass
             self._materials_sync_lock.release()
 
     def scan_enrolled_groups_via_cdp(self, all_courses: Dict[str, Dict[str, Any]]) -> Dict[str, Any]:
@@ -2163,6 +2194,7 @@ setTimeout(runUnibodyAutoFill, 2200);
         # ---------------------------------------------------------------------
         # PART A: Fast Event-Driven OpenOlat Sync (`lms.uni-kiel.de`)
         # ---------------------------------------------------------------------
+        olat_ready = False
         tabs = self._get_cdp_tabs()
         if tabs is None:
             self.add_log("INFO", "⚡ UNIBODY Deep-Sync: Starte schnelle OpenOlat-Session & parallelen Moodle-Abgleich...")
@@ -2170,6 +2202,7 @@ setTimeout(runUnibodyAutoFill, 2200);
                 target_url="https://lms.uni-kiel.de/url/GroupsSite/0",
                 force_auto_login=True,
                 fast_mode=True,
+                headless=True,
             )
             tabs = self._get_cdp_tabs()
 
@@ -2191,44 +2224,64 @@ setTimeout(runUnibodyAutoFill, 2200);
             if "groupssite" not in cur_url:
                 self._cdp_send_command(ws_olat, "Page.navigate", {"url": "https://lms.uni-kiel.de/url/GroupsSite/0"})
 
-            # Fast 50ms poll until either GroupsSite table or login form is ready
-            ready_state = self._cdp_wait_for_js(
-                ws_olat,
-                """
-                (() => {
-                    if (document.querySelector('#o_fiooolat_login_name, input[name="o_fiooolat_login_name"], input[type="password"]')) return 'LOGIN_NEEDED';
-                    if (document.querySelector('a[href*="BusinessGroup/"]') || document.querySelector('table.o_table, .o_EmptyTable')) return 'GROUPS_READY';
-                    return null;
-                })()
-                """,
-                timeout=2.5,
-                poll_interval=0.05,
-            )
-
-            if ready_state == "LOGIN_NEEDED" and creds.get("username") and creds.get("password"):
-                for _ in range(2):
-                    self.inject_autofill_into_tabs(force_submit=True)
-                    st = self._cdp_wait_for_js(
-                        ws_olat,
-                        """
-                        (() => {
-                            if (document.querySelector('a[href*="BusinessGroup/"]') || document.querySelector('table.o_table, .o_EmptyTable')) return 'READY';
-                            if (document.querySelector('input[type="password"]')) return 'PASS_STEP';
-                            return null;
-                        })()
-                        """,
-                        timeout=2.5,
-                        poll_interval=0.06,
-                    )
-                    if st == "READY":
-                        break
-                # Ensure we are back on GroupsSite/0 after login redirect
-                self._cdp_send_command(ws_olat, "Page.navigate", {"url": "https://lms.uni-kiel.de/url/GroupsSite/0"})
-                self._cdp_wait_for_js(
+            # Wait until 'Meine Gruppen' is rendered, logging in first if needed.
+            # Polling returns as soon as the page is ready, so the generous deadline only
+            # matters on a cold start (fresh Chrome profile, slow SSO). A login that is
+            # still loading must never be interrupted by another navigation.
+            olat_state_js = """
+            (() => {
+                if (document.querySelector('a[href*="BusinessGroup/"]') || document.querySelector('table.o_table, .o_EmptyTable')) return 'GROUPS_READY';
+                if (document.readyState !== 'complete') return null;
+                if (document.querySelector('#o_fiooolat_login_name, input[name="o_fiooolat_login_name"], input[type="password"]')) return 'LOGIN_NEEDED|' + location.href;
+                if (location.hostname === 'lms.uni-kiel.de' && location.pathname.indexOf('/auth/') === 0) return 'AUTHED';
+                return null;
+            })()
+            """
+            has_creds = bool(creds.get("username") and creds.get("password"))
+            olat_deadline = time.time() + 35.0
+            last_inject_at = 0.0
+            last_inject_href = ""
+            inject_count = 0
+            groups_nav_at = 0.0
+            while time.time() < olat_deadline:
+                st = self._cdp_wait_for_js(
                     ws_olat,
-                    "document.querySelector('a[href*=\"BusinessGroup/\"]') || document.querySelector('table.o_table, .o_EmptyTable') ? 'READY' : null",
-                    timeout=2.5,
-                    poll_interval=0.06,
+                    olat_state_js,
+                    timeout=max(0.5, min(5.0, olat_deadline - time.time())),
+                    poll_interval=0.05,
+                )
+                now = time.time()
+                if st == "GROUPS_READY":
+                    olat_ready = True
+                    break
+                if isinstance(st, str) and st.startswith("LOGIN_NEEDED"):
+                    if not has_creds:
+                        break
+                    href = st.partition("|")[2]
+                    new_step = href != last_inject_href
+                    # One submit per login step; a single retry on the same page at most.
+                    if (new_step and inject_count < 4) or (not new_step and inject_count < 2 and now - last_inject_at >= 8.0):
+                        self.inject_autofill_into_tabs(force_submit=True)
+                        last_inject_at = now
+                        last_inject_href = href
+                        inject_count += 1
+                    elif not new_step and now - last_inject_at >= 12.0:
+                        break  # Login form keeps coming back: credentials rejected or extra step required.
+                    time.sleep(0.5)
+                elif st == "AUTHED":
+                    if not groups_nav_at:
+                        self._cdp_send_command(ws_olat, "Page.navigate", {"url": "https://lms.uni-kiel.de/url/GroupsSite/0"})
+                        groups_nav_at = now
+                    elif now - groups_nav_at >= 6.0:
+                        olat_ready = True  # Signed in, the groups page just has no table.
+                        break
+                    time.sleep(0.3)
+
+            if not olat_ready:
+                self.add_log(
+                    "WARN",
+                    "⚠️ UNIBODY Deep-Sync: OpenOlat-Anmeldung (lms.uni-kiel.de) wurde nicht abgeschlossen – "
+                    "OpenOlat-Übungen konnten nicht geprüft werden. Bitte Zugangsdaten prüfen und den Abgleich erneut starten.",
                 )
 
             extract_olat_groups_js = """
@@ -2347,6 +2400,8 @@ setTimeout(runUnibodyAutoFill, 2200);
             # Only visit RepositoryEntry tree if an OpenOlat course with exercise groups wasn't already resolved from GroupsSite
             detected_cids_low = {d["course_id"].lower() for d in detected}
             for ckey, raw_c in all_courses.items():
+                if not olat_ready:
+                    break  # Not signed in: course pages would only show the login form.
                 if not raw_c.get("groups") or raw_c.get("enrollment_mode") == "lecture_only":
                     continue
                 c = enrich_course_with_unibody(raw_c)

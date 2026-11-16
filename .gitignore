@@ -27,3 +27,7 @@ Bildschirmfoto*
 UNIBODY.png
 
 
+
+# Packaged macOS builds
+dist/
+*.dmg

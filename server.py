@@ -45,7 +45,8 @@ from cau_materials import (
 )
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-DATA_DIR = os.path.join(BASE_DIR, "data")
+# The packaged macOS app keeps user data outside its read-only bundle.
+DATA_DIR = os.environ.get("UNIBODY_DATA_DIR") or os.path.join(BASE_DIR, "data")
 STATIC_DIR = os.path.join(BASE_DIR, "static")
 CHROME_PROFILE_DIR = os.path.join(DATA_DIR, "chrome_cau_profile")
 STATE_FILE = os.path.join(DATA_DIR, "state.json")
